@@ -1,8 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1 import api_router
 from app.api.v1.websocket.community_gateway import community_websocket_handler
@@ -43,6 +44,22 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Yakalanmayan tüm exception'lar için CORS başlıklı 503 döner."""
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin in settings.allowed_origins:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    logger.error("Unhandled exception: %s %s — %s", request.method, request.url, exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Geçici hata, lütfen tekrar deneyin."},
+        headers=headers,
+    )
 
 
 @app.websocket("/ws/race/{session_id}")
