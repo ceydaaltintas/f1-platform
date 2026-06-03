@@ -2,7 +2,6 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
-RUN chmod +x node_modules/.bin/tsc node_modules/.bin/vite 2>/dev/null || true
 COPY . .
 RUN npm run build
 
