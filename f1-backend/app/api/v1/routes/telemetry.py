@@ -15,8 +15,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.redis_client import cache_get, cache_key, cache_set
-from app.models.f1 import Round, Session
-from app.services import openf1, jolpica
+from app.models.f1 import Round, Session, OpenF1CarDataCache, EnergyAnalysisCache
+from app.services import openf1, jolpica, db_cache
+from app.services import energy as energy_svc
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sessions", tags=["telemetry"])
@@ -422,7 +423,7 @@ async def get_tyre_degradation(
     session_key = await _require_session_key(session, db)
 
     drivers = await openf1.fetch_session_drivers(session_key)
-    stints  = await openf1.fetch_stints(session_key)
+    stints  = await db_cache.get_stints(session, db)
 
     # driver_number → stintler
     stints_by_dn: dict[int, list] = {}
@@ -435,22 +436,11 @@ async def get_tyre_degradation(
 
     sem = asyncio.Semaphore(6)
 
-    async def _fetch_laps_with_retry(sk: int, dn: int, retries: int = 2) -> list:
-        for attempt in range(retries + 1):
-            try:
-                result = await openf1.fetch_laps(sk, dn)
-                if result is not None:
-                    return result
-            except Exception:
-                if attempt < retries:
-                    await asyncio.sleep(0.5 * (attempt + 1))
-        return []
-
     async def _driver_data(d: dict) -> dict | None:
         dn   = d.get("driver_number")
         code = d.get("name_acronym", "???")
         async with sem:
-            laps = await _fetch_laps_with_retry(session_key, dn)
+            laps = await db_cache.get_laps(session, dn, db)
 
         if not laps:
             return None
@@ -581,10 +571,7 @@ async def get_teammate_pace(
         dn   = d.get("driver_number")
         code = d.get("name_acronym", "???")
         async with sem:
-            try:
-                laps = await openf1.fetch_laps(session_key, dn)
-            except Exception:
-                return None
+            laps = await db_cache.get_laps(session, dn, db)
 
         if not laps:
             return None
@@ -1156,3 +1143,109 @@ async def get_leaderboard(
     }
     await cache_set(cache_k, response, ttl_seconds=300)
     return response
+
+
+@router.post("/{session_id}/sync_cache")
+async def sync_session_cache(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Biten bir session'ın tüm OpenF1 verisini (laps + stints) DB'ye kalıcı olarak yazar.
+    İlk çağrıda yavaş olabilir (~30-60s), sonraki tüm istekler DB'den anında gelir.
+    """
+    session = await _resolve_session(session_id, db)
+    result  = await db_cache.sync_session(session, db)
+    return result
+
+
+@router.post("/sync_all_finished")
+async def sync_all_finished_sessions(
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Veritabanındaki tüm biten session'ların verisini DB cache'e çeker.
+    Topluca ön-yükleme için kullanılır.
+    """
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Session).where(Session.status == "finished")
+    )
+    sessions = result.scalars().all()
+
+    results = []
+    for s in sessions:
+        r = await db_cache.sync_session(s, db)
+        results.append({"session_id": s.id, **r})
+
+    return {"total": len(sessions), "results": results}
+
+
+# ─── 2026 Enerji Analizi ─────────────────────────────────────────────────────
+
+@router.get("/{session_id}/energy_analysis/{driver_code}")
+async def get_energy_analysis(
+    session_id:  int,
+    driver_code: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    2026 F1 sanal enerji yönetimi analizi.
+
+    Fizik modeli ile tahmini:
+    - SoC (State of Charge) eğrisi
+    - Deploy / Regen bölgeleri
+    - Tur bazında enerji bütçesi
+    - Pilot agresiflik & harvest verimliliği profili
+    - X-mode (aktif aero) tespit olasılığı
+
+    İlk çağrı ~15-30s (OpenF1 + hesaplama), sonraki çağrılar ~10ms (DB cache).
+    """
+    session     = await _resolve_session(session_id, db)
+    session_key = await _require_session_key(session, db)
+
+    # Pilot numarasını bul
+    driver_number = await openf1.get_driver_number(session_key, driver_code.upper())
+    if not driver_number:
+        raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
+
+    # ── DB cache kontrolü ───────────────────────────────────────
+    cached = await db.get(EnergyAnalysisCache, (session_key, driver_number))
+    if cached:
+        return {"session_id": session_id, "driver_code": driver_code,
+                "cached": True, **cached.result}
+
+    # ── Ham car data'yı DB'den veya OpenF1'den al ───────────────
+    car_row = await db.get(OpenF1CarDataCache, (session_key, driver_number))
+    if car_row:
+        car_data = car_row.data
+    else:
+        car_data = await openf1.fetch_car_data(session_key, driver_number)
+        if car_data and session.status == "finished":
+            db.add(OpenF1CarDataCache(
+                session_key=session_key,
+                driver_number=driver_number,
+                data=car_data,
+            ))
+            await db.flush()
+
+    if not car_data:
+        raise HTTPException(404, "Bu oturum için araba verisi bulunamadı.")
+
+    # Lap verisi (timestamp eşleştirme için)
+    laps = await db_cache.get_laps(session, driver_number, db)
+
+    # ── Fizik modeli hesapla ─────────────────────────────────────
+    result = energy_svc.compute_energy_analysis(car_data, laps, driver_number)
+
+    # ── Hesaplanan sonucu DB'ye kaydet ───────────────────────────
+    if session.status == "finished":
+        db.add(EnergyAnalysisCache(
+            session_key=session_key,
+            driver_number=driver_number,
+            result=result,
+        ))
+        await db.commit()
+
+    return {"session_id": session_id, "driver_code": driver_code,
+            "cached": False, **result}

@@ -194,3 +194,68 @@ class PitStop(Base):
 
     session: Mapped["Session"] = relationship(back_populates="pit_stops")
     driver: Mapped["Driver"] = relationship()
+
+
+# ─── Kalıcı API Cache Tabloları ──────────────────────────────────────────────
+# Biten session'ların OpenF1 verisi ve geçmiş sezon Jolpica verisi
+# Redis'in aksine restart'ta silinmez, TTL'siz kalıcıdır.
+
+from sqlalchemy.dialects.postgresql import JSONB  # noqa: E402
+
+
+class OpenF1LapsCache(Base):
+    """Bir pilotun bir session'daki tüm tur verileri (OpenF1 raw)."""
+    __tablename__ = "openf1_laps_cache"
+
+    session_key:    Mapped[int] = mapped_column(Integer, primary_key=True)
+    driver_number:  Mapped[int] = mapped_column(Integer, primary_key=True)
+    data:           Mapped[list] = mapped_column(JSONB, nullable=False)
+    synced_at:      Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class OpenF1StintsCache(Base):
+    """Bir session'ın tüm stint verileri (OpenF1 raw)."""
+    __tablename__ = "openf1_stints_cache"
+
+    session_key:    Mapped[int] = mapped_column(Integer, primary_key=True)
+    data:           Mapped[list] = mapped_column(JSONB, nullable=False)
+    synced_at:      Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class JolpicaSeasonCache(Base):
+    """Geçmiş sezon Jolpica yarış sonuçları (tüm sezon, tek kayıt)."""
+    __tablename__ = "jolpica_season_cache"
+
+    year:           Mapped[int] = mapped_column(Integer, primary_key=True)
+    results_data:   Mapped[list] = mapped_column(JSONB, nullable=False)
+    synced_at:      Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class OpenF1CarDataCache(Base):
+    """Ham araba telemetrisi (speed/throttle/brake/rpm/gear) kalıcı cache."""
+    __tablename__ = "openf1_car_data_cache"
+
+    session_key:    Mapped[int] = mapped_column(Integer, primary_key=True)
+    driver_number:  Mapped[int] = mapped_column(Integer, primary_key=True)
+    data:           Mapped[list] = mapped_column(JSONB, nullable=False)
+    synced_at:      Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class EnergyAnalysisCache(Base):
+    """Hesaplanmış 2026 enerji analizi (fizik modeli çıktısı)."""
+    __tablename__ = "energy_analysis_cache"
+
+    session_key:    Mapped[int] = mapped_column(Integer, primary_key=True)
+    driver_number:  Mapped[int] = mapped_column(Integer, primary_key=True)
+    result:         Mapped[dict] = mapped_column(JSONB, nullable=False)
+    computed_at:    Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

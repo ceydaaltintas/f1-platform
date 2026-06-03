@@ -54,8 +54,8 @@ export function TelemetryChart({
 
   return (
     <div className="card pt-4 pb-2 px-2">
-      <p className="text-[10px] mono font-semibold tracking-[0.2em] pl-3 mb-3"
-        style={{ color: 'var(--t3)' }}>
+      <p className="text-[12px] mono font-semibold tracking-[0.15em] pl-3 mb-3"
+        style={{ color: 'var(--t2)' }}>
         {ch.label.toUpperCase()} {ch.unit ? `(${ch.unit})` : ''} · Tıkla → AI yorum al
       </p>
 
@@ -97,17 +97,17 @@ export function TelemetryChart({
 
           <XAxis
             dataKey="dist_m"
-            tick={{ fill: 'rgba(240,244,255,0.25)', fontSize: 10, fontFamily: 'IBM Plex Mono,monospace' }}
+            tick={{ fill: 'rgba(240,244,255,0.55)', fontSize: 11, fontFamily: 'IBM Plex Mono,monospace' }}
             tickLine={false}
-            axisLine={{ stroke: 'rgba(255,255,255,0.06)' }}
+            axisLine={{ stroke: 'rgba(255,255,255,0.10)' }}
             tickFormatter={(v) => `${Math.round(v)}m`}
           />
           <YAxis
             domain={ch.domain}
-            tick={{ fill: 'rgba(240,244,255,0.25)', fontSize: 10, fontFamily: 'IBM Plex Mono,monospace' }}
+            tick={{ fill: 'rgba(240,244,255,0.55)', fontSize: 11, fontFamily: 'IBM Plex Mono,monospace' }}
             tickLine={false}
             axisLine={false}
-            width={38}
+            width={42}
           />
 
           <Tooltip
@@ -119,7 +119,7 @@ export function TelemetryChart({
               fontFamily: 'IBM Plex Mono,monospace',
               backdropFilter: 'blur(12px)',
             }}
-            labelStyle={{ color: 'rgba(240,244,255,0.4)', marginBottom: 6, fontSize: 11 }}
+            labelStyle={{ color: 'rgba(240,244,255,0.65)', marginBottom: 6, fontSize: 12 }}
             labelFormatter={(v) => `📍 ${Math.round(Number(v))} m`}
             formatter={(v: any, name: string) => [
               `${v} ${ch.unit}`,
@@ -153,11 +153,11 @@ export function TelemetryChart({
       </ResponsiveContainer>
 
       <div className="flex gap-5 pl-3 pb-1 mt-2">
-        <span className="text-[10px] mono" style={{ color:'rgba(255,135,0,0.4)' }}>
+        <span className="text-[11px] mono" style={{ color:'rgba(255,135,0,0.6)' }}>
           ▓ Fren bölgesi
         </span>
         {compareData && (
-          <span className="text-[10px] mono" style={{ color: compareColor + '70' }}>
+          <span className="text-[11px] mono" style={{ color: compareColor + '99' }}>
             ── Karşılaştırma
           </span>
         )}

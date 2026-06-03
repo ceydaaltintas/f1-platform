@@ -99,26 +99,16 @@ async def get_h2h_circuit(
     circuit_map: dict[str, dict] = {}
 
     async def process_year(year: int):
-        ck_yr    = cache_key("season_all_results", year)
-        ck_yr_no = cache_key("season_all_results_fail", year)  # negatif cache
-
-        # Negatif cache — son 10dk içinde başarısız olmuş yılı tekrar deneme
-        if await cache_get(ck_yr_no):
+        from app.core.database import AsyncSessionLocal
+        from app.services.db_cache import get_season_all_results as _get_results
+        try:
+            async with AsyncSessionLocal() as db_sess:
+                races = await _get_results(year, db_sess)
+        except Exception as exc:
+            logger.warning("H2H: %d sezonu sonuçları alınamadı: %s", year, exc)
             return
-
-        races = await cache_get(ck_yr)
         if not races:
-            try:
-                races = await jolpica.fetch_all_season_results(year)
-                if races:
-                    await cache_set(ck_yr, races, ttl_seconds=86_400)
-                else:
-                    await cache_set(ck_yr_no, 1, ttl_seconds=600)
-                    return
-            except Exception as exc:
-                logger.warning("H2H: %d sezonu sonuçları alınamadı: %s", year, exc)
-                await cache_set(ck_yr_no, 1, ttl_seconds=600)
-                return
+            return
 
         for race in races:
             name    = race.get("raceName", "")

@@ -17,6 +17,7 @@ import { CircuitGuide } from '../components/session/CircuitGuide'
 import { RaceReplay } from '../components/session/RaceReplay'
 import { TyreDegradation } from '../components/analysis/TyreDegradation'
 import { TeammatePace } from '../components/analysis/TeammatePace'
+import { EnergyAnalysis } from '../components/analysis/EnergyAnalysis'
 import { CHANNELS, COMPOUND_COLORS, SESSION_LABELS, type TelemetryPoint, type SessionType } from '../types/f1'
 
 // ── Topluluk paneli (yorum + anket sekmeli) ───────────────────────────────────
@@ -51,6 +52,59 @@ import { F1Loader } from '../components/ui/F1Loader'
 import { ErrorCard } from '../components/ui/ErrorCard'
 
 const LAP_OPTIONS = ['fastest','1','2','3','4','5','10','15','20','30','40','50']
+
+/** Telemetri grafiği altında tahmini batarya doluluk şeridi */
+function SocMiniStrip({ sessionId, driverCode }: { sessionId: number; driverCode: string }) {
+  const { data } = useQuery({
+    queryKey: ['energy', sessionId, driverCode],
+    queryFn:  () => client.get(`/sessions/${sessionId}/energy_analysis/${driverCode}`).then(r => r.data),
+    staleTime: Infinity,
+    retry: 0,
+  })
+
+  if (!data?.soc_curve?.length) return null
+
+  const curve: any[] = data.soc_curve
+  if (!curve.length) return null
+  const step = curve.length
+
+  return (
+    <div className="card px-4 py-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[11px] mono font-semibold" style={{ color: 'var(--t2)' }}>
+          ⚡ TAHMİNİ BATARYA DOLULUK
+        </p>
+        <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>
+          Fizik modeli · yaklaşık değer
+        </p>
+      </div>
+      {/* Bar grafik — index bazlı x ekseni */}
+      <div className="flex items-end gap-px rounded-lg overflow-hidden h-10"
+        style={{ background: 'rgba(255,255,255,0.04)' }}>
+        {curve.filter((_: any, i: number) => i % Math.max(1, Math.floor(step / 120)) === 0).map((pt: any, i: number, arr: any[]) => (
+          <div key={i} className="flex-1 rounded-t-sm transition-all"
+            style={{
+              height:     `${Math.max(4, pt.soc_pct)}%`,
+              background: pt.x_mode > 0.6 ? 'rgba(255,255,255,0.8)'
+                : pt.soc_pct < 20 ? '#E10600'
+                : pt.soc_pct < 50 ? '#FF8700'
+                : '#00D2BE',
+              opacity: 0.85,
+            }} />
+        ))}
+      </div>
+      <div className="flex justify-between mt-1.5 text-[10px] mono" style={{ color: 'var(--t3)' }}>
+        <div className="flex gap-3">
+          <span style={{ color: '#00D2BE' }}>■ Dolu</span>
+          <span style={{ color: '#FF8700' }}>■ Düşük</span>
+          <span style={{ color: '#E10600' }}>■ Kritik</span>
+          <span style={{ color: 'rgba(255,255,255,0.6)' }}>■ X-mode</span>
+        </div>
+        <span>Yarış boyunca →</span>
+      </div>
+    </div>
+  )
+}
 
 const SESSION_TABS = [
   { id: 'telemetry', label: 'Telemetri', emoji: '📈' },
@@ -455,7 +509,7 @@ export function SessionPage() {
               message="OpenF1'den veri alınamadı. Pilot kodu doğru mu?"
               onRetry={() => telA.refetch()}
             />
-          ) : telA.data ? (
+          ) : telA.data ? (<>
             <TelemetryChart
               data={telA.data.telemetry}
               activeChannel={activeChannel}
@@ -463,7 +517,9 @@ export function SessionPage() {
               onPointClick={handlePointClick}
               compareData={compareMode && telB.data ? telB.data.telemetry : undefined}
             />
-          ) : null}
+            {/* Kompakt SoC şeridi */}
+            <SocMiniStrip sessionId={sid} driverCode={primaryDriver} />
+          </>) : null}
 
           {/* Anlık değerler */}
           {sp ? (
@@ -540,6 +596,11 @@ export function SessionPage() {
               />
             )}
           </div>
+          {/* 2026 Enerji Analizi — sadece yarış / sprint */}
+          {sessionDrivers.length >= 2 && ['race','sprint'].includes(sessionInfo.data?.type ?? '') && (
+            <EnergyAnalysis sessionId={sid} sessionDrivers={sessionDrivers} primaryDriver={primaryDriver} />
+          )}
+
           {/* Takım Arkadaşı Pace */}
           <TeammatePace sessionId={sid} />
 

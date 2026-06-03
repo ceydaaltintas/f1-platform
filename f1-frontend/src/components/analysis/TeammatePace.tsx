@@ -54,60 +54,66 @@ function GapBar({ gap, maxGap, color }: { gap: number; maxGap: number; color: st
 function TeamRow({ t, maxGap }: { t: TeamData; maxGap: number }) {
   const color = teamColor(t.team)
   return (
-    <div className="px-5 py-4 border-b" style={{ borderColor:'var(--b1)' }}>
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-        <p className="text-[10px] font-semibold mono tracking-widest" style={{ color:'var(--t2)' }}>
+    <div className="px-5 py-5 border-b" style={{ borderColor:'var(--b1)' }}>
+      {/* Takım adı */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-3 h-3 rounded-full shrink-0" style={{ background: color }} />
+        <p className="text-[12px] font-bold mono tracking-widest" style={{ color:'var(--t2)' }}>
           {t.team.toUpperCase()}
         </p>
       </div>
-      <div className="flex items-center gap-3">
-        {/* Hızlı */}
-        <div className="shrink-0 text-right" style={{ width:44 }}>
-          <p className="text-[15px] font-black mono" style={{ color }}>{t.faster.code}</p>
-          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{formatLapTime(t.faster.median)}</p>
+
+      <div className="flex items-center gap-4">
+        {/* Hızlı pilot */}
+        <div className="shrink-0 text-right" style={{ width:56 }}>
+          <p className="text-[17px] font-black mono" style={{ color }}>{t.faster.code}</p>
+          <p className="text-[12px] font-semibold mono mt-0.5" style={{ color:'var(--t2)' }}>
+            {formatLapTime(t.faster.median)}
+          </p>
+          <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>{t.faster.laps} tur</p>
         </div>
-        {/* Bar */}
-        <div className="flex-1 space-y-1.5">
+
+        {/* Bar + fark */}
+        <div className="flex-1 space-y-2">
           <div className="flex justify-between items-center">
-            <p className="text-[10px] mono" style={{ color:'rgba(240,244,255,0.25)' }}>
+            <p className="text-[12px] font-semibold mono" style={{ color:'var(--t2)' }}>
               {t.faster.code} daha hızlı
             </p>
-            <p className="text-[14px] font-black mono" style={{ color }}>
+            <p className="text-[18px] font-black mono" style={{ color }}>
               {t.gap_ms >= 1
                 ? `${t.gap_ms.toFixed(3)}s`
                 : `${(t.gap_ms * 1000).toFixed(0)}ms`}
             </p>
           </div>
           <GapBar gap={t.gap_ms} maxGap={maxGap} color={color} />
-          <div className="flex justify-between">
-            <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t.faster.laps} tur</p>
-            <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t.slower.laps} tur</p>
-          </div>
         </div>
-        {/* Yavaş */}
-        <div className="shrink-0" style={{ width:44 }}>
-          <p className="text-[15px] font-black mono" style={{ color:'rgba(240,244,255,0.3)' }}>
+
+        {/* Yavaş pilot */}
+        <div className="shrink-0" style={{ width:56 }}>
+          <p className="text-[17px] font-black mono" style={{ color:'rgba(240,244,255,0.5)' }}>
             {t.slower.code}
           </p>
-          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{formatLapTime(t.slower.median)}</p>
+          <p className="text-[12px] font-semibold mono mt-0.5" style={{ color:'var(--t3)' }}>
+            {formatLapTime(t.slower.median)}
+          </p>
+          <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>{t.slower.laps} tur</p>
         </div>
       </div>
-      {/* En hızlı tur */}
-      <div className="flex justify-between mt-2.5 pt-2 border-t text-[9px] mono"
-        style={{ borderColor:'rgba(255,255,255,0.04)', color:'var(--t3)' }}>
-        <span>
+
+      {/* En hızlı tur satırı */}
+      <div className="flex justify-between mt-3 pt-3 border-t"
+        style={{ borderColor:'rgba(255,255,255,0.07)' }}>
+        <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
           En hızlı:{' '}
-          <span style={{ color:'#00D2BE' }}>{formatLapTime(t.faster.best)}</span>
-          <span className="mx-1" style={{ color:'rgba(255,255,255,0.12)' }}>vs</span>
-          <span style={{ color:'rgba(240,244,255,0.35)' }}>{formatLapTime(t.slower.best)}</span>
-        </span>
-        <span>
-          best Δ{' '}
-          <span style={{ color:'#00D2BE' }}>
+          <span className="font-bold" style={{ color:'#00D2BE' }}>{formatLapTime(t.faster.best)}</span>
+          <span className="mx-2" style={{ color:'var(--t3)' }}>vs</span>
+          <span className="font-semibold" style={{ color:'var(--t2)' }}>{formatLapTime(t.slower.best)}</span>
+        </p>
+        <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
+          Δ <span className="font-bold" style={{ color:'#00D2BE' }}>
             {(t.slower.best - t.faster.best).toFixed(3)}s
           </span>
-        </span>
+        </p>
       </div>
     </div>
   )
@@ -265,16 +271,16 @@ export function TeammatePace({ sessionId }: Props) {
                 <table style={{ width:'100%', borderCollapse:'collapse', fontFamily:'IBM Plex Mono,monospace' }}>
                   <thead>
                     <tr style={{ background:'rgba(255,255,255,0.03)' }}>
-                      <th style={{ padding:'8px 14px', textAlign:'left', fontSize:9,
-                        fontWeight:600, letterSpacing:'0.12em', color:'rgba(240,244,255,0.25)' }}>
+                      <th style={{ padding:'10px 14px', textAlign:'left', fontSize:11,
+                        fontWeight:600, letterSpacing:'0.08em', color:'var(--t2)' }}>
                         METRİK
                       </th>
-                      <th style={{ padding:'8px 14px', textAlign:'center', fontSize:11,
+                      <th style={{ padding:'10px 14px', textAlign:'center', fontSize:13,
                         fontWeight:900, color:'#E10600' }}>{customFaster.code}</th>
-                      <th style={{ padding:'8px 14px', textAlign:'center', fontSize:11,
+                      <th style={{ padding:'10px 14px', textAlign:'center', fontSize:13,
                         fontWeight:900, color:'#FF8700' }}>{customSlower.code}</th>
-                      <th style={{ padding:'8px 14px', textAlign:'right', fontSize:9,
-                        fontWeight:600, letterSpacing:'0.1em', color:'rgba(240,244,255,0.25)' }}>
+                      <th style={{ padding:'10px 14px', textAlign:'right', fontSize:11,
+                        fontWeight:600, color:'var(--t2)' }}>
                         FARK
                       </th>
                     </tr>
@@ -304,15 +310,15 @@ export function TeammatePace({ sessionId }: Props) {
                       },
                     ].map(row => (
                       <tr key={row.label} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding:'10px 14px', fontSize:11, color:'rgba(240,244,255,0.4)' }}>
+                        <td style={{ padding:'10px 14px', fontSize:13, color:'var(--t2)' }}>
                           {row.label}
                         </td>
                         <td style={{ padding:'10px 14px', textAlign:'center',
-                          fontSize:13, fontWeight:700, color:'white' }}>{row.a}</td>
+                          fontSize:14, fontWeight:700, color:'white' }}>{row.a}</td>
                         <td style={{ padding:'10px 14px', textAlign:'center',
-                          fontSize:13, fontWeight:700, color:'rgba(240,244,255,0.45)' }}>{row.b}</td>
+                          fontSize:14, fontWeight:700, color:'var(--t2)' }}>{row.b}</td>
                         <td style={{ padding:'10px 14px', textAlign:'right',
-                          fontSize:12, fontWeight:700, color: row.diffColor }}>{row.diff}</td>
+                          fontSize:13, fontWeight:700, color: row.diffColor }}>{row.diff}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -321,8 +327,8 @@ export function TeammatePace({ sessionId }: Props) {
 
               {/* Tüm pilotlara göre sıralama */}
               <div>
-                <p className="text-[10px] mono font-semibold tracking-widest mb-2"
-                  style={{ color:'var(--t3)' }}>
+                <p className="text-[12px] mono font-semibold tracking-widest mb-3"
+                  style={{ color:'var(--t2)' }}>
                   TÜM PILOTLARA GÖRE PACE SIRALAMASI
                 </p>
                 <div className="space-y-1">
@@ -339,21 +345,21 @@ export function TeammatePace({ sessionId }: Props) {
                           background: isA ? 'rgba(225,6,0,0.08)' : isB ? 'rgba(255,135,0,0.08)' : 'transparent',
                           border: isA ? '1px solid rgba(225,6,0,0.2)' : isB ? '1px solid rgba(255,135,0,0.2)' : '1px solid transparent',
                         }}>
-                        <span className="text-[11px] mono w-5 shrink-0"
-                          style={{ color: i===0?'#FFD700':i===1?'#C0C0C0':i===2?'#CD7F32':'rgba(240,244,255,0.25)' }}>
+                        <span className="text-[12px] mono w-5 shrink-0 font-bold"
+                          style={{ color: i===0?'#FFD700':i===1?'#C0C0C0':i===2?'#CD7F32':'var(--t3)' }}>
                           {i+1}
                         </span>
-                        <span className="text-[13px] font-black mono w-10 shrink-0"
-                          style={{ color: isA?'#E10600': isB?'#FF8700':'rgba(240,244,255,0.6)' }}>
+                        <span className="text-[14px] font-black mono w-12 shrink-0"
+                          style={{ color: isA?'#E10600': isB?'#FF8700':'var(--t2)' }}>
                           {d.code}
                         </span>
-                        <div className="flex-1 h-1 rounded-full" style={{ background:'rgba(255,255,255,0.06)' }}>
+                        <div className="flex-1 h-1.5 rounded-full" style={{ background:'rgba(255,255,255,0.08)' }}>
                           <div className="h-full rounded-full"
                             style={{ width:`${barPct}%`,
-                              background: isA?'#E10600': isB?'#FF8700':'rgba(255,255,255,0.2)' }} />
+                              background: isA?'#E10600': isB?'#FF8700':'rgba(255,255,255,0.25)' }} />
                         </div>
-                        <span className="text-[11px] mono shrink-0 w-20 text-right"
-                          style={{ color:'rgba(240,244,255,0.4)' }}>
+                        <span className="text-[12px] mono shrink-0 w-20 text-right font-semibold"
+                          style={{ color: i===0 ? 'var(--t2)' : 'var(--t2)' }}>
                           {i === 0 ? '— lider' : `+${gap.toFixed(3)}s`}
                         </span>
                       </div>

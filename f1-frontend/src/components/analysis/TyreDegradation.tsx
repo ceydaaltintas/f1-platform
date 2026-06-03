@@ -191,16 +191,16 @@ export function TyreDegradation({ sessionId }: Props) {
             <CartesianGrid strokeDasharray="3 8" stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis dataKey="age"
               label={{ value: 'Lastik Yaşı (tur)', position: 'insideBottom', offset: -4,
-                       fill: 'rgba(240,244,255,0.3)', fontSize: 10 }}
-              tick={{ fill:'rgba(240,244,255,0.3)', fontSize:10, fontFamily:'IBM Plex Mono,monospace' }}
-              tickLine={false} axisLine={{ stroke:'rgba(255,255,255,0.08)' }} />
+                       fill: 'rgba(240,244,255,0.55)', fontSize: 11 }}
+              tick={{ fill:'rgba(240,244,255,0.55)', fontSize:11, fontFamily:'IBM Plex Mono,monospace' }}
+              tickLine={false} axisLine={{ stroke:'rgba(255,255,255,0.10)' }} />
             <YAxis
               tickFormatter={v => viewMode==='laptime' ? formatLapTime(v) : `+${v.toFixed(1)}s`}
-              tick={{ fill:'rgba(240,244,255,0.3)', fontSize:10, fontFamily:'IBM Plex Mono,monospace' }}
-              tickLine={false} axisLine={false} width={70} />
+              tick={{ fill:'rgba(240,244,255,0.55)', fontSize:11, fontFamily:'IBM Plex Mono,monospace' }}
+              tickLine={false} axisLine={false} width={75} />
             <Tooltip content={<CustomTooltip />} />
             <Legend
-              formatter={(v) => <span style={{ color:'rgba(240,244,255,0.6)', fontSize:11 }}>{v}</span>}
+              formatter={(v) => <span style={{ color:'rgba(240,244,255,0.75)', fontSize:12 }}>{v}</span>}
             />
             {viewMode === 'delta' && (
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="4 4" />
@@ -216,16 +216,16 @@ export function TyreDegradation({ sessionId }: Props) {
 
       {/* Özet tablo */}
       <div className="px-5 pb-5">
-        <p className="text-[10px] mono font-semibold tracking-widest mb-3" style={{ color:'var(--t3)' }}>
+        <p className="text-[12px] mono font-semibold tracking-widest mb-3" style={{ color:'var(--t2)' }}>
           STINT ÖZETİ
         </p>
         <div className="overflow-x-auto">
           <table style={{ width:'100%', borderCollapse:'collapse', fontFamily:'IBM Plex Mono,monospace' }}>
             <thead>
-              <tr style={{ borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+              <tr style={{ borderBottom:'1px solid rgba(255,255,255,0.10)' }}>
                 {['Pilot','Hamur','Süre','Avg Tur','En Hızlı','Degradasyon'].map(h => (
-                  <th key={h} style={{ padding:'6px 10px', textAlign:'left', fontSize:9,
-                    fontWeight:600, letterSpacing:'0.1em', color:'rgba(240,244,255,0.25)' }}>{h}</th>
+                  <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontSize:11,
+                    fontWeight:600, letterSpacing:'0.08em', color:'var(--t2)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -233,30 +233,30 @@ export function TyreDegradation({ sessionId }: Props) {
               {drivers.filter(d => selected.includes(d.code)).flatMap(d =>
                 d.stints.map(s => (
                   <tr key={`${d.code}-${s.stint_number}`}
-                    style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding:'8px 10px', fontWeight:900, color:'white', fontSize:12 }}>
+                    style={{ borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                    <td style={{ padding:'10px 10px', fontWeight:900, color:'white', fontSize:13 }}>
                       {d.code}
                     </td>
-                    <td style={{ padding:'8px 10px' }}>
+                    <td style={{ padding:'10px 10px' }}>
                       <span style={{
-                        padding:'2px 8px', borderRadius:4, fontSize:10, fontWeight:700,
-                        background:(COMPOUND_COLORS[s.compound]??'#888')+'20',
+                        padding:'3px 8px', borderRadius:4, fontSize:11, fontWeight:700,
+                        background:(COMPOUND_COLORS[s.compound]??'#888')+'25',
                         color: COMPOUND_COLORS[s.compound]??'#888',
-                        border:`1px solid ${(COMPOUND_COLORS[s.compound]??'#888')}40`,
+                        border:`1px solid ${(COMPOUND_COLORS[s.compound]??'#888')}50`,
                       }}>
                         {COMPOUND_NAME[s.compound] ?? s.compound}
                       </span>
                     </td>
-                    <td style={{ padding:'8px 10px', color:'rgba(240,244,255,0.5)', fontSize:11 }}>
+                    <td style={{ padding:'10px 10px', color:'var(--t2)', fontSize:12 }}>
                       {s.laps.length} tur
                     </td>
-                    <td style={{ padding:'8px 10px', color:'rgba(240,244,255,0.8)', fontSize:11, fontWeight:700 }}>
+                    <td style={{ padding:'10px 10px', color:'white', fontSize:13, fontWeight:700 }}>
                       {formatLapTime(s.avg_time)}
                     </td>
-                    <td style={{ padding:'8px 10px', color:'#00D2BE', fontSize:11, fontWeight:700 }}>
+                    <td style={{ padding:'10px 10px', color:'#00D2BE', fontSize:13, fontWeight:700 }}>
                       {formatLapTime(s.best_time)}
                     </td>
-                    <td style={{ padding:'8px 10px', fontWeight:700, fontSize:12,
+                    <td style={{ padding:'10px 10px', fontWeight:700, fontSize:13,
                       color: degColor(s.degradation) }}>
                       +{s.degradation.toFixed(2)}s
                     </td>
@@ -266,10 +266,10 @@ export function TyreDegradation({ sessionId }: Props) {
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] mono mt-3" style={{ color:'var(--t3)' }}>
-          🟢 &lt;0.5s/stint degradasyon = iyi &nbsp;·&nbsp;
+        <p className="text-[12px] mono mt-3" style={{ color:'var(--t2)' }}>
+          🟢 &lt;0.5s/stint = iyi &nbsp;·&nbsp;
           🟡 0.5–1.5s = orta &nbsp;·&nbsp;
-          🔴 &gt;1.5s = yüksek lastik yıpranması
+          🔴 &gt;1.5s = yüksek yıpranma
         </p>
       </div>
     </div>

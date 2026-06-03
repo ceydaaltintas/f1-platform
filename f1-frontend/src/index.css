@@ -10,20 +10,23 @@
   --s1:       #090e1c;
   --s2:       #0d1428;
   --s3:       #111b35;
-  --b1:       rgba(255,255,255,0.07);
-  --b2:       rgba(255,255,255,0.13);
+  --b1:       rgba(255,255,255,0.10);
+  --b2:       rgba(255,255,255,0.18);
   --red:      #E10600;
   --red-glow: rgba(225,6,0,0.30);
   --cyan:     #00D2BE;
   --orange:   #FF8700;
   --text:     #f0f4ff;
-  --t2:       rgba(240,244,255,0.55);
-  --t3:       rgba(240,244,255,0.22);
+  --t2:       rgba(240,244,255,0.75);
+  --t3:       rgba(240,244,255,0.50);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  font-size: 15px; /* Taban font büyüklüğü — rem birimleri buna göre ölçeklenir */
+}
 
 body {
   background: var(--bg);
@@ -31,6 +34,8 @@ body {
   font-family: 'Inter', -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .mono { font-family: 'IBM Plex Mono', monospace; }
