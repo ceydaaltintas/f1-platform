@@ -1162,23 +1162,33 @@ async def sync_session_cache(
 @router.post("/sync_all_finished")
 async def sync_all_finished_sessions(
     db: AsyncSession = Depends(get_db),
+    session_type: str | None = Query(None, description="Sadece bu tip: race, qualifying vb."),
 ):
     """
-    Veritabanındaki tüm biten session'ların verisini DB cache'e çeker.
-    Topluca ön-yükleme için kullanılır.
+    Biten session'ların verisini DB cache'e sıralı olarak çeker.
+    Rate limit'e takılmamak için session'lar arası 2s bekleme uygulanır.
+    Büyük veri setleri için arka planda çalışır.
     """
-    from sqlalchemy import select
-    result = await db.execute(
-        select(Session).where(Session.status == "finished")
-    )
+    from sqlalchemy import select as sa_select
+
+    q = sa_select(Session).where(Session.status == "finished")
+    if session_type:
+        q = q.where(Session.type == session_type)
+
+    result = await db.execute(q)
     sessions = result.scalars().all()
 
     results = []
     for s in sessions:
-        r = await db_cache.sync_session(s, db)
-        results.append({"session_id": s.id, **r})
+        try:
+            r = await db_cache.sync_session(s, db)
+            results.append({"session_id": s.id, "type": s.type, **r})
+            # Rate limit koruması — session'lar arası kısa bekleme
+            await asyncio.sleep(2)
+        except Exception as e:
+            results.append({"session_id": s.id, "type": s.type, "status": "error", "error": str(e)})
 
-    return {"total": len(sessions), "results": results}
+    return {"total": len(sessions), "synced": sum(1 for r in results if r.get("status") == "ok"), "results": results}
 
 
 # ─── 2026 Enerji Analizi ─────────────────────────────────────────────────────

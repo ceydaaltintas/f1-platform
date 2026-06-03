@@ -147,54 +147,55 @@ async def sync_session(session: F1Session, db: AsyncSession) -> dict:
     if not session_key:
         return {"status": "skipped", "reason": "no session_key"}
 
+    import asyncio
+
     synced_drivers = 0
     errors = []
 
-    # Stints (tek çağrı, tüm pilotlar)
+    # Stints — zaten cache'de değilse çek
     stints_row = await db.get(OpenF1StintsCache, session_key)
     if not stints_row:
-        stints = await openf1.fetch_stints(session_key)
-        if stints:
-            db.add(OpenF1StintsCache(session_key=session_key, data=stints))
-            await db.flush()
+        try:
+            stints = await openf1.fetch_stints(session_key)
+            if stints:
+                db.add(OpenF1StintsCache(session_key=session_key, data=stints))
+                await db.commit()
+        except Exception as e:
+            errors.append(f"stints: {e}")
 
-    # Pilotlar
-    drivers = await openf1.fetch_session_drivers(session_key)
+    # Pilotlar — sıralı işle (rate limit: 3 req/s)
+    try:
+        drivers = await openf1.fetch_session_drivers(session_key)
+    except Exception as e:
+        return {"status": "error", "reason": f"drivers fetch failed: {e}"}
 
-    import asyncio
-    sem = asyncio.Semaphore(4)
-
-    async def _sync_driver(d: dict):
-        nonlocal synced_drivers
+    for d in drivers:
         dn = d.get("driver_number")
         if not dn:
-            return
-
-        async with sem:
-            # Zaten DB'de mi?
-            row = await db.get(OpenF1LapsCache, (session_key, dn))
-            if row:
+            continue
+        row = await db.get(OpenF1LapsCache, (session_key, dn))
+        if row:
+            synced_drivers += 1
+            continue
+        try:
+            laps = await openf1.fetch_laps(session_key, dn)
+            if laps:
+                db.add(OpenF1LapsCache(
+                    session_key=session_key,
+                    driver_number=dn,
+                    data=laps,
+                ))
+                await db.commit()
                 synced_drivers += 1
-                return
-            try:
-                laps = await openf1.fetch_laps(session_key, dn)
-                if laps:
-                    db.add(OpenF1LapsCache(
-                        session_key=session_key,
-                        driver_number=dn,
-                        data=laps,
-                    ))
-                    synced_drivers += 1
-            except Exception as e:
-                errors.append(f"driver {dn}: {e}")
-
-    await asyncio.gather(*[_sync_driver(d) for d in drivers])
-    await db.commit()
+            await asyncio.sleep(0.35)  # ~3 req/s limit
+        except Exception as e:
+            errors.append(f"driver {dn}: {e}")
+            await asyncio.sleep(1)
 
     return {
-        "status":          "ok",
-        "session_key":     session_key,
-        "synced_drivers":  synced_drivers,
-        "total_drivers":   len(drivers),
-        "errors":          errors,
+        "status":         "ok",
+        "session_key":    session_key,
+        "synced_drivers": synced_drivers,
+        "total_drivers":  len(drivers),
+        "errors":         errors,
     }
