@@ -1,0 +1,33 @@
+# Environment variables - asla commit'leme
+.env
+.env.local
+.env.production
+.env.*.local
+f1-backend/.env
+f1-frontend/.env
+f1-frontend/.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+f1-frontend/node_modules/
+
+# Build
+f1-frontend/dist/
+f1-backend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
