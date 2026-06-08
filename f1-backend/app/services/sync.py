@@ -230,10 +230,15 @@ async def sync_sessions_for_round(round_: Round, year: int, db: AsyncSession) ->
         session_date = None
         if date_start_str:
             try:
-                from datetime import datetime
+                from datetime import datetime, timezone
                 session_date = datetime.fromisoformat(date_start_str.replace("Z", "+00:00"))
             except (ValueError, AttributeError):
                 pass
+
+        # Tarihe göre gerçek durum: gelecekte ise upcoming, geçtiyse finished
+        from datetime import datetime, timezone
+        now_utc = datetime.now(timezone.utc)
+        resolved_status = "finished" if (session_date and session_date < now_utc) else "upcoming"
 
         # session_key varsa önce ara, yoksa round+type ile bul
         result = await db.execute(
@@ -256,16 +261,18 @@ async def sync_sessions_for_round(round_: Round, year: int, db: AsyncSession) ->
             session_obj = Session(
                 round_id=round_.id,
                 type=session_type,
-                status="finished",
+                status=resolved_status,
                 session_date=session_date,
                 session_key=session_key,
             )
             db.add(session_obj)
-            logger.info("Yeni session: %s (key=%s) round %d", session_type, session_key, round_.round_number)
+            logger.info("Yeni session: %s (key=%s) round %d status=%s", session_type, session_key, round_.round_number, resolved_status)
         else:
             existing.session_key = session_key
             existing.session_date = session_date
-            existing.status = "finished"
+            # Aktif oturumu ezme; sadece upcoming/finished arasında güncelle
+            if existing.status != "active":
+                existing.status = resolved_status
             session_obj = existing
 
         sessions_created.append(session_obj)

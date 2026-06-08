@@ -111,6 +111,17 @@ export function TyreDegradation({ sessionId }: Props) {
     </div>
   )
 
+  if (data?.syncing) return (
+    <div className="card p-5 text-center space-y-2">
+      <p className="text-[12px] mono font-semibold" style={{ color:'var(--t3)' }}>
+        Oturum verisi hazırlanıyor...
+      </p>
+      <p className="text-[11px]" style={{ color:'var(--t3)' }}>
+        30–60 saniye sonra sayfayı yenileyin.
+      </p>
+    </div>
+  )
+
   if (isError || !drivers.length) return (
     <div className="card p-5 text-center">
       <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>

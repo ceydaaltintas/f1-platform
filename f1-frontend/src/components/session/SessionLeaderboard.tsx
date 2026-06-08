@@ -101,6 +101,19 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
     />
   )
 
+  if (data.syncing) return (
+    <div className="card p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>SIRALAMA</p>
+        <div className="flex gap-1">{[0,1,2].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#E10600]" style={{ animation:`bounce-dot 0.8s ${i*0.15}s infinite` }} />)}</div>
+      </div>
+      <p className="text-[12px] text-center py-6" style={{ color: 'var(--t3)' }}>
+        Oturum verisi hazırlanıyor, lütfen 30–60 saniye sonra yenileyin.
+      </p>
+      <style>{`@keyframes bounce-dot{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-4px)}}`}</style>
+    </div>
+  )
+
   const isRace: boolean  = data.is_race ?? false
   const isQuali: boolean = data.is_quali ?? false
   const isDynamic        = isRace && !!lapNum

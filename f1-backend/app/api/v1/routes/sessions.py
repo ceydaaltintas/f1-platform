@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,8 +7,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.redis_client import cache_get, cache_key, cache_set
-from app.models.f1 import DriverSession, Lap, PitStop, Session
+from app.models.f1 import Driver, DriverSession, Lap, PitStop, Session
 from app.schemas.f1 import DriverSessionOut, LapOut, PitStopOut
+from app.services import db_cache, openf1
 
 router = APIRouter(tags=["sessions"])
 
@@ -72,15 +75,67 @@ async def get_session_laps(session_id: int, db: AsyncSession = Depends(get_db)):
         .order_by(Lap.driver_id, Lap.lap_number)
     )
     laps = result.scalars().all()
-    data = [
-        {
-            **LapOut.model_validate(lap).model_dump(mode="json"),
-            "driver_code": lap.driver.code,
-            "driver_id": lap.driver_id,
-        }
-        for lap in laps
-    ]
-    await cache_set(cache_k, data, ttl_seconds=600)
+
+    if laps:
+        data = [
+            {
+                **LapOut.model_validate(lap).model_dump(mode="json"),
+                "driver_code": lap.driver.code,
+                "driver_id": lap.driver_id,
+            }
+            for lap in laps
+        ]
+        await cache_set(cache_k, data, ttl_seconds=86_400)
+        return data
+
+    # Lap tablosu boş — bitmiş session için db_cache üzerinden inline çek
+    session_res = await db.execute(select(Session).where(Session.id == session_id))
+    session = session_res.scalar_one_or_none()
+    if session is None or not session.session_key or session.status != "finished":
+        return []
+
+    of1_drivers = await db_cache.get_session_drivers(session)
+    driver_map: dict[int, tuple[str, int | None]] = {}
+    for d in of1_drivers:
+        code = (d.get("name_acronym") or "").upper()
+        dn = d.get("driver_number")
+        if not dn:
+            continue
+        drv_res = await db.execute(select(Driver).where(Driver.code == code))
+        drv = drv_res.scalar_one_or_none()
+        driver_map[dn] = (code, drv.id if drv else None)
+
+    sem = asyncio.Semaphore(5)
+
+    async def _fetch_driver_laps(dn: int, code: str, drv_id: int | None) -> list[dict]:
+        async with sem:
+            raw_laps = await db_cache.get_laps(session, dn, db)
+        return [
+            {
+                "lap_number": lap.get("lap_number"),
+                "lap_time": lap.get("lap_duration"),
+                "sector1_time": lap.get("duration_sector_1"),
+                "sector2_time": lap.get("duration_sector_2"),
+                "sector3_time": lap.get("duration_sector_3"),
+                "compound": (lap.get("compound") or "UNKNOWN").upper(),
+                "tyre_life": lap.get("stint_tyre_life"),
+                "is_personal_best": bool(lap.get("is_personal_best", False)),
+                "is_pit_out_lap": bool(lap.get("is_pit_out_lap", False)),
+                "is_pit_in_lap": bool(lap.get("is_pit_in_lap", False)),
+                "driver_code": code,
+                "driver_id": drv_id,
+            }
+            for lap in raw_laps
+        ]
+
+    nested = await asyncio.gather(*[
+        _fetch_driver_laps(dn, code, drv_id)
+        for dn, (code, drv_id) in driver_map.items()
+    ])
+    data = [item for sublist in nested for item in sublist]
+    data.sort(key=lambda x: (x["driver_id"] or 0, x["lap_number"] or 0))
+    if data:
+        await cache_set(cache_k, data, ttl_seconds=86_400)
     return data
 
 

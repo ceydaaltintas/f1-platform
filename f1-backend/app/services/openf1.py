@@ -23,12 +23,18 @@ TIMEOUT = 20.0
 HEADERS = {"Accept": "application/json"}
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
 async def _get(path: str, params: dict | None = None) -> list[dict[str, Any]]:
     """OpenF1'e GET isteği gönderir. Her zaman liste döner."""
+    import asyncio as _asyncio
     url = f"{BASE_URL}/{path}"
     async with httpx.AsyncClient(timeout=TIMEOUT, headers=HEADERS) as client:
         resp = await client.get(url, params={k: v for k, v in (params or {}).items() if v is not None})
+        if resp.status_code == 429:
+            retry_after = int(resp.headers.get("Retry-After", "60"))
+            logger.warning("OpenF1 rate limit (429), %ds bekleniyor", retry_after)
+            await _asyncio.sleep(retry_after)
+            resp.raise_for_status()
         resp.raise_for_status()
         return resp.json()
 
@@ -99,6 +105,11 @@ async def get_driver_number(session_key: int, driver_code: str) -> int | None:
 async def fetch_laps(session_key: int, driver_number: int) -> list[dict]:
     """Bir pilotun tüm tur verilerini getirir (timestamp dahil)."""
     return await _get("laps", {"session_key": session_key, "driver_number": driver_number})
+
+
+async def fetch_all_session_laps(session_key: int) -> list[dict]:
+    """Tüm pilotların turlarını tek API isteğiyle getirir."""
+    return await _get("laps", {"session_key": session_key})
 
 
 def find_lap(laps: list[dict], lap_number: int | str) -> dict | None:
@@ -242,7 +253,11 @@ async def fetch_track_map(session_key: int, driver_number: int, laps: list[dict]
         start_dt = datetime.fromisoformat(date_start.replace("Z", "+00:00"))
         date_end = (start_dt + timedelta(seconds=float(lap_duration) + 1)).isoformat()
 
-    points = await fetch_location(session_key, driver_number, date_start, date_end)
+    try:
+        points = await fetch_location(session_key, driver_number, date_start, date_end)
+    except Exception as e:
+        logger.warning("Track map location fetch başarısız: %s", e)
+        return []
     if not points:
         return []
 
@@ -272,7 +287,15 @@ async def fetch_track_map(session_key: int, driver_number: int, laps: list[dict]
 
 async def fetch_positions(session_key: int) -> list[dict]:
     """Tüm pilotların anlık konum verilerini getirir (FIA timing)."""
-    return await _get("position", {"session_key": session_key})
+    url = f"{BASE_URL}/position"
+    try:
+        async with httpx.AsyncClient(timeout=120.0, headers=HEADERS) as client:
+            resp = await client.get(url, params={"session_key": session_key})
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.warning("Position fetch başarısız session_key=%s: %s", session_key, e)
+        return []
 
 
 async def fetch_weather(session_key: int) -> list[dict]:

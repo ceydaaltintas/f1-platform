@@ -13,10 +13,14 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.f1 import (
+    Driver,
     JolpicaSeasonCache,
+    Lap,
+    OpenF1CarDataCache,
     OpenF1LapsCache,
     OpenF1StintsCache,
     Session as F1Session,
@@ -56,12 +60,18 @@ async def get_laps(
         logger.info("DB cache miss: laps session_key=%s driver=%s", session_key, driver_number)
         data = await openf1.fetch_laps(session_key, driver_number)
         if data:
-            db.add(OpenF1LapsCache(
-                session_key=session_key,
-                driver_number=driver_number,
-                data=data,
-            ))
-            await db.commit()
+            try:
+                db.add(OpenF1LapsCache(
+                    session_key=session_key,
+                    driver_number=driver_number,
+                    data=data,
+                ))
+                await db.commit()
+            except IntegrityError:
+                await db.rollback()
+                row = await db.get(OpenF1LapsCache, (session_key, driver_number))
+                if row:
+                    return row.data
         return data or []
 
     # Aktif session → direkt API
@@ -90,11 +100,84 @@ async def get_stints(
         logger.info("DB cache miss: stints session_key=%s", session_key)
         data = await openf1.fetch_stints(session_key)
         if data:
-            db.add(OpenF1StintsCache(session_key=session_key, data=data))
-            await db.commit()
+            try:
+                db.add(OpenF1StintsCache(session_key=session_key, data=data))
+                await db.commit()
+            except IntegrityError:
+                await db.rollback()
+                row = await db.get(OpenF1StintsCache, session_key)
+                if row:
+                    return row.data
         return data or []
 
     return await openf1.fetch_stints(session_key) or []
+
+
+# ─── OpenF1 Session Drivers ──────────────────────────────────────────────────
+
+async def get_session_drivers(session: F1Session) -> list[dict]:
+    """
+    Session pilotlarını döner.
+    Biten session → Redis 24 saat cache.
+    Aktif/upcoming → Redis 5 dakika cache.
+    """
+    from app.core.redis_client import cache_get, cache_key, cache_set
+
+    session_key = session.session_key
+    if not session_key:
+        return []
+
+    ck = cache_key("session_drivers", session_key)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    data = await openf1.fetch_session_drivers(session_key) or []
+    if data:
+        ttl = 86_400 if _is_finished(session) else 300
+        await cache_set(ck, data, ttl_seconds=ttl)
+    return data
+
+
+# ─── OpenF1 Car Data ─────────────────────────────────────────────────────────
+
+async def get_car_data(
+    session: F1Session,
+    driver_number: int,
+    db: AsyncSession,
+) -> list[dict]:
+    """
+    Bir pilotun ham araba telemetri verisini döner.
+    Biten session → DB'den kalıcı cache.
+    Aktif/upcoming → doğrudan OpenF1.
+    """
+    session_key = session.session_key
+    if not session_key:
+        return []
+
+    if _is_finished(session):
+        row = await db.get(OpenF1CarDataCache, (session_key, driver_number))
+        if row:
+            return row.data
+
+        logger.info("DB cache miss: car_data session_key=%s driver=%s", session_key, driver_number)
+        data = await openf1.fetch_car_data(session_key, driver_number)
+        if data:
+            try:
+                db.add(OpenF1CarDataCache(
+                    session_key=session_key,
+                    driver_number=driver_number,
+                    data=data,
+                ))
+                await db.commit()
+            except IntegrityError:
+                await db.rollback()
+                row = await db.get(OpenF1CarDataCache, (session_key, driver_number))
+                if row:
+                    return row.data
+        return data or []
+
+    return await openf1.fetch_car_data(session_key, driver_number) or []
 
 
 # ─── Jolpica Sezon Sonuçları ──────────────────────────────────────────────────
@@ -131,6 +214,133 @@ async def get_season_all_results(year: int, db: AsyncSession) -> list[dict]:
     if data:
         await cache_set(ck, data, ttl_seconds=3600)
     return data or []
+
+
+# ─── Bulk Lap Sync (tek API çağrısı) ─────────────────────────────────────────
+
+async def bulk_sync_to_lap_table(session: F1Session, db: AsyncSession) -> int:
+    """
+    Tüm pilotların turlarını TEK OpenF1 API çağrısıyla alır ve Lap tablosuna bulk yazar.
+    İlk açılışta ~2-3 saniye. Sonraki açılışlar anında Lap tablosundan gelir.
+    """
+    if not _is_finished(session) or not session.session_key:
+        return 0
+
+    session_key = session.session_key
+
+    # 1. Tek API çağrısı — tüm pilotların turları
+    all_laps_raw = await openf1.fetch_all_session_laps(session_key)
+    if not all_laps_raw:
+        return 0
+
+    # 2. Driver number → DB id eşleştirmesi (2 sorgu)
+    of1_drivers = await openf1.fetch_session_drivers(session_key)
+    codes = [(d.get("name_acronym") or "").upper() for d in of1_drivers]
+    driver_number_to_id: dict[int, int] = {}
+    if codes:
+        drv_res = await db.execute(select(Driver).where(Driver.code.in_(codes)))
+        code_to_id = {d.code: d.id for d in drv_res.scalars()}
+        for d in of1_drivers:
+            code = (d.get("name_acronym") or "").upper()
+            dn = d.get("driver_number")
+            if dn and code in code_to_id:
+                driver_number_to_id[dn] = code_to_id[code]
+
+    # 3. Mevcut turları tek sorguda al → set'e al (O(1) lookup)
+    existing_res = await db.execute(
+        select(Lap.driver_id, Lap.lap_number).where(Lap.session_id == session.id)
+    )
+    existing_set = {(row.driver_id, row.lap_number) for row in existing_res}
+
+    # 4. Yeni Lap objelerini bellekte hazırla
+    VALID_COMPOUNDS = {"SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"}
+    new_laps = []
+    for lap_raw in all_laps_raw:
+        dn        = lap_raw.get("driver_number")
+        driver_id = driver_number_to_id.get(dn)
+        lap_num   = lap_raw.get("lap_number")
+        if not driver_id or not lap_num:
+            continue
+        if (driver_id, lap_num) in existing_set:
+            continue
+
+        compound = (lap_raw.get("compound") or "UNKNOWN").upper()
+        if compound not in VALID_COMPOUNDS:
+            compound = "UNKNOWN"
+
+        new_laps.append(Lap(
+            session_id       = session.id,
+            driver_id        = driver_id,
+            lap_number       = lap_num,
+            lap_time         = lap_raw.get("lap_duration"),
+            sector1_time     = lap_raw.get("duration_sector_1"),
+            sector2_time     = lap_raw.get("duration_sector_2"),
+            sector3_time     = lap_raw.get("duration_sector_3"),
+            compound         = compound,
+            tyre_life        = lap_raw.get("stint_tyre_life"),
+            is_personal_best = bool(lap_raw.get("is_personal_best", False)),
+            is_pit_out_lap   = bool(lap_raw.get("is_pit_out_lap", False)),
+            is_pit_in_lap    = bool(lap_raw.get("is_pit_in_lap", False)),
+        ))
+
+    # 5. Lap tablosuna bulk yaz
+    try:
+        if new_laps:
+            db.add_all(new_laps)
+
+        # OpenF1LapsCache'e de yaz (track_map ve telemetri için date_start gerekli)
+        laps_by_dn: dict[int, list] = {}
+        for lap_raw in all_laps_raw:
+            dn = lap_raw.get("driver_number")
+            if dn:
+                laps_by_dn.setdefault(dn, []).append(lap_raw)
+
+        existing_cache_res = await db.execute(
+            select(OpenF1LapsCache.driver_number)
+            .where(OpenF1LapsCache.session_key == session_key)
+        )
+        existing_cache_dns = {row.driver_number for row in existing_cache_res}
+
+        for dn, laps in laps_by_dn.items():
+            if dn not in existing_cache_dns:
+                db.add(OpenF1LapsCache(session_key=session_key, driver_number=dn, data=laps))
+
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        logger.warning("Bulk sync IntegrityError — kısmi veri zaten vardı")
+    except Exception as e:
+        await db.rollback()
+        logger.error("Bulk lap sync commit hatası: %s", e)
+        return 0
+
+    logger.info("Session %d: %d tur Lap+Cache tablosuna yazıldı", session.id, len(new_laps))
+    return len(new_laps)
+
+
+# ─── Eksik Veri Koruması ─────────────────────────────────────────────────────
+
+async def ensure_laps_synced(session: F1Session, db: AsyncSession) -> None:
+    """
+    Bitmiş session için tüm pilotların tur verilerinin DB'de olduğundan emin olur.
+    15'ten az pilot cache'deyse sync_session() çağırır (sıralı, rate-limit uyumlu).
+    Leaderboard/pace gibi tüm pilotları gerektiren endpoint'ler bunu çağırır.
+    """
+    if not _is_finished(session) or not session.session_key:
+        return
+
+    from sqlalchemy import func
+    result = await db.execute(
+        select(func.count()).select_from(OpenF1LapsCache)
+        .where(OpenF1LapsCache.session_key == session.session_key)
+    )
+    cached_count = result.scalar_one()
+    if cached_count < 15:
+        logger.info(
+            "Session %s için %d pilot cache'de, tam sync başlıyor",
+            session.session_key, cached_count,
+        )
+        await sync_session(session, db)
 
 
 # ─── Toplu Session Sync ───────────────────────────────────────────────────────

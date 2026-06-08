@@ -13,7 +13,7 @@ from datetime import date
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal
+from app.core.database import CeleryAsyncSession
 from app.core.redis_client import cache_delete_pattern
 from app.models.f1 import Driver, Lap, PitStop, Round, Season, Session
 from app.services import openf1
@@ -29,11 +29,19 @@ def sync_session_laps(self, session_id: int) -> dict:
     Celery task'ı olduğu için sync (asyncio.run kullanır).
     """
     import asyncio
-    return asyncio.run(_sync_session_laps_async(session_id))
+    from app.core.redis_client import close_redis
+
+    async def _run():
+        try:
+            return await _sync_session_laps_async(session_id)
+        finally:
+            await close_redis()
+
+    return asyncio.run(_run())
 
 
 async def _sync_session_laps_async(session_id: int) -> dict:
-    async with AsyncSessionLocal() as db:
+    async with CeleryAsyncSession() as db:
         result = await db.execute(
             select(Session).where(Session.id == session_id)
         )
@@ -154,13 +162,21 @@ def sync_completed_sessions() -> dict:
     Her gece çalışır.
     """
     import asyncio
-    return asyncio.run(_sync_completed_sessions_async())
+    from app.core.redis_client import close_redis
+
+    async def _run():
+        try:
+            return await _sync_completed_sessions_async()
+        finally:
+            await close_redis()
+
+    return asyncio.run(_run())
 
 
 async def _sync_completed_sessions_async() -> dict:
     from datetime import datetime, timezone
 
-    async with AsyncSessionLocal() as db:
+    async with CeleryAsyncSession() as db:
         result = await db.execute(
             select(Session)
             .join(Round, Session.round_id == Round.id)
@@ -181,20 +197,97 @@ async def _sync_completed_sessions_async() -> dict:
         return {"triggered": triggered}
 
 
+@celery_app.task(name="app.tasks.post_session.sync_race_weekend_sessions")
+def sync_race_weekend_sessions() -> dict:
+    """
+    Bu haftanın yarış round'u için OpenF1'den session kayıtlarını çeker.
+    Round tamamlanmamış olsa bile çalışır. Cuma-Cumartesi-Pazar akşamı tetiklenir.
+    """
+    import asyncio
+    from app.core.redis_client import close_redis
+
+    async def _run():
+        try:
+            return await _sync_race_weekend_sessions_async()
+        finally:
+            await close_redis()
+
+    return asyncio.run(_run())
+
+
+async def _sync_race_weekend_sessions_async() -> dict:
+    from datetime import datetime, timedelta, timezone
+    from app.services.sync import _determine_current_season, sync_sessions_for_round
+
+    async with CeleryAsyncSession() as db:
+        current_year = _determine_current_season()
+        result = await db.execute(
+            select(Season).where(Season.year == current_year)
+        )
+        season = result.scalar_one_or_none()
+        if season is None:
+            return {"error": f"{current_year} sezonu DB'de yok"}
+
+        today = date.today()
+        # Bu haftanın round'unu bul: race_date bugünden 2 gün önce ile 3 gün sonrası arasında
+        round_result = await db.execute(
+            select(Round).where(
+                Round.season_id == season.id,
+                Round.race_date >= today - timedelta(days=2),
+                Round.race_date <= today + timedelta(days=3),
+            )
+        )
+        rnd = round_result.scalar_one_or_none()
+        if rnd is None:
+            logger.info("Bu hafta için yarış round'u bulunamadı")
+            return {"sessions_synced": 0}
+
+        # Session kayıtlarını OpenF1'den çek (round_status'tan bağımsız)
+        sessions = await sync_sessions_for_round(rnd, current_year, db)
+        await db.commit()
+
+        # Tarihi geçmiş session'lar için lap sync tetikle
+        now = datetime.now(timezone.utc)
+        triggered = []
+        for s in sessions:
+            if s.session_key and s.session_date and s.session_date < now:
+                sync_session_laps.delay(s.id)
+                triggered.append(s.id)
+                logger.info("Hafta sonu session %d lap sync tetiklendi", s.id)
+
+        logger.info(
+            "Yarış haftası round %d: %d session bulundu, %d lap sync tetiklendi",
+            rnd.round_number, len(sessions), len(triggered),
+        )
+        return {
+            "round": rnd.round_number,
+            "sessions_found": len(sessions),
+            "laps_triggered": triggered,
+        }
+
+
 @celery_app.task(name="app.tasks.post_session.refresh_current_season_rounds")
 def refresh_current_season_rounds() -> dict:
     """
     Aktif sezonun round_status'larını bugünün tarihiyle günceller.
-    Yarış haftasonlarında çalışır.
+    Pazartesi sabahı çalışır.
     """
     import asyncio
-    return asyncio.run(_refresh_async())
+    from app.core.redis_client import close_redis
+
+    async def _run():
+        try:
+            return await _refresh_async()
+        finally:
+            await close_redis()
+
+    return asyncio.run(_run())
 
 
 async def _refresh_async() -> dict:
     from app.services.sync import _determine_current_season, _round_status
 
-    async with AsyncSessionLocal() as db:
+    async with CeleryAsyncSession() as db:
         current_year = _determine_current_season()
         result = await db.execute(
             select(Season).where(Season.year == current_year)

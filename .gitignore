@@ -1,27 +1,23 @@
-# Environment variables - asla commit'leme
-.env
-.env.local
-.env.production
-.env.*.local
-f1-backend/.env
-f1-frontend/.env
-f1-frontend/.env.production
-
 # Python
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
+
+# Virtual environments
 .venv/
 venv/
-*.egg-info/
+env/
 
-# Node
-node_modules/
-f1-frontend/node_modules/
+# Celery
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid
 
-# Build
-f1-frontend/dist/
-f1-backend/dist/
+# Environment variables
+.env
+.env.*
+!.env.example
 
 # IDE
 .vscode/
@@ -31,3 +27,16 @@ f1-backend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node / frontend
+node_modules/
+.next/
+dist/
+build/
+
+# Claude
+.claude/

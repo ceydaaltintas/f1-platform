@@ -13,10 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.deps import require_admin
 from app.core.database import get_db
 from app.core.redis_client import cache_get, cache_key, cache_set
-from app.models.f1 import Round, Session, OpenF1CarDataCache, EnergyAnalysisCache
-from app.services import openf1, jolpica, db_cache
+from app.models.f1 import Driver, EnergyAnalysisCache, Lap, OpenF1CarDataCache, Round, Season, Session
+from app.models.user import User
+from app.services import db_cache, jolpica, openf1
 from app.services import energy as energy_svc
 
 logger = logging.getLogger(__name__)
@@ -48,8 +50,7 @@ async def _require_session_key(session: Session, db: AsyncSession) -> int:
     # OpenF1'den bul
     round_: Round = session.round
     season_result = await db.execute(
-        select(__import__("app.models.f1", fromlist=["Season"]).Season)
-        .where(__import__("app.models.f1", fromlist=["Season"]).Season.id == round_.season_id)
+        select(Season).where(Season.id == round_.season_id)
     )
     season = season_result.scalar_one_or_none()
     if season is None:
@@ -94,6 +95,84 @@ async def _require_session_key(session: Session, db: AsyncSession) -> int:
         f"OpenF1'de oturum eşleşmedi: {session_name}. "
         "Oturum henüz tamamlanmamış ya da verisi yüklenmemiş olabilir.",
     )
+
+
+def _build_telemetry_from_car_data(
+    laps: list[dict],
+    car_data_full: list[dict],
+    lap_number: int | str = "fastest",
+) -> dict:
+    """
+    Önceden çekilmiş (DB cache'ten gelen) car data'sından tur telemetrisi oluşturur.
+    OpenF1 API çağrısı yapmaz.
+    """
+    from datetime import datetime, timedelta
+    from app.services.openf1 import find_lap
+
+    lap = find_lap(laps, lap_number)
+    if lap is None:
+        return {"lap": None, "telemetry": []}
+
+    date_start = lap.get("date_start")
+    lap_duration = lap.get("lap_duration", 120)
+    start_dt = end_dt = None
+
+    if date_start and lap_duration:
+        try:
+            start_dt = datetime.fromisoformat(date_start.replace("Z", "+00:00"))
+            end_dt   = start_dt + timedelta(seconds=float(lap_duration) + 2)
+        except (ValueError, AttributeError):
+            pass
+
+    # Zaman penceresine göre filtrele
+    filtered = []
+    for point in car_data_full:
+        ts_str = point.get("date", "")
+        if not ts_str:
+            continue
+        try:
+            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            if start_dt and end_dt:
+                if start_dt <= ts <= end_dt:
+                    filtered.append((ts, point))
+            else:
+                filtered.append((ts, point))
+        except (ValueError, AttributeError):
+            pass
+
+    # Kümülatif mesafe hesapla
+    enriched = []
+    cumulative_dist = 0.0
+    prev_ts = None
+    for ts, point in filtered:
+        if prev_ts:
+            dt = (ts - prev_ts).total_seconds()
+            cumulative_dist += (point.get("speed", 0) or 0) / 3.6 * dt
+        enriched.append({
+            "date":     point.get("date"),
+            "speed":    point.get("speed"),
+            "throttle": point.get("throttle"),
+            "brake":    point.get("brake"),
+            "drs":      point.get("drs"),
+            "rpm":      point.get("rpm"),
+            "gear":     point.get("n_gear"),
+            "dist_m":   round(cumulative_dist, 1),
+        })
+        prev_ts = ts
+
+    return {
+        "lap": {
+            "number":          lap.get("lap_number"),
+            "duration":        lap.get("lap_duration"),
+            "date_start":      date_start,
+            "compound":        lap.get("compound"),
+            "sector1":         lap.get("duration_sector_1"),
+            "sector2":         lap.get("duration_sector_2"),
+            "sector3":         lap.get("duration_sector_3"),
+            "is_personal_best": lap.get("is_personal_best", False),
+        },
+        "telemetry": enriched,
+    }
 
 
 def _extract_key_moments(telemetry: list[dict]) -> list[dict]:
@@ -171,8 +250,14 @@ async def get_telemetry(
     if driver_number is None:
         raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
 
-    laps = await openf1.fetch_laps(session_key, driver_number)
-    result = await openf1.fetch_lap_telemetry(session_key, driver_number, laps, lap)
+    laps = await db_cache.get_laps(session, driver_number, db)
+    car_data = await db_cache.get_car_data(session, driver_number, db)
+
+    if car_data:
+        result = _build_telemetry_from_car_data(laps, car_data, lap)
+    else:
+        # DB'de car data yok — doğrudan API'den çek (tur bazlı, küçük veri)
+        result = await openf1.fetch_lap_telemetry(session_key, driver_number, laps, lap)
 
     if result["lap"] is None:
         raise HTTPException(404, f"Tur bulunamadı: {lap}")
@@ -181,7 +266,8 @@ async def get_telemetry(
     result["driver_code"] = driver_code.upper()
     result["session_id"] = session_id
 
-    await cache_set(cache_k, result, ttl_seconds=3600)
+    ttl = 86_400 if session.status == "finished" else 3600
+    await cache_set(cache_k, result, ttl_seconds=ttl)
     return result
 
 
@@ -205,18 +291,33 @@ async def get_track_map(
 
     driver_number = await openf1.get_driver_number(session_key, driver_code)
     if driver_number is None:
-        # Listedeki ilk pilotu dene
-        drivers = await openf1.fetch_session_drivers(session_key)
+        drivers = await db_cache.get_session_drivers(session)
         driver_number = drivers[0]["driver_number"] if drivers else None
 
     if driver_number is None:
         raise HTTPException(404, "Pilot bulunamadı")
 
-    laps = await openf1.fetch_laps(session_key, driver_number)
+    # DB cache kontrolü — driver_number=-1 track map verisi için özel sentinel
+    if session.status == "finished":
+        cached_row = await db.get(OpenF1CarDataCache, (session_key, -1))
+        if cached_row:
+            result = {"session_id": session_id, "points": cached_row.data, "count": len(cached_row.data)}
+            await cache_set(cache_k, result, ttl_seconds=7 * 86_400)
+            return result
+
+    laps = await db_cache.get_laps(session, driver_number, db)
     track_points = await openf1.fetch_track_map(session_key, driver_number, laps)
 
+    if track_points and session.status == "finished":
+        try:
+            db.add(OpenF1CarDataCache(session_key=session_key, driver_number=-1, data=track_points))
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
     result = {"session_id": session_id, "points": track_points, "count": len(track_points)}
-    await cache_set(cache_k, result, ttl_seconds=86_400)  # Pist değişmez, 24s cache
+    if track_points:  # Sadece veri varsa cache'le
+        await cache_set(cache_k, result, ttl_seconds=7 * 86_400)
     return result
 
 
@@ -241,16 +342,21 @@ async def get_stints(
     if driver_code:
         driver_number = await openf1.get_driver_number(session_key, driver_code)
 
-    stints = await openf1.fetch_stints(session_key, driver_number)
+    all_stints = await db_cache.get_stints(session, db)
+    stints = (
+        [s for s in all_stints if s.get("driver_number") == driver_number]
+        if driver_number else all_stints
+    )
 
     # Pilot kodlarını ekle
-    drivers = await openf1.fetch_session_drivers(session_key)
+    drivers = await db_cache.get_session_drivers(session)
     num_to_code = {d["driver_number"]: d.get("name_acronym", "?") for d in drivers}
     for s in stints:
         s["driver_code"] = num_to_code.get(s.get("driver_number"), "?")
 
     result = {"session_id": session_id, "stints": stints}
-    await cache_set(cache_k, result, ttl_seconds=3600)
+    ttl = 86_400 if session.status == "finished" else 3600
+    await cache_set(cache_k, result, ttl_seconds=ttl)
     return result
 
 
@@ -282,8 +388,12 @@ async def compare_drivers(
         dn = await openf1.get_driver_number(session_key, code)
         if dn is None:
             raise HTTPException(404, f"Pilot bulunamadı: {code}")
-        laps_data = await openf1.fetch_laps(session_key, dn)
-        results[code] = await openf1.fetch_lap_telemetry(session_key, dn, laps_data, lap)
+        laps_data = await db_cache.get_laps(session, dn, db)
+        car_data  = await db_cache.get_car_data(session, dn, db)
+        if car_data:
+            results[code] = _build_telemetry_from_car_data(laps_data, car_data, lap)
+        else:
+            results[code] = await openf1.fetch_lap_telemetry(session_key, dn, laps_data, lap)
 
     # Delta hesabı: ortak mesafe noktalarında A – B zaman farkı
     telem_a = results[codes[0]]["telemetry"]
@@ -329,7 +439,8 @@ async def compare_drivers(
             "faster": codes[0] if dur_a <= dur_b else codes[1],
         },
     }
-    await cache_set(cache_k, response, ttl_seconds=3600)
+    ttl = 86_400 if session.status == "finished" else 3600
+    await cache_set(cache_k, response, ttl_seconds=ttl)
     return response
 
 
@@ -358,7 +469,7 @@ async def get_replay_laps(
         dn   = d.get("driver_number")
         async with sem:
             try:
-                laps = await openf1.fetch_laps(session_key, dn)
+                laps = await db_cache.get_laps(session, dn, db)
             except Exception:
                 laps = []
         return {
@@ -398,10 +509,26 @@ async def get_all_positions(
     session     = await _resolve_session(session_id, db)
     session_key = await _require_session_key(session, db)
 
+    # DB cache kontrolü (driver_number=0 → tüm pilotların konum verisi)
+    if session.status == "finished":
+        cached_row = await db.get(OpenF1CarDataCache, (session_key, 0))
+        if cached_row:
+            result = {"session_id": session_id, "positions": cached_row.data}
+            await cache_set(ck, result, ttl_seconds=7 * 86_400)
+            return result
+
     positions = await openf1.fetch_positions(session_key)
 
+    if positions and session.status == "finished":
+        try:
+            db.add(OpenF1CarDataCache(session_key=session_key, driver_number=0, data=positions))
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
     result = {"session_id": session_id, "positions": positions}
-    await cache_set(ck, result, ttl_seconds=86_400)
+    if positions:  # Sadece veri varsa cache'le
+        await cache_set(ck, result, ttl_seconds=7 * 86_400)
     return result
 
 
@@ -412,66 +539,77 @@ async def get_tyre_degradation(
 ):
     """
     Her pilot için lastik yaşı → tur süresi eğrisi.
-    Cliff noktası ve hamur karşılaştırması için kullanılır.
+    Lap zamanları: Lap tablosu (DB). Stint yapısı: OpenF1StintsCache (DB).
     """
     ck = cache_key("tyre_deg", session_id)
     cached = await cache_get(ck)
     if cached:
         return cached
 
-    session     = await _resolve_session(session_id, db)
-    session_key = await _require_session_key(session, db)
+    session = await _resolve_session(session_id, db)
+    from collections import defaultdict
+    from sqlalchemy import func as sa_func
+    from sqlalchemy.orm import selectinload as sl
 
-    drivers = await openf1.fetch_session_drivers(session_key)
-    stints  = await db_cache.get_stints(session, db)
+    # Lap tablosu boşsa bulk sync tetikle
+    driver_count = (await db.execute(
+        select(sa_func.count(sa_func.distinct(Lap.driver_id))).where(Lap.session_id == session_id)
+    )).scalar_one()
 
-    # driver_number → stintler
-    stints_by_dn: dict[int, list] = {}
-    for s in stints:
+    if session.status == "finished" and driver_count < 18:
+        await db_cache.bulk_sync_to_lap_table(session, db)
+
+    # 1. Lap zamanları: Lap tablosundan (driver_id → {lap_number: lap_time})
+    laps_res = await db.execute(
+        select(Lap)
+        .where(Lap.session_id == session_id, Lap.lap_time.isnot(None))
+        .options(sl(Lap.driver))
+        .order_by(Lap.driver_id, Lap.lap_number)
+    )
+    all_laps = laps_res.scalars().all()
+
+    lap_time_by_driver: dict[int, dict[int, float]] = defaultdict(dict)
+    driver_id_to_code: dict[int, str] = {}
+    for lap in all_laps:
+        driver_id_to_code[lap.driver_id] = lap.driver.code
+        if lap.lap_time and not lap.is_pit_out_lap and lap.lap_time < 300:
+            lap_time_by_driver[lap.driver_id][lap.lap_number] = lap.lap_time
+
+    # 2. Stint yapısı: OpenF1StintsCache'ten (driver_number → stints)
+    stints_raw = await db_cache.get_stints(session, db)
+    stints_by_dn: dict[int, list] = defaultdict(list)
+    for s in stints_raw:
         dn = s.get("driver_number")
         if dn:
-            if dn not in stints_by_dn:
-                stints_by_dn[dn] = []
             stints_by_dn[dn].append(s)
 
-    sem = asyncio.Semaphore(6)
-
-    async def _driver_data(d: dict) -> dict | None:
+    # 3. driver_number → driver_id eşleştirmesi
+    of1_drivers = await db_cache.get_session_drivers(session)
+    code_to_driver_id = {code: did for did, code in driver_id_to_code.items()}
+    dn_to_driver_id: dict[int, int] = {}
+    for d in of1_drivers:
+        code = (d.get("name_acronym") or "").upper()
         dn   = d.get("driver_number")
-        code = d.get("name_acronym", "???")
-        async with sem:
-            laps = await db_cache.get_laps(session, dn, db)
+        if dn and code in code_to_driver_id:
+            dn_to_driver_id[dn] = code_to_driver_id[code]
 
-        if not laps:
-            return None
+    driver_id_to_dn = {did: dn for dn, did in dn_to_driver_id.items()}
 
-        # Tur → süre haritası (pit out turları dahil et — hariç tutulacak stint bazında)
-        all_lap_map = {
-            l["lap_number"]: {
-                "duration":    l["lap_duration"],
-                "is_pit_out":  bool(l.get("is_pit_out_lap")),
-            }
-            for l in laps
-            if l.get("lap_number") and l.get("lap_duration")
-        }
-        # Pit out hariç geçerli tur haritası
-        lap_time_map = {
-            ln: info["duration"]
-            for ln, info in all_lap_map.items()
-            if not info["is_pit_out"] and info["duration"] < 300
-        }
+    # 4. Her pilot için stint + lap verisi birleştir
+    driver_list = []
+    for driver_id, lap_time_map in lap_time_by_driver.items():
         if not lap_time_map:
-            return None
+            continue
+        code = driver_id_to_code.get(driver_id, "???")
+        dn   = driver_id_to_dn.get(driver_id)
+        driver_stints = sorted(stints_by_dn.get(dn, []), key=lambda s: s.get("lap_start") or 0)
 
-        driver_stints = stints_by_dn.get(dn, [])
         stint_data = []
-
         if driver_stints:
-            # Stint verisi varsa — her stint için işle
             for s in driver_stints:
-                lap_s    = s.get("lap_start") or 1
-                lap_e    = s.get("lap_end")   or max(lap_time_map.keys(), default=0)
-                compound = s.get("compound")  or "UNKNOWN"
+                lap_s          = s.get("lap_start") or 1
+                lap_e          = s.get("lap_end") or max(lap_time_map.keys(), default=0)
+                compound       = (s.get("compound") or "UNKNOWN").upper()
                 tyre_age_start = s.get("tyre_age_at_start") or 0
 
                 stint_laps = []
@@ -484,55 +622,61 @@ async def get_tyre_degradation(
                             "lap_time":   round(lt, 3),
                         })
 
-                if stint_laps:
-                    valid_times = [l["lap_time"] for l in stint_laps]
-                    base        = min(valid_times)
-                    for l in stint_laps:
-                        l["delta"] = round(l["lap_time"] - base, 3)
-
-                    stint_data.append({
-                        "stint_number":   s.get("stint_number", len(stint_data) + 1),
-                        "compound":       compound,
-                        "tyre_age_start": tyre_age_start,
-                        "laps":           stint_laps,
-                        "avg_time":       round(sum(valid_times) / len(valid_times), 3),
-                        "best_time":      round(base, 3),
-                        "degradation":    round(valid_times[-1] - base, 3) if len(valid_times) > 1 else 0,
-                    })
-        else:
-            # Stint verisi yoksa → tüm tur verilerini tek sentetik stint olarak göster
-            sorted_laps = sorted(lap_time_map.items())
-            if sorted_laps:
-                stint_laps = [
-                    {"lap_number": ln, "tyre_age": i, "lap_time": round(lt, 3)}
-                    for i, (ln, lt) in enumerate(sorted_laps)
-                ]
-                valid_times = [l["lap_time"] for l in stint_laps]
-                base        = min(valid_times)
+                if not stint_laps:
+                    continue
+                times = [l["lap_time"] for l in stint_laps]
+                base  = min(times)
                 for l in stint_laps:
                     l["delta"] = round(l["lap_time"] - base, 3)
-
                 stint_data.append({
-                    "stint_number":   1,
-                    "compound":       "UNKNOWN",
+                    "stint_number":   s.get("stint_number", len(stint_data) + 1),
+                    "compound":       compound,
+                    "tyre_age_start": tyre_age_start,
+                    "laps":           stint_laps,
+                    "avg_time":       round(sum(times) / len(times), 3),
+                    "best_time":      round(base, 3),
+                    "degradation":    round(times[-1] - base, 3) if len(times) > 1 else 0,
+                })
+        else:
+            # Stint verisi yoksa Lap tablosundaki compound değişiminden çıkar (fallback)
+            groups: list[tuple[str, list]] = []
+            cur_compound, cur_laps = None, []
+            for lap_n in sorted(lap_time_map):
+                # Lap tablosundan compound bul
+                lap_obj = next((l for l in all_laps if l.driver_id == driver_id and l.lap_number == lap_n), None)
+                compound = (lap_obj.compound or "UNKNOWN") if lap_obj else "UNKNOWN"
+                if compound != cur_compound:
+                    if cur_laps:
+                        groups.append((cur_compound, cur_laps))
+                    cur_compound, cur_laps = compound, [(lap_n, lap_time_map[lap_n])]
+                else:
+                    cur_laps.append((lap_n, lap_time_map[lap_n]))
+            if cur_laps:
+                groups.append((cur_compound, cur_laps))
+
+            for i, (compound, group_laps) in enumerate(groups):
+                times = [lt for _, lt in group_laps]
+                base  = min(times)
+                stint_laps = [
+                    {"lap_number": ln, "tyre_age": j, "lap_time": round(lt, 3), "delta": round(lt - base, 3)}
+                    for j, (ln, lt) in enumerate(group_laps)
+                ]
+                stint_data.append({
+                    "stint_number":   i + 1,
+                    "compound":       compound or "UNKNOWN",
                     "tyre_age_start": 0,
                     "laps":           stint_laps,
-                    "avg_time":       round(sum(valid_times) / len(valid_times), 3),
+                    "avg_time":       round(sum(times) / len(times), 3),
                     "best_time":      round(base, 3),
-                    "degradation":    round(valid_times[-1] - base, 3) if len(valid_times) > 1 else 0,
+                    "degradation":    round(times[-1] - base, 3) if len(times) > 1 else 0,
                 })
 
-        if not stint_data:
-            return None
-
-        return {"code": code, "stints": stint_data}
-
-    results = await asyncio.gather(*[_driver_data(d) for d in drivers])
-    driver_list = [r for r in results if r is not None]
+        if stint_data:
+            driver_list.append({"code": code, "stints": stint_data})
 
     result = {"session_id": session_id, "drivers": driver_list}
-    # Kısa TTL — eksik pilotların cache'de takılmaması için
-    await cache_set(ck, result, ttl_seconds=1800)
+    ttl = 3600 if session.status == "finished" else 60
+    await cache_set(ck, result, ttl_seconds=ttl)
     return result
 
 
@@ -542,111 +686,103 @@ async def get_teammate_pace(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Takım arkadaşı pace karşılaştırması.
-    Her takım için iki pilotun medyan tur süresini ve aralarındaki farkı döner.
-    Pit-out, çok yavaş (SC/VSC) ve çok hızlı (outlier) turlar filtrelenir.
+    Takım arkadaşı pace karşılaştırması. Lap tablosundan okur.
     """
     ck = cache_key("teammate_pace", session_id)
     cached = await cache_get(ck)
     if cached:
         return cached
 
-    session     = await _resolve_session(session_id, db)
-    session_key = await _require_session_key(session, db)
+    session = await _resolve_session(session_id, db)
+    from collections import defaultdict
+    from sqlalchemy import func as sa_func
+    from sqlalchemy.orm import selectinload as sl
 
     is_quali = session.type in ("qualifying", "sprint_qualifying")
-    is_race  = session.type in ("race", "sprint")
 
-    drivers = await openf1.fetch_session_drivers(session_key)
+    driver_count = (await db.execute(
+        select(sa_func.count(sa_func.distinct(Lap.driver_id))).where(Lap.session_id == session_id)
+    )).scalar_one()
 
-    # Takım → sürücüler
-    team_map: dict[str, list[dict]] = {}
-    for d in drivers:
-        team = d.get("team_name") or d.get("team_colour") or "Unknown"
-        team_map.setdefault(team, []).append(d)
+    if session.status == "finished" and driver_count < 18:
+        await db_cache.bulk_sync_to_lap_table(session, db)
 
-    sem = asyncio.Semaphore(5)
+    laps_res = await db.execute(
+        select(Lap)
+        .where(
+            Lap.session_id == session_id,
+            Lap.is_pit_out_lap == False,
+            Lap.lap_time.isnot(None),
+        )
+        .options(sl(Lap.driver).selectinload(Driver.current_team))
+    )
+    all_laps = laps_res.scalars().all()
 
-    async def _driver_laps(d: dict) -> dict | None:
-        dn   = d.get("driver_number")
-        code = d.get("name_acronym", "???")
-        async with sem:
-            laps = await db_cache.get_laps(session, dn, db)
+    laps_by_driver: dict[int, list] = defaultdict(list)
+    for lap in all_laps:
+        if lap.lap_time and lap.lap_time < 300:
+            laps_by_driver[lap.driver_id].append(lap)
 
-        if not laps:
-            return None
+    driver_pace: dict[str, dict] = {}
+    team_map: dict[str, list] = defaultdict(list)
 
-        # Geçerli tur süreleri: pit-out değil, 300s'den kısa
-        times = [
-            l["lap_duration"]
-            for l in laps
-            if l.get("lap_duration")
-            and not l.get("is_pit_out_lap")
-            and l["lap_duration"] < 300
-        ]
+    for driver_id, driver_laps in laps_by_driver.items():
+        drv  = driver_laps[0].driver
+        team = drv.current_team
+        code = drv.code
+        team_name = team.name if team else "Unknown"
+
+        times = sorted(l.lap_time for l in driver_laps)
         if not times:
-            return None
-
-        sorted_t = sorted(times)
-        best = sorted_t[0]
-
-        if is_quali:
-            # Sıralama turunda: en iyi tur = pace göstergesi
-            # Minimum 1 geçerli tur yeterli
-            pace = best
-        else:
-            # Yarış/antrenman: medyan (SC dönemi outlier'larını eler)
-            # En az 3 tur olmadan güvenilir değil
-            if len(times) < 3:
-                pace = best
-            else:
-                lo    = int(len(sorted_t) * 0.05)
-                hi    = int(len(sorted_t) * 0.85)
-                clean = sorted_t[lo:hi] if hi > lo + 2 else sorted_t
-                pace  = clean[len(clean) // 2]
-
-        return {
-            "code":   code,
-            "number": dn,
-            "median": round(pace, 3),   # sıralama için best, yarış için medyan
-            "best":   round(best, 3),
-            "laps":   len(times),
-        }
-
-    results = await asyncio.gather(*[_driver_laps(d) for d in drivers])
-    driver_pace = {r["code"]: r for r in results if r}
-
-    teams_out = []
-    for team, team_drivers in team_map.items():
-        members = [driver_pace.get(d.get("name_acronym", "")) for d in team_drivers]
-        members = [m for m in members if m]
-        if len(members) < 2:
             continue
 
+        best = times[0]
+        if is_quali:
+            pace = best
+        elif len(times) < 3:
+            pace = best
+        else:
+            lo = int(len(times) * 0.05)
+            hi = int(len(times) * 0.85)
+            clean = times[lo:hi] if hi > lo + 2 else times
+            pace = clean[len(clean) // 2]
+
+        entry = {
+            "code":        code,
+            "full_name":   drv.full_name,
+            "team_name":   team_name,
+            "team_colour": team.color_hex if team else "#AAAAAA",
+            "median":      round(pace, 3),
+            "best":        round(best, 3),
+            "laps":        len(times),
+        }
+        driver_pace[code] = entry
+        team_map[team_name].append(entry)
+
+    teams_out = []
+    for team_name, members in team_map.items():
+        if len(members) < 2:
+            continue
         members.sort(key=lambda x: x["median"])
         faster, slower = members[0], members[1]
-        gap = round(slower["median"] - faster["median"], 3)
-
         teams_out.append({
-            "team":    team,
+            "team":    team_name,
             "faster":  faster,
             "slower":  slower,
-            "gap_ms":  gap,           # saniye cinsinden fark (+ = slower daha yavaş)
+            "gap_ms":  round(slower["median"] - faster["median"], 3),
         })
 
-    # Gap'e göre büyükten küçüğe sırala
     teams_out.sort(key=lambda x: x["gap_ms"], reverse=True)
-
-    # Tüm pilotların pace listesi (serbest karşılaştırma için)
     all_drivers = sorted(driver_pace.values(), key=lambda x: x["median"])
 
     result = {
         "session_id":   session_id,
         "session_type": session.type,
         "teams":        teams_out,
-        "all_drivers":  all_drivers,   # [{code, median, best, laps}, ...]
+        "all_drivers":  all_drivers,
     }
-    await cache_set(ck, result, ttl_seconds=3600)
+    ttl = 3600 if session.status == "finished" else 60
+    await cache_set(ck, result, ttl_seconds=ttl)
     return result
 
 
@@ -673,7 +809,7 @@ async def get_available_laps(
     if driver_number is None:
         raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
 
-    laps = await openf1.fetch_laps(session_key, driver_number)
+    laps = await db_cache.get_laps(session, driver_number, db)
     max_valid = 180.0 if is_quali else 9999.0
 
     flying = [
@@ -709,7 +845,8 @@ async def get_available_laps(
         "is_quali":     is_quali,
         "laps":         valid,
     }
-    await cache_set(cache_k, result, ttl_seconds=300)
+    ttl = 86_400 if session.status == "finished" else 300
+    await cache_set(cache_k, result, ttl_seconds=ttl)
     return result
 
 
@@ -737,10 +874,9 @@ async def get_driver_summary(
     if driver_number is None:
         raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
 
-    # Tüm turları çek
-    laps_raw = await openf1.fetch_laps(session_key, driver_number)
-    # Stintleri çek
-    stints_raw = await openf1.fetch_stints(session_key, driver_number)
+    laps_raw = await db_cache.get_laps(session, driver_number, db)
+    all_stints = await db_cache.get_stints(session, db)
+    stints_raw = [s for s in all_stints if s.get("driver_number") == driver_number]
 
     # Geçerli turlar: pit out değil, süre var, makul
     valid_laps = [
@@ -793,7 +929,8 @@ async def get_driver_summary(
         "total_laps":      max((l.get("lap_number", 0) for l in laps_raw), default=0),
         "fastest_lap":     fastest_overall,
     }
-    await cache_set(cache_k, result, ttl_seconds=600)
+    ttl = 86_400 if session.status == "finished" else 600
+    await cache_set(cache_k, result, ttl_seconds=ttl)
     return result
 
 
@@ -877,7 +1014,8 @@ async def get_leaderboard(
                     "entries":      race_entries,
                     "segments":     {},
                 }
-                await cache_set(cache_k, response, ttl_seconds=3600)
+                # Bitmiş yarış sonuçları değişmez — 7 gün cache
+                await cache_set(cache_k, response, ttl_seconds=7 * 86_400)
                 return response
             except Exception as exc:
                 logger.warning("Jolpica yarış sonucu alınamadı: %s", exc)
@@ -926,8 +1064,11 @@ async def get_leaderboard(
             dn   = driver.get("driver_number")
             code = driver.get("name_acronym", "???")
             async with sem:
-                try: laps = await openf1.fetch_laps(session_key, dn)
-                except: laps = []
+                try:
+                    laps = await db_cache.get_laps(session, dn, db)
+                except Exception:
+                    logger.warning("Lap fetch hatası: driver=%s session=%s", dn, session_id)
+                    laps = []
             return code, laps
 
         lap_raw = await asyncio.gather(*[_fetch_lap_safe(d) for d in drivers])
@@ -1015,133 +1156,97 @@ async def get_leaderboard(
         await cache_set(cache_k, response, ttl_seconds=120)
         return response
 
-    # ── Sıralama / Antrenman için tüm lap verilerini çek ──────────────────
-    async def _fetch(driver):
-        dn = driver.get("driver_number")
-        async with sem:
-            try: laps = await openf1.fetch_laps(session_key, dn)
-            except: laps = []
-        return driver.get("name_acronym", "???"), laps
+    # ── Sıralama / Antrenman: Lap tablosundan oku (kalıcı, tüm pilotlar) ──────
+    from collections import defaultdict
+    from sqlalchemy import func as sa_func
+    from sqlalchemy.orm import selectinload as sl
 
-    raw = await asyncio.gather(*[_fetch(d) for d in drivers])
-    laps_by = {code: laps for code, laps in raw if laps}
+    driver_count_res = await db.execute(
+        select(sa_func.count(sa_func.distinct(Lap.driver_id)))
+        .where(Lap.session_id == session_id)
+    )
+    driver_count = driver_count_res.scalar_one()
 
-    # ── Segment başlangıçlarını timestamp boşluğundan bul ──────────────────
-    seg_starts = []  # [Q1_start, Q2_start, Q3_start]
-    if is_quali:
-        all_dts = sorted(
-            _parse(l.get("date_start"))
-            for laps in laps_by.values() for l in laps
-            if _parse(l.get("date_start"))
+    # Yeterli pilot yoksa tek API çağrısıyla inline sync yap
+    if driver_count < 18 and session.status == "finished":
+        await db_cache.bulk_sync_to_lap_table(session, db)
+        driver_count = (await db.execute(
+            select(sa_func.count(sa_func.distinct(Lap.driver_id))).where(Lap.session_id == session_id)
+        )).scalar_one()
+
+    # Lap tablosundan tüm geçerli turları tek sorguda çek
+    laps_res = await db.execute(
+        select(Lap)
+        .where(
+            Lap.session_id == session_id,
+            Lap.is_pit_out_lap == False,
+            Lap.lap_time.isnot(None),
         )
-        prev = None
-        seg_starts = [all_dts[0]] if all_dts else []
-        for d in all_dts:
-            if prev and (d - prev).total_seconds() > 300:
-                seg_starts.append(d)
-            prev = d
+        .options(sl(Lap.driver).selectinload(Driver.current_team))
+        .order_by(Lap.driver_id, Lap.lap_number)
+    )
+    all_laps = laps_res.scalars().all()
 
-    def _seg_of(laps, lap_num):
-        """Bir lap numarasının hangi segmentte olduğunu döner."""
-        lap = next((l for l in laps if l.get("lap_number") == lap_num), None)
-        if not lap or not seg_starts: return None
-        lap_dt = _parse(lap.get("date_start"))
-        if not lap_dt: return None
-        seg = 1
-        for start in seg_starts[1:]:
-            if lap_dt >= start: seg += 1
-        return f"Q{min(seg, 3)}"
+    # Her pilot için en iyi turu bul
+    laps_by_driver: dict[int, list] = defaultdict(list)
+    for lap in all_laps:
+        if lap.lap_time and lap.lap_time < 300:  # SC/kırmızı bayrak turlarını at
+            laps_by_driver[lap.driver_id].append(lap)
 
-    def _seg_flying(laps, seg_idx):
-        """Belirli bir segmentteki flying lapları döner."""
-        if seg_idx >= len(seg_starts): return []
-        seg_s = seg_starts[seg_idx]
-        seg_e = seg_starts[seg_idx + 1] if seg_idx + 1 < len(seg_starts) else None
-        seg_laps = [
-            l for l in laps
-            if l.get("lap_duration") and not l.get("is_pit_out_lap")
-            and (lambda d: d and d >= seg_s and (seg_e is None or d < seg_e))(_parse(l.get("date_start")))
-        ]
-        return _flying(seg_laps)
-
-    # ── Genel (overall best) sıralama ──────────────────────────────────────
-    entries = []
-    for d in drivers:
-        code = d.get("name_acronym","???")
-        laps = laps_by.get(code, [])
-        valid = _flying(laps)
-        if not valid: continue
-        best = min(valid, key=lambda x: x["lap_duration"])
-        entries.append({
-            "code": code,
-            "full_name": (d.get("full_name") or f"{d.get('first_name','')} {d.get('last_name','')}").strip(),
-            "team_name":   d.get("team_name",""),
-            "team_colour": f"#{d.get('team_colour','AAAAAA')}",
-            "lap_time":  best.get("lap_duration"),
-            "sector1":   best.get("duration_sector_1"),
-            "sector2":   best.get("duration_sector_2"),
-            "sector3":   best.get("duration_sector_3"),
-            "compound":  best.get("compound"),
-            "q_segment": _seg_of(laps, best.get("lap_number")) if is_quali and seg_starts else None,
-        })
-    entries.sort(key=lambda e: e["lap_time"])
-    lead = entries[0]["lap_time"] if entries else 0
     def _add_pos(lst, lead_time):
         for i, e in enumerate(lst):
             e["position"] = i + 1
             e["gap"] = round(e["lap_time"] - lead_time, 4) if i > 0 else 0.0
         return lst
-    entries = _add_pos(entries, lead)
 
     def _mark_best(lst):
-        for field in ("sector1","sector2","sector3"):
+        for field in ("sector1", "sector2", "sector3"):
             vals = [e[field] for e in lst if e.get(field)]
-            best = min(vals) if vals else None
+            best_val = min(vals) if vals else None
             for e in lst:
-                e[f"{field}_is_best"] = bool(e.get(field) and e[field] == best)
+                e[f"{field}_is_best"] = bool(e.get(field) and e[field] == best_val)
         return lst
-    entries = _mark_best(entries)
 
-    # ── Per-segment sıralamalar (Q1/Q2/Q3) ────────────────────────────────
-    # Her segment kendi içinde sıralanır, ayrı best lap gösterilir.
-    seg_data = {}
-    if is_quali and len(seg_starts) >= 2:
-        seg_names = ["Q1","Q2","Q3"]
-        for si, seg_name in enumerate(seg_names):
-            if si >= len(seg_starts): break
-            seg_entries = []
-            for d in drivers:
-                code = d.get("name_acronym","???")
-                laps = laps_by.get(code, [])
-                valid_seg = _seg_flying(laps, si)
-                if not valid_seg: continue
-                best_seg = min(valid_seg, key=lambda x: x["lap_duration"])
-                seg_entries.append({
-                    "code": code,
-                    "full_name": (d.get("full_name") or f"{d.get('first_name','')} {d.get('last_name','')}").strip(),
-                    "team_name":   d.get("team_name",""),
-                    "team_colour": f"#{d.get('team_colour','AAAAAA')}",
-                    "lap_time":  best_seg.get("lap_duration"),
-                    "sector1":   best_seg.get("duration_sector_1"),
-                    "sector2":   best_seg.get("duration_sector_2"),
-                    "sector3":   best_seg.get("duration_sector_3"),
-                    "compound":  best_seg.get("compound"),
-                    "q_segment": seg_name,
-                })
-            seg_entries.sort(key=lambda e: e["lap_time"])
-            seg_lead = seg_entries[0]["lap_time"] if seg_entries else 0
-            seg_entries = _add_pos(seg_entries, seg_lead)
-            seg_entries = _mark_best(seg_entries)
-            seg_data[seg_name] = seg_entries
+    entries = []
+    for driver_id, driver_laps in laps_by_driver.items():
+        best = min(driver_laps, key=lambda l: l.lap_time)
+        drv  = best.driver
+        team = drv.current_team
+        entries.append({
+            "code":       drv.code,
+            "full_name":  drv.full_name,
+            "team_name":  team.name if team else "",
+            "team_colour": team.color_hex if team else "#AAAAAA",
+            "lap_time":   best.lap_time,
+            "sector1":    best.sector1_time,
+            "sector2":    best.sector2_time,
+            "sector3":    best.sector3_time,
+            "compound":   best.compound,
+            "q_segment":  None,
+            "gap":        0.0,
+            "position":   0,
+            "sector1_is_best": False,
+            "sector2_is_best": False,
+            "sector3_is_best": False,
+        })
+
+    entries.sort(key=lambda e: e["lap_time"])
+    lead = entries[0]["lap_time"] if entries else 0
+    entries = _add_pos(entries, lead)
+    entries = _mark_best(entries)
 
     response = {
         "session_id":   session_id,
         "session_type": session.type,
         "is_quali":     is_quali,
-        "entries":      entries,   # Overall best
-        "segments":     seg_data,  # Q1/Q2/Q3 ayrı sıralamalar
+        "is_race":      False,
+        "syncing":      False,
+        "entries":      entries,
+        "segments":     {},  # Q segmentleri Lap tablosunda timestamp yok, şimdilik boş
     }
-    await cache_set(cache_k, response, ttl_seconds=300)
+    # 18+ pilot varsa 1 saat, eksikse 15 saniye (arka plan sync tamamlanınca dolar)
+    ttl = 3600 if (session.status == "finished" and len(entries) >= 18) else 15
+    await cache_set(cache_k, response, ttl_seconds=ttl)
     return response
 
 
@@ -1149,6 +1254,7 @@ async def get_leaderboard(
 async def sync_session_cache(
     session_id: int,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """
     Biten bir session'ın tüm OpenF1 verisini (laps + stints) DB'ye kalıcı olarak yazar.
@@ -1163,6 +1269,7 @@ async def sync_session_cache(
 async def sync_all_finished_sessions(
     db: AsyncSession = Depends(get_db),
     session_type: str | None = Query(None, description="Sadece bu tip: race, qualifying vb."),
+    _admin: User = Depends(require_admin),
 ):
     """
     Biten session'ların verisini DB cache'e sıralı olarak çeker.

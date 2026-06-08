@@ -27,7 +27,15 @@ _last_positions_hash: dict[int, str] = {}
 def poll_live_session(self) -> dict:
     """Ana polling görevi. Asyncio.run ile async iç fonksiyonu çağırır."""
     import asyncio
-    return asyncio.run(_poll_async())
+    from app.core.redis_client import close_redis
+
+    async def _run():
+        try:
+            return await _poll_async()
+        finally:
+            await close_redis()
+
+    return asyncio.run(_run())
 
 
 async def _poll_async() -> dict:
@@ -201,7 +209,15 @@ def detect_and_activate_live_session() -> dict:
     Celery beat tarafından her dakika çalıştırılır.
     """
     import asyncio
-    return asyncio.run(_detect_async())
+    from app.core.redis_client import close_redis
+
+    async def _run():
+        try:
+            return await _detect_async()
+        finally:
+            await close_redis()
+
+    return asyncio.run(_run())
 
 
 async def _detect_async() -> dict:
@@ -221,12 +237,12 @@ async def _detect_async() -> dict:
         return {"status": "no_live_session"}
 
     # DB'de session_key ile eşleşen kaydı bul
-    from app.core.database import AsyncSessionLocal
+    from app.core.database import CeleryAsyncSession
     from sqlalchemy import select
     from app.models.f1 import Session
 
     session_id = None
-    async with AsyncSessionLocal() as db:
+    async with CeleryAsyncSession() as db:
         result = await db.execute(
             select(Session).where(Session.session_key == live["session_key"])
         )

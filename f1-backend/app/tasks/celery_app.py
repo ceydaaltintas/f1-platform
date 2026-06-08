@@ -26,6 +26,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_soft_time_limit=300,
     task_time_limit=600,
+    broker_connection_retry_on_startup=True,
 )
 
 celery_app.conf.beat_schedule = {
@@ -47,9 +48,14 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.post_session.sync_completed_sessions",
         "schedule": crontab(hour=0, minute=30),
     },
-    # Yarış haftasonlarında aktif sezon round_status güncelle
-    "weekend-season-refresh": {
+    # Pazartesi sabahı round_status güncelle (Pazar yarışı tamamlandıktan sonra)
+    "monday-season-refresh": {
         "task": "app.tasks.post_session.refresh_current_season_rounds",
-        "schedule": crontab(hour=6, minute=0, day_of_week="5,6,0"),
+        "schedule": crontab(hour=2, minute=0, day_of_week=1),
+    },
+    # Yarış haftasonu Cuma-Cumartesi-Pazar akşamı session kayıtlarını çek
+    "race-weekend-session-sync": {
+        "task": "app.tasks.post_session.sync_race_weekend_sessions",
+        "schedule": crontab(hour=20, minute=0, day_of_week="5,6,0"),
     },
 }
