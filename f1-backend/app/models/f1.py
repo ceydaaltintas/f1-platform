@@ -85,6 +85,7 @@ class Round(Base):
     country: Mapped[str | None] = mapped_column(String(100))
     locality: Mapped[str | None] = mapped_column(String(100))
     race_date: Mapped[date | None] = mapped_column(DATE)
+    race_datetime: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     meeting_key: Mapped[int | None] = mapped_column(Integer)  # OpenF1 meeting_key
     # "upcoming" | "completed" — yarış tarihi geçmişse completed, değilse upcoming
     round_status: Mapped[str] = mapped_column(

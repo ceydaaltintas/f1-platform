@@ -147,7 +147,7 @@ export function AIInsightPanel({
       </div>
 
       {/* Body */}
-      <div className="flex-1 p-5">
+      <div className="flex-1 p-5 overflow-y-auto" style={{ maxHeight: 420 }}>
 
         {/* Karşılaştırma modu — veri kartları */}
         {isCompareMode && selectedPoint && comparePoint && state.kind !== 'loading' && (

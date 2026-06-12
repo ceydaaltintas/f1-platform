@@ -196,7 +196,7 @@ async def _groq_interpret(content: str, system: str) -> str:
     client = AsyncGroq(api_key=settings.groq_api_key)
     resp = await client.chat.completions.create(
         model="llama-3.1-8b-instant",
-        max_tokens=350,
+        max_tokens=600,
         messages=[
             {"role": "system", "content": system},
             {"role": "user",   "content": content},

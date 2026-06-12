@@ -222,7 +222,7 @@ export function HomePage() {
   const days      = daysUntil(nextRound.data?.race_date ?? null)
   const round     = nextRound.data
   const flag      = FLAG[round?.country ?? ''] ?? '🏁'
-  const countdown = useCountdown(round?.race_date ?? null)
+  const countdown = useCountdown(round?.race_datetime ?? round?.race_date ?? null)
 
   // Son tamamlanan yarış podyumu
   const completedRaces = seasonResults.data?.filter((r: any) => r.podium?.length > 0) ?? []

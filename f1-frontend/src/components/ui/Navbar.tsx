@@ -50,21 +50,22 @@ export function Navbar() {
       )}
     >
       {/* ── Logo ── */}
-      <Link to="/" className="flex items-center gap-3 group">
-        <div className="relative">
-          <div className="w-8 h-8 rounded-lg bg-[#E10600] flex items-center justify-center
-                          group-hover:shadow-[0_0_16px_rgba(225,6,0,0.5)] transition-shadow">
-            <span className="text-white text-sm font-black mono">F1</span>
-          </div>
-        </div>
-        <div className="hidden sm:block">
-          <p className="text-white text-[13px] font-bold leading-none tracking-tight">
-            F1 Platform
-          </p>
-          <p className="text-[10px] mono" style={{ color: 'rgba(240,244,255,0.3)' }}>
-            Telemetri · Analiz · Topluluk
-          </p>
-        </div>
+      <Link to="/" className="flex items-center gap-2.5">
+        <img
+          src="/favicon.svg"
+          alt="Hotlap logo"
+          style={{ width: 28, height: 28, flexShrink: 0 }}
+        />
+        <span style={{
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontSize: 18,
+          fontWeight: 600,
+          letterSpacing: '-0.3px',
+          lineHeight: 1,
+        }}>
+          <span style={{ color: '#ffffff' }}>Hot</span>
+          <span style={{ color: '#E10600' }}>lap</span>
+        </span>
       </Link>
 
       {/* ── Nav Links ── */}

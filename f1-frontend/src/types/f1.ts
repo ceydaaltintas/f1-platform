@@ -39,6 +39,7 @@ export interface Round {
   country: string | null
   locality: string | null
   race_date: string | null
+  race_datetime: string | null
   round_status: 'completed' | 'upcoming'
   sessions: SessionBrief[]
 }

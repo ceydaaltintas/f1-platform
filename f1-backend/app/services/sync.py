@@ -8,7 +8,7 @@ Jolpica → Veritabanı senkronizasyon servisi.
 """
 
 import logging
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,6 +134,11 @@ async def sync_rounds(year: int, season: Season, db: AsyncSession) -> list[Round
         parsed = jolpica.parse_round(raw)
         race_date_str = parsed.pop("race_date", None)
         race_date = date.fromisoformat(race_date_str) if race_date_str else None
+        race_datetime_str = parsed.pop("race_datetime", None)
+        race_datetime = (
+            datetime.fromisoformat(race_datetime_str.replace("Z", "+00:00"))
+            if race_datetime_str else None
+        )
         status = _round_status(race_date)
 
         result = await db.execute(
@@ -149,6 +154,7 @@ async def sync_rounds(year: int, season: Season, db: AsyncSession) -> list[Round
                 **parsed,
                 season_id=season.id,
                 race_date=race_date,
+                race_datetime=race_datetime,
                 round_status=status,
             )
             db.add(rnd)
@@ -159,6 +165,7 @@ async def sync_rounds(year: int, season: Season, db: AsyncSession) -> list[Round
             for k, v in parsed.items():
                 setattr(rnd, k, v)
             rnd.race_date = race_date
+            rnd.race_datetime = race_datetime
             rnd.round_status = status  # Her sync'te güncelle
 
         rounds.append(rnd)

@@ -62,6 +62,7 @@ class RoundOut(BaseModel):
     country: str | None
     locality: str | None
     race_date: date | None
+    race_datetime: datetime | None
     round_status: str  # "completed" | "upcoming"
     sessions: list[SessionBrief] = []
 

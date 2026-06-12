@@ -1,0 +1,17 @@
+{
+  "name": "Hotlap",
+  "short_name": "Hotlap",
+  "description": "F1 telemetri, canlı yarış takibi ve AI destekli analiz",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#E10600",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

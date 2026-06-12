@@ -134,13 +134,19 @@ def parse_round(race: dict) -> dict:
     """Jolpica round verisini iç formata dönüştürür."""
     circuit = race.get("Circuit", {})
     location = circuit.get("Location", {})
+
+    race_date = race.get("date")
+    race_time = race.get("time")  # örn. "13:00:00Z" (UTC)
+    race_datetime = f"{race_date}T{race_time}" if race_date and race_time else None
+
     return {
         "round_number": int(race["round"]),
         "name": race["raceName"],
         "circuit_name": circuit.get("circuitName", ""),
         "country": location.get("country"),
         "locality": location.get("locality"),
-        "race_date": race.get("date"),
+        "race_date": race_date,
+        "race_datetime": race_datetime,
     }
 
 
