@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,9 +10,10 @@ from app.core.database import get_db
 from app.core.redis_client import cache_delete_pattern, cache_get, cache_key, cache_set
 from app.models.f1 import Driver, Round, Season, Team
 from app.schemas.f1 import DriverOut, RoundOut, SeasonOut, TeamOut
-from app.services.sync import _determine_current_season, sync_full_season
+from app.services.sync import _determine_current_season, sync_full_season, sync_sessions_for_round
 
 router = APIRouter(tags=["seasons"])
+logger = logging.getLogger(__name__)
 
 
 def _season_cache_ttl(year: int) -> int:
@@ -93,6 +95,44 @@ async def sync_season_endpoint(year: int, db: AsyncSession = Depends(get_db)):
         await cache_delete_pattern("seasons:*")
 
     return {"message": f"{year} sezonu senkronize edildi", "stats": result}
+
+
+@router.post("/seasons/{year}/rounds/{round_number}/sync_sessions", status_code=202)
+async def sync_round_sessions_endpoint(year: int, round_number: int, db: AsyncSession = Depends(get_db)):
+    """
+    Bir round için OpenF1'den session kayıtlarını çeker (round_status'tan
+    bağımsız — devam eden yarış haftasonları için). Geçmişte kalan session'ların
+    tur verisi de hemen DB'ye senkronize edilir.
+    """
+    from datetime import datetime, timezone
+    from app.services import db_cache
+
+    season = (await db.execute(select(Season).where(Season.year == year))).scalar_one_or_none()
+    if season is None:
+        raise HTTPException(404, f"{year} sezonu bulunamadı")
+
+    rnd = (await db.execute(
+        select(Round).where(Round.season_id == season.id, Round.round_number == round_number)
+    )).scalar_one_or_none()
+    if rnd is None:
+        raise HTTPException(404, f"Round {round_number} bulunamadı")
+
+    sessions = await sync_sessions_for_round(rnd, year, db)
+    await db.commit()
+
+    now = datetime.now(timezone.utc)
+    laps_synced = []
+    for s in sessions:
+        if s.session_key and s.session_date and s.session_date < now:
+            try:
+                result = await db_cache.sync_session(s, db)
+                laps_synced.append({"session_id": s.id, "type": s.type, **result})
+            except Exception as exc:
+                logger.warning("Session %d lap sync hatası: %s", s.id, exc)
+
+    await cache_delete_pattern(f"rounds:{year}:*")
+
+    return {"round": rnd.round_number, "sessions_found": len(sessions), "laps_synced": laps_synced}
 
 
 # ─── Rounds ──────────────────────────────────────────────────────────────────
