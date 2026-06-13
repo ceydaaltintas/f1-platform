@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
 import { formatLapTime, formatSectorTime } from '../../utils/format'
+import { HistoricalShareCard } from '../ui/HistoricalShareCard'
+import { useShareCard } from '../../hooks/useShareCard'
 
 interface Props {
   circuitName?: string
@@ -29,6 +31,8 @@ export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver 
   const toggleYear = (y: number) => {
     setYears(prev => prev.includes(y) ? prev.filter(x => x !== y) : [...prev, y].sort())
   }
+
+  const { cardRef: shareCardRef, share: shareHistorical } = useShareCard()
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['historical', driver, circuit, years],
@@ -96,6 +100,23 @@ export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver 
 
       {data?.results && (
         <div className="space-y-2">
+          <div className="flex justify-end">
+            <button onClick={() => shareHistorical(`hotlap-${driver}-${circuit.replace(/\s+/g, '-')}-tarihsel`)}
+              className="flex items-center gap-2 px-4 py-2 text-[11px] border border-[#E10600]/40 text-[#E10600] rounded-lg hover:bg-[#E10600]/10 transition-all"
+            >
+              <span>↗</span> Karşılaştırmayı Paylaş
+            </button>
+          </div>
+
+          {/* Görünmez kart — sadece yakalama için */}
+          <HistoricalShareCard
+            ref={shareCardRef}
+            driver={driver}
+            circuitName={circuitName ?? circuit}
+            results={data.results}
+            fastestYear={data.fastest_year}
+          />
+
           {data.results.map((r: any) => (
             <div key={r.year}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl"

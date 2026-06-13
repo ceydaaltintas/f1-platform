@@ -32,6 +32,18 @@ class CommentOut(BaseModel):
     user_id: uuid.UUID
 
 
+class CommentUpdate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("content")
+    @classmethod
+    def no_spam(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Yorum boş olamaz")
+        return v
+
+
 class CommentPage(BaseModel):
     items: list[CommentOut]
     total: int
@@ -74,6 +86,7 @@ class PollOut(BaseModel):
     created_at: datetime
     closes_at: datetime | None
     is_closed: bool
+    created_by: uuid.UUID
     created_by_username: str = ""
 
 

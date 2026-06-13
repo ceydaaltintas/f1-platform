@@ -646,7 +646,7 @@ export function SessionPage() {
           </div>
           {/* 2026 Enerji Analizi — sadece yarış / sprint */}
           {sessionDrivers.length >= 2 && ['race','sprint'].includes(sessionInfo.data?.type ?? '') && (
-            <EnergyAnalysis sessionId={sid} sessionDrivers={sessionDrivers} primaryDriver={primaryDriver} />
+            <EnergyAnalysis sessionId={sid} sessionDrivers={sessionDrivers} primaryDriver={primaryDriver} sessionName={`${roundName} · ${sessionLabel}`} />
           )}
 
           {/* Takım Arkadaşı Pace */}

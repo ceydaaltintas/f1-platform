@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { client } from '../../api/client'
+import { client, getCurrentUserId } from '../../api/client'
 import { useCommunityStore, type Poll } from '../../store/communityStore'
 
 function useCountdown(closesAt: string | null): string {
@@ -22,7 +22,9 @@ function useCountdown(closesAt: string | null): string {
   return label
 }
 
-function PollCard({ poll, sessionId, userId }: { poll: Poll; sessionId: number; userId: string | null }) {
+function PollCard({ poll, sessionId, userId, onDeleted }: {
+  poll: Poll; sessionId: number; userId: string | null; onDeleted: (id: string) => void
+}) {
   const countdown   = useCountdown(poll.closes_at)
   const queryClient = useQueryClient()
 
@@ -33,8 +35,14 @@ function PollCard({ poll, sessionId, userId }: { poll: Poll; sessionId: number; 
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['polls', sessionId] }),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => client.delete(`/polls/${poll.id}`),
+    onSuccess: () => onDeleted(poll.id),
+  })
+
   const hasVoted = poll.user_vote !== null && poll.user_vote !== undefined
   const isClosed = poll.is_closed
+  const isOwn = poll.created_by === getCurrentUserId()
 
   return (
     <div className="rounded-xl border p-4 space-y-3"
@@ -116,11 +124,21 @@ function PollCard({ poll, sessionId, userId }: { poll: Poll; sessionId: number; 
         <span className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
           {poll.total_votes} oy · @{poll.created_by_username}
         </span>
-        {!hasVoted && !isClosed && (
-          <span className="text-[10px]" style={{ color: 'var(--t3)' }}>
-            Seç ve oy ver
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {!hasVoted && !isClosed && (
+            <span className="text-[10px]" style={{ color: 'var(--t3)' }}>
+              Seç ve oy ver
+            </span>
+          )}
+          {isOwn && (
+            <button onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              className="text-[11px] transition-colors hover:text-[#f87171] disabled:opacity-50"
+              style={{ color: 'var(--t3)' }}>
+              {deleteMutation.isPending ? '⏳' : 'Sil'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -134,6 +152,7 @@ function PollCreateForm({ sessionId, onCreated }: {
   const [options, setOptions] = useState(['', ''])
   const [minutes, setMinutes] = useState(5)
   const [error, setError] = useState<string | null>(null)
+  const submittingRef = useRef(false)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -143,8 +162,20 @@ function PollCreateForm({ sessionId, onCreated }: {
         closes_in_minutes: minutes,
       }).then(r => r.data),
     onSuccess: (p) => { onCreated(p); setOpen(false); setQuestion(''); setOptions(['', '']); setError(null) },
-    onError: (e: any) => setError(e.response?.data?.detail ?? 'Anket oluşturulamadı'),
+    onError: (e: any) => {
+      const msg = e.response?.data?.detail
+      if (typeof msg === 'string') setError(msg)
+      else if (Array.isArray(msg) && msg[0]?.msg) setError(String(msg[0].msg))
+      else setError('Anket oluşturulamadı')
+    },
+    onSettled: () => { submittingRef.current = false },
   })
+
+  const handleSubmit = () => {
+    if (submittingRef.current || mutation.isPending) return
+    submittingRef.current = true
+    mutation.mutate()
+  }
 
   const inputStyle = {
     width: '100%',
@@ -217,8 +248,8 @@ function PollCreateForm({ sessionId, onCreated }: {
             className="px-3 py-1.5 rounded-lg text-[12px] transition-colors"
             style={{ color: 'var(--t3)' }}>İptal</button>
           <button
-            onClick={() => mutation.mutate()}
-            disabled={!question.trim() || options.filter(o => o.trim()).length < 2 || mutation.isPending}
+            onClick={handleSubmit}
+            disabled={question.trim().length < 5 || options.filter(o => o.trim()).length < 2 || mutation.isPending}
             className="px-4 py-1.5 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             style={{ background: 'rgba(225,6,0,0.15)', border: '1px solid rgba(225,6,0,0.3)', color: '#E10600' }}>
             {mutation.isPending ? '⏳' : 'Oluştur'}
@@ -234,7 +265,7 @@ function PollCreateForm({ sessionId, onCreated }: {
 interface Props { sessionId: number; userId: string | null; isAuthenticated: boolean }
 
 export function PollWidget({ sessionId, userId, isAuthenticated }: Props) {
-  const { polls, setInitialPolls } = useCommunityStore()
+  const { polls, setInitialPolls, addPoll, removePoll } = useCommunityStore()
   const queryClient = useQueryClient()
 
   const { data: pollsData } = useQuery({
@@ -274,13 +305,13 @@ export function PollWidget({ sessionId, userId, isAuthenticated }: Props) {
           </div>
         ) : (
           polls.map(p => (
-            <PollCard key={p.id} poll={p} sessionId={sessionId} userId={userId} />
+            <PollCard key={p.id} poll={p} sessionId={sessionId} userId={userId} onDeleted={removePoll} />
           ))
         )}
 
         {isAuthenticated ? (
           <PollCreateForm sessionId={sessionId}
-            onCreated={p => setInitialPolls([p, ...polls])} />
+            onCreated={addPoll} />
         ) : (
           <div className="text-center py-3">
             <p className="text-[12px]" style={{ color: 'var(--t3)' }}>

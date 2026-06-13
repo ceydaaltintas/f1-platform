@@ -11,6 +11,19 @@ import type {
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+/** Access token'daki `sub` (kullanıcı id) alanını okur, token yoksa/bozuksa null döner. */
+export function getCurrentUserId(): string | null {
+  const token = localStorage.getItem('access_token')
+  if (!token) return null
+  try {
+    const payload = token.split('.')[1]
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(json).sub ?? null
+  } catch {
+    return null
+  }
+}
+
 export const client = axios.create({
   baseURL: `${BASE_URL}/api/v1`,
   timeout: 90_000,
@@ -23,6 +36,45 @@ client.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
+
+// Access token süresi dolunca refresh_token ile otomatik yenile ve isteği tekrarla
+let refreshPromise: Promise<string> | null = null
+
+client.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+    if (error.response?.status !== 401 || originalRequest._retried || originalRequest.url?.includes('/auth/')) {
+      return Promise.reject(error)
+    }
+
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (!refreshToken) return Promise.reject(error)
+
+    originalRequest._retried = true
+
+    try {
+      if (!refreshPromise) {
+        refreshPromise = axios
+          .post<{ access_token: string; refresh_token: string }>(`${BASE_URL}/api/v1/auth/refresh`, { refresh_token: refreshToken })
+          .then((r) => {
+            localStorage.setItem('access_token', r.data.access_token)
+            localStorage.setItem('refresh_token', r.data.refresh_token)
+            return r.data.access_token
+          })
+          .finally(() => { refreshPromise = null })
+      }
+
+      const newToken = await refreshPromise
+      originalRequest.headers.Authorization = `Bearer ${newToken}`
+      return client(originalRequest)
+    } catch {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      return Promise.reject(error)
+    }
+  }
+)
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 

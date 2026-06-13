@@ -81,6 +81,7 @@ export function LoginPage() {
                 KULLANICI ADI
               </label>
               <input value={form.username} onChange={set('username')}
+                name="username" id="username"
                 placeholder="kullanici_adi" autoComplete="username"
                 style={inputStyle} onFocus={e => e.target.style.borderColor='rgba(225,6,0,0.5)'}
                 onBlur={e => e.target.style.borderColor='var(--b1)'} />
@@ -90,6 +91,7 @@ export function LoginPage() {
           <div className="space-y-1.5">
             <label className="text-[11px] mono font-semibold" style={{ color:'var(--t3)' }}>E-POSTA</label>
             <input value={form.email} onChange={set('email')}
+              name="email" id="email"
               placeholder="ornek@mail.com" type="email" autoComplete="email"
               style={inputStyle} onFocus={e => e.target.style.borderColor='rgba(225,6,0,0.5)'}
               onBlur={e => e.target.style.borderColor='var(--b1)'} />
@@ -98,6 +100,7 @@ export function LoginPage() {
           <div className="space-y-1.5">
             <label className="text-[11px] mono font-semibold" style={{ color:'var(--t3)' }}>ŞİFRE</label>
             <input value={form.password} onChange={set('password')}
+              name="password" id="password"
               placeholder="••••••••" type="password"
               autoComplete={tab==='login' ? 'current-password' : 'new-password'}
               style={inputStyle} onFocus={e => e.target.style.borderColor='rgba(225,6,0,0.5)'}

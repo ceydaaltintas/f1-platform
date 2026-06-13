@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { client } from '../../api/client'
+import { client, getCurrentUserId } from '../../api/client'
 import { useCommunityStore, type Comment } from '../../store/communityStore'
 
 function timeAgo(iso: string): string {
@@ -19,8 +19,33 @@ function nameColor(name: string): string {
   return palette[Math.abs(hash) % palette.length]
 }
 
-function CommentItem({ comment, onUpvote }: { comment: Comment; onUpvote: (id: string) => void }) {
+function CommentItem({ comment, onUpvote, onUpdated, onDeleted }: {
+  comment: Comment
+  onUpvote: (id: string) => void
+  onUpdated: (c: Comment) => void
+  onDeleted: (id: string) => void
+}) {
   const color = nameColor(comment.username)
+  const isOwn = comment.user_id === getCurrentUserId()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(comment.content)
+  const [error, setError] = useState<string | null>(null)
+
+  const updateMutation = useMutation({
+    mutationFn: (content: string) =>
+      client.patch<Comment>(`/comments/${comment.id}`, { content }).then(r => r.data),
+    onSuccess: (c) => { onUpdated(c); setEditing(false); setError(null) },
+    onError: (e: any) => {
+      const msg = e.response?.data?.detail
+      setError(typeof msg === 'string' ? msg : 'Güncellenemedi')
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => client.delete(`/comments/${comment.id}`),
+    onSuccess: () => onDeleted(comment.id),
+  })
+
   return (
     <div className="flex gap-3 py-3 border-b last:border-0"
       style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
@@ -46,17 +71,71 @@ function CommentItem({ comment, onUpvote }: { comment: Comment; onUpvote: (id: s
         </div>
 
         {/* Metin */}
-        <p className="text-[13px] leading-relaxed mb-2" style={{ color: 'rgba(240,244,255,0.75)' }}>
-          {comment.content}
-        </p>
+        {editing ? (
+          <div className="mb-2 space-y-2">
+            <textarea
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) updateMutation.mutate(draft.trim()) }}
+              rows={2}
+              maxLength={500}
+              className="w-full rounded-xl text-[13px] resize-none mono"
+              style={{
+                background: 'var(--s2)',
+                border: '1px solid rgba(225,6,0,0.4)',
+                color: 'rgba(240,244,255,0.85)',
+                padding: '8px 12px',
+                outline: 'none',
+              }}
+            />
+            {error && <p className="text-[11px] text-[#f87171]">{error}</p>}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => updateMutation.mutate(draft.trim())}
+                disabled={!draft.trim() || updateMutation.isPending}
+                className="px-3 py-1 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-30"
+                style={{ background: 'rgba(225,6,0,0.15)', border: '1px solid rgba(225,6,0,0.3)', color: '#E10600' }}>
+                {updateMutation.isPending ? '⏳' : 'Kaydet'}
+              </button>
+              <button
+                onClick={() => { setEditing(false); setDraft(comment.content); setError(null) }}
+                className="px-3 py-1 rounded-lg text-[11px] transition-all"
+                style={{ color: 'var(--t3)' }}>
+                İptal
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[13px] leading-relaxed mb-2" style={{ color: 'rgba(240,244,255,0.75)' }}>
+            {comment.content}
+          </p>
+        )}
 
-        {/* Upvote */}
-        <button onClick={() => onUpvote(comment.id)}
-          className="flex items-center gap-1.5 text-[11px] mono transition-all group"
-          style={{ color: 'var(--t3)' }}>
-          <span className="group-hover:text-[#E10600] transition-colors">▲</span>
-          <span className="group-hover:text-white transition-colors">{comment.upvotes}</span>
-        </button>
+        {/* Eylemler */}
+        <div className="flex items-center gap-4">
+          <button onClick={() => onUpvote(comment.id)}
+            className="flex items-center gap-1.5 text-[11px] mono transition-all group"
+            style={{ color: 'var(--t3)' }}>
+            <span className="group-hover:text-[#E10600] transition-colors">▲</span>
+            <span className="group-hover:text-white transition-colors">{comment.upvotes}</span>
+          </button>
+
+          {isOwn && !editing && (
+            <>
+              <button onClick={() => setEditing(true)}
+                className="text-[11px] transition-colors hover:text-white"
+                style={{ color: 'var(--t3)' }}>
+                Düzenle
+              </button>
+              <button onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="text-[11px] transition-colors hover:text-[#f87171] disabled:opacity-50"
+                style={{ color: 'var(--t3)' }}>
+                {deleteMutation.isPending ? '⏳' : 'Sil'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -130,7 +209,7 @@ interface FeedProps {
 }
 
 export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className }: FeedProps) {
-  const { comments, addComment, setInitialComments } = useCommunityStore()
+  const { comments, addComment, updateComment, removeComment, setInitialComments } = useCommunityStore()
   const queryClient = useQueryClient()
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -194,7 +273,10 @@ export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className }
             <p className="text-[12px]" style={{ color: 'var(--t3)' }}>İlk yorumu sen yap!</p>
           </div>
         ) : (
-          filtered.map(c => <CommentItem key={c.id} comment={c} onUpvote={handleUpvote} />)
+          filtered.map(c => (
+            <CommentItem key={c.id} comment={c} onUpvote={handleUpvote}
+              onUpdated={updateComment} onDeleted={removeComment} />
+          ))
         )}
       </div>
 

@@ -8,7 +8,9 @@ session_key eşleşmesi: veritabanındaki Session.session_key alanı kullanılı
 import asyncio
 import logging
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from tenacity import RetryError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -1531,7 +1533,12 @@ async def historical_compare(
                 "session_id": session.id,
             })
         except Exception as e:
-            results.append({"year": year, "error": str(e)})
+            cause = e.__cause__ if isinstance(e, RetryError) else e
+            if isinstance(cause, httpx.HTTPStatusError) and cause.response.status_code == 401:
+                results.append({"year": year, "error": "Veriye ulaşılamadı"})
+            else:
+                logger.warning("historical-compare %s/%s: %s", year, circuit, e)
+                results.append({"year": year, "error": "veri alınamadı"})
 
     # En hızlı yılı belirle
     valid = [r for r in results if "lap_time" in r and r["lap_time"]]

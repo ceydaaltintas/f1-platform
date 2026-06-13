@@ -10,6 +10,8 @@ import {
   ResponsiveContainer, LineChart, Line, ReferenceLine, Legend,
 } from 'recharts'
 import { client } from '../../api/client'
+import { EnergyShareCard } from '../ui/EnergyShareCard'
+import { useShareCard } from '../../hooks/useShareCard'
 
 interface PerLap {
   lap: number; deploy_kj: number; regen_kj: number
@@ -29,7 +31,7 @@ interface EnergyData {
   per_lap: PerLap[]; profile: Profile
 }
 interface Props {
-  sessionId: number; sessionDrivers: string[]; primaryDriver?: string
+  sessionId: number; sessionDrivers: string[]; primaryDriver?: string; sessionName?: string
 }
 
 // Sözlük tanımları
@@ -107,7 +109,7 @@ function ScoreBar({ label, value, color, description }: {
   )
 }
 
-export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver }: Props) {
+export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessionName }: Props) {
   const defaultA = primaryDriver && sessionDrivers.includes(primaryDriver)
     ? primaryDriver : (sessionDrivers[0] ?? 'VER')
   const defaultB = sessionDrivers.find(d => d !== defaultA) ?? sessionDrivers[1] ?? 'NOR'
@@ -128,6 +130,8 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver }: Pro
     queryFn: () => client.get(`/sessions/${sessionId}/energy_analysis/${dB}`).then(r => r.data as EnergyData),
     staleTime: Infinity, retry: 1, enabled: dB !== dA,
   })
+
+  const { cardRef: shareCardRef, share: shareEnergy } = useShareCard()
 
   const eA = queryA.data
   const eB = queryB.data
@@ -339,6 +343,29 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver }: Pro
                     )
                   })}
                 </div>
+              )}
+
+              {/* Paylaşım */}
+              {eB && (
+                <>
+                  <div className="flex justify-end">
+                    <button onClick={() => shareEnergy(`hotlap-${dA}-vs-${dB}-enerji`)}
+                      className="flex items-center gap-2 px-4 py-2 text-[11px] border border-[#E10600]/40 text-[#E10600] rounded-lg hover:bg-[#E10600]/10 transition-all"
+                    >
+                      <span>↗</span> Profili Paylaş
+                    </button>
+                  </div>
+
+                  {/* Görünmez kart — sadece yakalama için */}
+                  <EnergyShareCard
+                    ref={shareCardRef}
+                    sessionName={sessionName ?? ''}
+                    driverA={dA}
+                    driverB={dB}
+                    profileA={eA.profile}
+                    profileB={eB.profile}
+                  />
+                </>
               )}
 
               {/* Sözlük */}

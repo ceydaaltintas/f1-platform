@@ -8,7 +8,7 @@ export function useShareCard() {
 
     const html2canvas = (await import('html2canvas')).default
     const canvas = await html2canvas(cardRef.current, {
-      backgroundColor: '#080808',
+      backgroundColor: '#0a0a0a',
       scale: 2,               // retina kalitesi
       useCORS: true,
       logging: false,

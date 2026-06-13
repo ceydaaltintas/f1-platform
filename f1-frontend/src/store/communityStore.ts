@@ -29,6 +29,7 @@ export interface Poll {
   created_at: string
   closes_at: string | null
   is_closed: boolean
+  created_by: string
   created_by_username: string
 }
 
@@ -54,7 +55,11 @@ interface CommunityStore {
   connect: (sessionId: number) => void
   disconnect: () => void
   addComment: (comment: Comment) => void   // Optimistik güncelleme için
+  updateComment: (comment: Comment) => void
+  removeComment: (id: string) => void
+  addPoll: (poll: Poll) => void
   updatePoll: (poll: Poll) => void
+  removePoll: (id: string) => void
   clearLiveReactions: () => void
   setInitialComments: (comments: Comment[]) => void
   setInitialPolls: (polls: Poll[]) => void
@@ -114,12 +119,32 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
   },
 
   addComment: (comment) =>
-    set((s) => ({ comments: [comment, ...s.comments].slice(0, 200) })),
+    set((s) => {
+      if (s.comments.some((c) => c.id === comment.id)) return s
+      return { comments: [comment, ...s.comments].slice(0, 200) }
+    }),
+
+  updateComment: (comment) =>
+    set((s) => ({
+      comments: s.comments.map((c) => c.id === comment.id ? comment : c),
+    })),
+
+  removeComment: (id) =>
+    set((s) => ({ comments: s.comments.filter((c) => c.id !== id) })),
+
+  addPoll: (poll) =>
+    set((s) => {
+      if (s.polls.some((p) => p.id === poll.id)) return s
+      return { polls: [poll, ...s.polls] }
+    }),
 
   updatePoll: (poll) =>
     set((s) => ({
       polls: s.polls.map((p) => p.id === poll.id ? poll : p),
     })),
+
+  removePoll: (id) =>
+    set((s) => ({ polls: s.polls.filter((p) => p.id !== id) })),
 
   clearLiveReactions: () => set({ liveReactions: [] }),
 
@@ -137,20 +162,45 @@ function handleCommunityMessage(
   switch (msg.type) {
     case 'comment': {
       const c: Comment = msg.data
+      set((s: CommunityStore) => {
+        if (s.comments.some((existing) => existing.id === c.id)) return s
+        return { comments: [c, ...s.comments].slice(0, 200) }
+      })
+      break
+    }
+    case 'comment_update': {
+      const c: Comment = msg.data
       set((s: CommunityStore) => ({
-        comments: [c, ...s.comments].slice(0, 200),
+        comments: s.comments.map((existing) => existing.id === c.id ? c : existing),
+      }))
+      break
+    }
+    case 'comment_delete': {
+      const { id } = msg.data
+      set((s: CommunityStore) => ({
+        comments: s.comments.filter((existing) => existing.id !== id),
       }))
       break
     }
     case 'poll_new': {
       const p: Poll = msg.data
-      set((s: CommunityStore) => ({ polls: [p, ...s.polls] }))
+      set((s: CommunityStore) => {
+        if (s.polls.some((existing) => existing.id === p.id)) return s
+        return { polls: [p, ...s.polls] }
+      })
       break
     }
     case 'poll_update': {
       const p: Poll = msg.data
       set((s: CommunityStore) => ({
         polls: s.polls.map((existing) => existing.id === p.id ? p : existing),
+      }))
+      break
+    }
+    case 'poll_delete': {
+      const { id } = msg.data
+      set((s: CommunityStore) => ({
+        polls: s.polls.filter((existing) => existing.id !== id),
       }))
       break
     }

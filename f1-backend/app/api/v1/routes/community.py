@@ -19,7 +19,7 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,6 +32,7 @@ from app.schemas.community import (
     CommentCreate,
     CommentOut,
     CommentPage,
+    CommentUpdate,
     PollCreate,
     PollOptionOut,
     PollOut,
@@ -80,6 +81,7 @@ def _poll_to_out(poll: Poll, user_vote: int | None, username: str = "") -> PollO
         created_at=poll.created_at,
         closes_at=poll.closes_at,
         is_closed=is_closed,
+        created_by=poll.created_by,
         created_by_username=username,
     )
 
@@ -149,6 +151,51 @@ async def create_comment(
     # WebSocket yayını
     await _publish_community(session_id, "comment", out.model_dump(mode="json"))
     return out
+
+
+@router.patch("/comments/{comment_id}", response_model=CommentOut)
+async def update_comment(
+    comment_id: uuid.UUID,
+    body: CommentUpdate,
+    user: User = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Comment).where(Comment.id == comment_id))
+    comment = result.scalar_one_or_none()
+    if comment is None:
+        raise HTTPException(404, "Yorum bulunamadı")
+    if comment.user_id != user.id:
+        raise HTTPException(403, "Bu yorumu düzenleme yetkiniz yok")
+
+    comment.content = body.content
+    await db.commit()
+    await db.refresh(comment)
+
+    out = CommentOut.model_validate(comment)
+    out.username = user.username
+
+    await _publish_community(comment.session_id, "comment_update", out.model_dump(mode="json"))
+    return out
+
+
+@router.delete("/comments/{comment_id}", status_code=204)
+async def delete_comment(
+    comment_id: uuid.UUID,
+    user: User = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Comment).where(Comment.id == comment_id))
+    comment = result.scalar_one_or_none()
+    if comment is None:
+        raise HTTPException(404, "Yorum bulunamadı")
+    if comment.user_id != user.id:
+        raise HTTPException(403, "Bu yorumu silme yetkiniz yok")
+
+    session_id = comment.session_id
+    await db.delete(comment)
+    await db.commit()
+
+    await _publish_community(session_id, "comment_delete", {"id": str(comment_id)})
 
 
 @router.post("/comments/{comment_id}/upvote", status_code=200)
@@ -274,9 +321,11 @@ async def vote_poll(
     if option_index >= len(options):
         raise HTTPException(400, "Geçersiz seçenek")
 
-    # Oy say
-    options[option_index]["votes"] = options[option_index].get("votes", 0) + 1
-    poll.options = options
+    # Oy say — JSONB sütununu SQLAlchemy'nin değişikliği fark etmesi için
+    # yeni bir liste/dict ile değiştiriyoruz (yerinde mutate algılanmaz)
+    new_options = [dict(o) for o in options]
+    new_options[option_index]["votes"] = new_options[option_index].get("votes", 0) + 1
+    poll.options = new_options
 
     vote = PollVote(poll_id=poll_id, user_id=user.id, option_index=option_index)
     db.add(vote)
@@ -286,6 +335,27 @@ async def vote_poll(
     out = _poll_to_out(poll, option_index, creator_username)
     await _publish_community(poll.session_id, "poll_update", out.model_dump(mode="json"))
     return out
+
+
+@router.delete("/polls/{poll_id}", status_code=204)
+async def delete_poll(
+    poll_id: uuid.UUID,
+    user: User = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Poll).where(Poll.id == poll_id))
+    poll = result.scalar_one_or_none()
+    if poll is None:
+        raise HTTPException(404, "Anket bulunamadı")
+    if poll.created_by != user.id:
+        raise HTTPException(403, "Bu anketi silme yetkiniz yok")
+
+    session_id = poll.session_id
+    await db.execute(delete(PollVote).where(PollVote.poll_id == poll_id))
+    await db.delete(poll)
+    await db.commit()
+
+    await _publish_community(session_id, "poll_delete", {"id": str(poll_id)})
 
 
 # ─── Tepkiler (Reaction) ─────────────────────────────────────────────────────
