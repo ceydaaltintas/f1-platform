@@ -345,8 +345,13 @@ def compute_energy_analysis(
     top_deploy = max(deploy_zones, key=lambda z: z["intensity"], default=None)
     top_regen  = max(regen_zones,  key=lambda z: z["intensity"], default=None)
 
+    # SoC eğrisini eşit aralıklarla 500 noktaya indir (son N nokta değil —
+    # erken finiş eden pilotlarda son noktalar park edilmiş arabaya denk gelip
+    # SoC'yi sabit 100'de gösterebilir, yarışın tamamını temsil etmeli)
+    curve_step = max(1, len(soc_curve) // 500)
+
     return {
-        "soc_curve":    soc_curve[-500:],   # Son 500 nokta (bellek)
+        "soc_curve":    soc_curve[::curve_step][:500],
         "deploy_zones": deploy_zones[:100],
         "regen_zones":  regen_zones[:100],
         "per_lap":      per_lap,

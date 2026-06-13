@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { Helmet } from 'react-helmet-async'
 import { seasonApi } from '../api/client'
 import { SESSION_LABELS, type Round, type SessionType } from '../types/f1'
 import { ErrorCard } from '../components/ui/ErrorCard'
@@ -168,6 +169,10 @@ export function SeasonPage() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+      <Helmet>
+        <title>{`${y} F1 Sezonu — Yarış Takvimi ve Telemetri · Hotlap`}</title>
+        <meta name="description" content={`Formula 1 ${y} sezonu yarış takvimi, telemetri analizleri ve canlı yarış takibi. Hotlap.live`} />
+      </Helmet>
 
       {/* ── Season Header ──────────────────────────── */}
       <div className="border-b" style={{ borderColor: 'var(--b1)', background: 'var(--s1)' }}>

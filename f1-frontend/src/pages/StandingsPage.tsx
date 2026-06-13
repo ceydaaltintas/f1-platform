@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { Helmet } from 'react-helmet-async'
 import { client } from '../api/client'
 import { ErrorCard } from '../components/ui/ErrorCard'
 import { useFavoritesStore } from '../store/favoritesStore'
 import { ChampionshipScenario } from '../components/analysis/ChampionshipScenario'
 import { HeadToHead } from '../components/analysis/HeadToHead'
+import { FantasyPicks } from '../components/fantasy/FantasyPicks'
 
 // Mevcut yılı baz alarak yıl seçenekleri üret — 2027 gelince otomatik güncellenir
 function buildYearOptions(currentYear: number): number[] {
@@ -37,11 +39,11 @@ export function StandingsPage() {
   const y = Number(year) || currentYear
   const YEAR_OPTIONS = buildYearOptions(currentYear)
 
-  const [tab, setTab] = useState<'drivers' | 'constructors' | 'results' | 'scenarios' | 'h2h'>('drivers')
+  const [tab, setTab] = useState<'drivers' | 'constructors' | 'results' | 'scenarios' | 'h2h' | 'fantasy'>('drivers')
 
-  // Senaryolar ve H2H yalnızca güncel sezonda
+  // Senaryolar, H2H ve Fantasy yalnızca güncel sezonda
   const isCurrentYear = currentSeasonQ.isSuccess && y === currentYear
-  const effectiveTab = (!isCurrentYear && (tab === 'scenarios' || tab === 'h2h')) ? 'drivers' : tab
+  const effectiveTab = (!isCurrentYear && (tab === 'scenarios' || tab === 'h2h' || tab === 'fantasy')) ? 'drivers' : tab
 
   // Jolpica down olunca DB'den fallback
   // Önce 3s içinde cevap gelmezse direkt DB'ye geç
@@ -109,6 +111,17 @@ export function StandingsPage() {
     retry: 0,
   })
 
+  // Fantasy için bir sonraki round'u doğrudan DB'den al — Jolpica yavaş
+  // kaldığında results.data.length'e dayanmak yanlış round numarası verip
+  // 404'e (ve boş Fantasy sekmesine) yol açıyordu.
+  const nextRound = useQuery({
+    queryKey: ['next-round', y],
+    queryFn:  () => client.get(`/seasons/${y}/next`).then(r => r.data),
+    enabled:  effectiveTab === 'fantasy',
+    staleTime: 300_000,
+    retry: 0,
+  })
+
   const isFallback    = !!(drivers.data?.[0]?.fallback || constructors.data?.[0]?.fallback)
   const { toggleDriver, isFavorite } = useFavoritesStore()
   const maxDriverPts  = Math.max(1, ...(drivers.data?.map((d: any) => Number(d.points) || 0) ?? [0]))
@@ -121,6 +134,10 @@ export function StandingsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+      <Helmet>
+        <title>{`${y} F1 Şampiyona Tablosu · Hotlap`}</title>
+        <meta name="description" content={`${y} Formula 1 pilot ve takım şampiyona sıralaması. Güncel puan tablosu ve yarış sonuçları.`} />
+      </Helmet>
       <div className="max-w-4xl mx-auto px-6 py-8">
 
         {/* ── Başlık ──────────────────────────────────────────── */}
@@ -152,7 +169,7 @@ export function StandingsPage() {
             ['constructors', '🔧 Takımlar'],
             ['results',      '🏁 Yarışlar'],
             ...(y === currentYear
-              ? [['scenarios', '📊 Senaryolar'], ['h2h', '⚔️ H2H']] as const
+              ? [['scenarios', '📊 Senaryolar'], ['h2h', '⚔️ H2H'], ['fantasy', '🎮 Fantasy']] as const
               : []),
           ] as const).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t as any)}
@@ -408,6 +425,25 @@ export function StandingsPage() {
         {/* ── Head-to-Head ─────────────────────────────────────── */}
         {effectiveTab === 'h2h' && (
           <HeadToHead />
+        )}
+
+        {/* ── Fantasy F1 ──────────────────────────────────────── */}
+        {effectiveTab === 'fantasy' && (
+          nextRound.data?.round_number
+            ? <FantasyPicks year={y} roundNumber={nextRound.data.round_number} />
+            : nextRound.isError
+              ? (
+                <div className="card p-4 text-center">
+                  <p className="text-[12px]" style={{ color: 'var(--t3)' }}>
+                    Bu sezon için önümüzdeki yarış bulunamadı.
+                  </p>
+                </div>
+              )
+              : (
+                <div className="card p-4">
+                  {[1,2,3].map(i => <div key={i} className="h-10 rounded mb-2 animate-pulse" style={{ background: 'var(--s2)' }}/>)}
+                </div>
+              )
         )}
 
       </div>

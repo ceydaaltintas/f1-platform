@@ -18,7 +18,7 @@ from app.core.database import get_db
 from app.core.redis_client import cache_get, cache_key, cache_set
 from app.models.f1 import Driver, EnergyAnalysisCache, Lap, OpenF1CarDataCache, Round, Season, Session
 from app.models.user import User
-from app.services import db_cache, jolpica, openf1
+from app.services import claude_ai, db_cache, jolpica, openf1
 from app.services import energy as energy_svc
 
 logger = logging.getLogger(__name__)
@@ -246,7 +246,7 @@ async def get_telemetry(
     session = await _resolve_session(session_id, db)
     session_key = await _require_session_key(session, db)
 
-    driver_number = await openf1.get_driver_number(session_key, driver_code)
+    driver_number = await db_cache.get_driver_number(driver_code, db)
     if driver_number is None:
         raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
 
@@ -289,7 +289,7 @@ async def get_track_map(
     session = await _resolve_session(session_id, db)
     session_key = await _require_session_key(session, db)
 
-    driver_number = await openf1.get_driver_number(session_key, driver_code)
+    driver_number = await db_cache.get_driver_number(driver_code, db)
     if driver_number is None:
         drivers = await db_cache.get_session_drivers(session)
         driver_number = drivers[0]["driver_number"] if drivers else None
@@ -340,7 +340,7 @@ async def get_stints(
 
     driver_number = None
     if driver_code:
-        driver_number = await openf1.get_driver_number(session_key, driver_code)
+        driver_number = await db_cache.get_driver_number(driver_code, db)
 
     all_stints = await db_cache.get_stints(session, db)
     stints = (
@@ -349,8 +349,7 @@ async def get_stints(
     )
 
     # Pilot kodlarını ekle
-    drivers = await db_cache.get_session_drivers(session)
-    num_to_code = {d["driver_number"]: d.get("name_acronym", "?") for d in drivers}
+    num_to_code = await db_cache.get_driver_code_map(db)
     for s in stints:
         s["driver_code"] = num_to_code.get(s.get("driver_number"), "?")
 
@@ -385,7 +384,7 @@ async def compare_drivers(
 
     results = {}
     for code in codes:
-        dn = await openf1.get_driver_number(session_key, code)
+        dn = await db_cache.get_driver_number(code, db)
         if dn is None:
             raise HTTPException(404, f"Pilot bulunamadı: {code}")
         laps_data = await db_cache.get_laps(session, dn, db)
@@ -438,6 +437,90 @@ async def compare_drivers(
             "gap_seconds": round(abs(dur_a - dur_b), 3),
             "faster": codes[0] if dur_a <= dur_b else codes[1],
         },
+    }
+    ttl = 86_400 if session.status == "finished" else 3600
+    await cache_set(cache_k, response, ttl_seconds=ttl)
+    return response
+
+
+@router.get("/{session_id}/sector-analysis")
+async def sector_analysis(
+    session_id: int,
+    drivers: str = Query(..., description="Virgülle ayrılmış 2 pilot: VER,NOR"),
+    lap: str = Query("fastest"),
+    mode: str = Query("beginner", pattern="^(beginner|expert)$"),
+    db: AsyncSession = Depends(get_db),
+):
+    """İki pilotun sektör zamanlarını karşılaştırır."""
+    codes = [c.strip().upper() for c in drivers.split(",")]
+    if len(codes) != 2:
+        raise HTTPException(400, "Tam 2 pilot kodu girin")
+
+    cache_k = cache_key("sector-analysis-v2", session_id, codes[0], codes[1], lap, mode)
+    cached = await cache_get(cache_k)
+    if cached:
+        return cached
+
+    session = await _resolve_session(session_id, db)
+    session_key = await _require_session_key(session, db)
+
+    results = {}
+    for code in codes:
+        dn = await db_cache.get_driver_number(code, db)
+        if dn is None:
+            raise HTTPException(404, f"Pilot bulunamadı: {code}")
+        laps_data = await db_cache.get_laps(session, dn, db)
+        target_lap = openf1.find_lap(laps_data, lap)
+        if target_lap is None:
+            raise HTTPException(404, f"{code} için tur bulunamadı")
+        results[code] = {
+            "lap_number": target_lap.get("lap_number"),
+            "lap_time": target_lap.get("lap_duration"),
+            "s1": target_lap.get("duration_sector_1"),
+            "s2": target_lap.get("duration_sector_2"),
+            "s3": target_lap.get("duration_sector_3"),
+            "compound": target_lap.get("compound"),
+        }
+
+    a, b = codes
+    ra, rb = results[a], results[b]
+
+    def delta(va, vb):
+        if va is None or vb is None:
+            return None
+        return round(va - vb, 3)  # negatif = A daha hızlı
+
+    sectors = []
+    for i, key in enumerate(["s1", "s2", "s3"], 1):
+        va, vb = ra.get(key), rb.get(key)
+        d = delta(va, vb)
+        faster = a if (d is not None and d <= 0) else b
+        sectors.append({
+            "sector": i,
+            f"time_{a}": va,
+            f"time_{b}": vb,
+            "delta": d,           # A - B (negatif = A hızlı)
+            "faster": faster,
+            "gap_abs": abs(d) if d is not None else None,
+        })
+
+    ai_summary = ""
+    try:
+        ai_summary = await claude_ai.explain_sectors(
+            a, b, sectors, ra.get("compound"), rb.get("compound"), mode,
+        )
+    except Exception as e:
+        logger.warning("Sektör AI yorumu başarısız: %s", e)
+
+    response = {
+        "session_id": session_id,
+        "drivers": results,
+        "sectors": sectors,
+        "total_gap": round(
+            (ra.get("lap_time") or 0) - (rb.get("lap_time") or 0), 3
+        ),
+        "faster_overall": a if (ra.get("lap_time") or 999) <= (rb.get("lap_time") or 999) else b,
+        "ai_summary": ai_summary,
     }
     ttl = 86_400 if session.status == "finished" else 3600
     await cache_set(cache_k, response, ttl_seconds=ttl)
@@ -584,14 +667,13 @@ async def get_tyre_degradation(
             stints_by_dn[dn].append(s)
 
     # 3. driver_number → driver_id eşleştirmesi
-    of1_drivers = await db_cache.get_session_drivers(session)
+    dn_to_code = await db_cache.get_driver_code_map(db)
     code_to_driver_id = {code: did for did, code in driver_id_to_code.items()}
-    dn_to_driver_id: dict[int, int] = {}
-    for d in of1_drivers:
-        code = (d.get("name_acronym") or "").upper()
-        dn   = d.get("driver_number")
-        if dn and code in code_to_driver_id:
-            dn_to_driver_id[dn] = code_to_driver_id[code]
+    dn_to_driver_id: dict[int, int] = {
+        dn: code_to_driver_id[code]
+        for dn, code in dn_to_code.items()
+        if code in code_to_driver_id
+    }
 
     driver_id_to_dn = {did: dn for dn, did in dn_to_driver_id.items()}
 
@@ -805,7 +887,7 @@ async def get_available_laps(
     session_key = await _require_session_key(session, db)
     is_quali    = session.type in ("qualifying", "sprint_qualifying")
 
-    driver_number = await openf1.get_driver_number(session_key, driver_code)
+    driver_number = await db_cache.get_driver_number(driver_code, db)
     if driver_number is None:
         raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
 
@@ -870,7 +952,7 @@ async def get_driver_summary(
     session_key = await _require_session_key(session, db)
 
     # Pilot numarası
-    driver_number = await openf1.get_driver_number(session_key, driver_code)
+    driver_number = await db_cache.get_driver_number(driver_code, db)
     if driver_number is None:
         raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
 
@@ -1322,7 +1404,7 @@ async def get_energy_analysis(
     session_key = await _require_session_key(session, db)
 
     # Pilot numarasını bul
-    driver_number = await openf1.get_driver_number(session_key, driver_code.upper())
+    driver_number = await db_cache.get_driver_number(driver_code.upper(), db)
     if not driver_number:
         raise HTTPException(404, f"Pilot bulunamadı: {driver_code}")
 
@@ -1366,3 +1448,109 @@ async def get_energy_analysis(
 
     return {"session_id": session_id, "driver_code": driver_code,
             "cached": False, **result}
+
+
+# ─── Tarihsel Karşılaştırma ──────────────────────────────────────────────────
+# Not: bu endpoint /sessions altında değil, doğrudan /api/v1 altında yer alır.
+historical_router = APIRouter(tags=["telemetry"])
+
+
+@historical_router.get("/historical-compare")
+async def historical_compare(
+    driver: str = Query(..., description="Pilot kodu: VER"),
+    circuit: str = Query(..., description="Devre adı: monaco"),
+    years: str = Query(..., description="Virgülle ayrılmış yıllar: 2024,2026"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aynı devrede farklı yılların en hızlı tur sürelerini karşılaştırır."""
+    year_list = [int(y.strip()) for y in years.split(",")]
+
+    cache_k = cache_key("historical-compare", driver.upper(), circuit.lower(), ",".join(map(str, year_list)))
+    cached = await cache_get(cache_k)
+    if cached:
+        return cached
+
+    results = []
+
+    for year in year_list:
+        # DB'de ilgili round'u bul
+        season_result = await db.execute(
+            select(Season).where(Season.year == year)
+        )
+        season = season_result.scalar_one_or_none()
+        if not season:
+            results.append({"year": year, "error": "sezon bulunamadı"})
+            continue
+
+        # Devre adında eşleşen round'u bul
+        round_result = await db.execute(
+            select(Round).where(
+                Round.season_id == season.id,
+                Round.circuit_name.ilike(f"%{circuit}%"),
+            )
+        )
+        rnd = round_result.scalar_one_or_none()
+        if not rnd:
+            results.append({"year": year, "error": f"{circuit} bulunamadı"})
+            continue
+
+        # Qualifying session bul
+        session_result = await db.execute(
+            select(Session).where(
+                Session.round_id == rnd.id,
+                Session.type == "qualifying",
+                Session.session_key.isnot(None),
+            )
+        )
+        session = session_result.scalar_one_or_none()
+        if not session:
+            results.append({"year": year, "error": "qualifying session yok"})
+            continue
+
+        # OpenF1'den telemetri çek
+        try:
+            dn = await db_cache.get_driver_number(driver.upper(), db)
+            if not dn:
+                results.append({"year": year, "error": "pilot bulunamadı"})
+                continue
+
+            laps = await db_cache.get_laps(session, dn, db)
+            fastest = openf1.find_lap(laps, "fastest")
+            if not fastest:
+                results.append({"year": year, "error": "tur verisi yok"})
+                continue
+
+            results.append({
+                "year": year,
+                "circuit": rnd.circuit_name,
+                "lap_time": fastest.get("lap_duration"),
+                "s1": fastest.get("duration_sector_1"),
+                "s2": fastest.get("duration_sector_2"),
+                "s3": fastest.get("duration_sector_3"),
+                "compound": fastest.get("compound"),
+                "session_id": session.id,
+            })
+        except Exception as e:
+            results.append({"year": year, "error": str(e)})
+
+    # En hızlı yılı belirle
+    valid = [r for r in results if "lap_time" in r and r["lap_time"]]
+    if valid:
+        best_year = min(valid, key=lambda x: x["lap_time"])["year"]
+    else:
+        best_year = None
+
+    response = {
+        "driver": driver.upper(),
+        "circuit": circuit,
+        "years": year_list,
+        "results": results,
+        "fastest_year": best_year,
+    }
+
+    # Hatasız sonuçlar için uzun TTL (geçmiş yarış verisi değişmez)
+    if valid and len(valid) == len([r for r in results if "error" not in r]):
+        await cache_set(cache_k, response, ttl_seconds=7 * 86_400)
+    else:
+        await cache_set(cache_k, response, ttl_seconds=3600)
+    return response

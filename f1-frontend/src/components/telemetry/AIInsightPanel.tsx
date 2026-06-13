@@ -60,7 +60,7 @@ export function AIInsightPanel({
           driver_b: compareDriver,
           snapshot_b: pointToSnap(comparePoint),
         }
-      : { ...snapA, mode }
+      : { ...snapA, mode, driver_a: driverCode }
 
     aiApi.interpret(payload, mode)
       .then(r => {
@@ -81,7 +81,7 @@ export function AIInsightPanel({
   }, [pointKey, compareKey, mode, driverCode, compareDriver])
 
   const sourceLabel = (source?: string) => {
-    if (source === 'groq')      return '⚡ Groq · Llama 3.1'
+    if (source === 'groq')      return '⚡ Groq · Llama 3.3'
     if (source === 'anthropic') return '🤖 Claude'
     return '📐 Kural tabanlı'
   }

@@ -9,12 +9,14 @@ from app.api.v1.routes.seasons import router as seasons_router
 from app.api.v1.routes.sessions import router as sessions_router
 from app.api.v1.routes.standings import router as standings_router
 from app.api.v1.routes.telemetry import router as telemetry_router
+from app.api.v1.routes.telemetry import historical_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)
 api_router.include_router(seasons_router)
 api_router.include_router(sessions_router)
 api_router.include_router(telemetry_router)
+api_router.include_router(historical_router)
 api_router.include_router(ai_router)
 api_router.include_router(live_router)
 api_router.include_router(community_router)

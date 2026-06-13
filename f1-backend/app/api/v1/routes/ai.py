@@ -72,7 +72,7 @@ async def interpret_snapshot(body: TelemetrySnapshot):
             mode=body.mode,
         )
     else:
-        explanation = await claude_ai.interpret_telemetry(snap_a, body.mode)
+        explanation = await claude_ai.interpret_telemetry(snap_a, body.mode, driver_code=body.driver_a)
 
     source = "groq" if claude_ai._groq_ok() else ("anthropic" if claude_ai._anthropic_ok() else "rule")
     return {"explanation": explanation, "mode": body.mode, "source": source}

@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.redis_client import cache_get, cache_key, cache_set
+from app.services import claude_ai
 from app.services import standings as standings_svc
 from app.services import strategy as strategy_svc
 
@@ -126,3 +128,75 @@ async def simulate_strategy(
             for s in scenarios
         ],
     }
+
+
+# ─── Fantasy F1 Tahminleri ───────────────────────────────────────────────────
+
+@router.get("/seasons/{year}/fantasy/picks")
+async def fantasy_picks(
+    year: int,
+    round: int = Query(..., description="Bu haftanın round numarası"),
+    mode: str = Query("beginner", pattern="^(beginner|expert)$"),
+):
+    """Fantasy F1 haftasonu tahminleri — son 3 yarışın formuna göre."""
+    cache_k = cache_key("fantasy_picks_full_v3", year, round, mode)
+    cached = await cache_get(cache_k)
+    if cached:
+        return cached
+
+    try:
+        picks = await standings_svc.get_weekend_fantasy_picks(year, round)
+        if not picks:
+            raise HTTPException(404, "Yeterli veri yok")
+
+        # Top 3 için AI gerekçesi
+        top3 = picks[:3]
+        top3_codes = [p["code"] for p in top3]
+        system = (
+            "F1 Fantasy koçusun. Son yarışların formuna göre kısa, net öneriler ver. "
+            + ("Sade Türkçe, teknik terim yok." if mode == "beginner"
+               else "Teknik analiz, pace/degradation/qualifying performance dahil et.")
+            + " Düz metin yaz, tek paragraf — markdown kullanma (yıldız, başlık, "
+              "madde işareti veya numaralı liste kullanma). "
+            + f"Bu paragrafta SADECE şu üç pilot kodundan bahsedebilirsin: "
+              f"{top3_codes[0]}, {top3_codes[1]}, {top3_codes[2]}. "
+              f"Bunlar dışında BAŞKA HİÇBİR pilot ismi veya kodu YAZMA — "
+              f"sadece bu üçü hakkında yorum yap. Pilotlardan SADECE 3 harfli "
+              f"kodlarıyla bahset (örn. {top3_codes[0]}), pilotların gerçek "
+              f"adını ASLA yazma — kod-isim eşleşmesini hatalı bilebilirsin ve "
+              f"yanlış isim yazman kullanıcıyı yanıltır."
+        )
+        prompt = "Bu hafta için top 3 öneri (SADECE bu pilot kodlarından bahset, isim yazma):\n" + "\n".join(
+            f"{i+1}. {p['code']}: form={p['form_score']}, ort puan={p['avg_points']}, ort pozisyon={p['avg_position']}"
+            for i, p in enumerate(top3)
+        ) + (
+            f"\nBu {len(top3)} pilot için tek cümle gerekçe yaz, hepsini akıcı bir paragrafta birleştir. "
+            f"Pilot kodları olarak SADECE {', '.join(top3_codes)} kullan, başka isim/kod yazma."
+        )
+
+        ai_note = ""
+        if claude_ai._groq_ok():
+            try:
+                ai_note = await claude_ai._groq_interpret(prompt, system)
+            except Exception:
+                ai_note = ""
+        if not ai_note and claude_ai._anthropic_ok():
+            try:
+                ai_note = await claude_ai._anthropic_interpret(prompt, system)
+            except Exception:
+                ai_note = ""
+        ai_note = claude_ai._clean_ai_text(ai_note)
+
+        response = {
+            "year": year,
+            "round": round,
+            "picks": picks,
+            "ai_summary": ai_note,
+            "mode": mode,
+        }
+        await cache_set(cache_k, response, ttl_seconds=3600)
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Fantasy tahmin alınamadı: {e}")

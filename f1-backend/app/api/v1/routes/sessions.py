@@ -34,6 +34,7 @@ async def get_session(session_id: int, db: AsyncSession = Depends(get_db)):
             "id": session.round.id,
             "name": session.round.name,
             "round_number": session.round.round_number,
+            "circuit_name": session.round.circuit_name,
         },
     }
 

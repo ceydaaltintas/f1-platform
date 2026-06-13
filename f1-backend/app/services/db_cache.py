@@ -113,6 +113,28 @@ async def get_stints(
     return await openf1.fetch_stints(session_key) or []
 
 
+# ─── Pilot Kodu → Araba Numarası ─────────────────────────────────────────────
+
+async def get_driver_number(driver_code: str, db: AsyncSession) -> int | None:
+    """
+    Pilot kodundan (örn. 'LEC') araba numarasını DB'den bulur.
+    Driver.number sezon senkronu ile zaten dolu — canlı OpenF1 çağrısına gerek yok,
+    bu sayede OpenF1'in global 401 kilidi sırasında da telemetri çalışabilir.
+    """
+    row = await db.execute(select(Driver.number).where(Driver.code == driver_code.upper()))
+    return row.scalar_one_or_none()
+
+
+async def get_driver_code_map(db: AsyncSession) -> dict[int, str]:
+    """
+    Araba numarasından pilot koduna eşleme (örn. {16: 'LEC'}) — DB'den,
+    OpenF1'e gitmeden. Stints/strateji gibi endpoint'lerin driver_number → kod
+    eşlemesi için kullanılır.
+    """
+    rows = await db.execute(select(Driver.number, Driver.code).where(Driver.number.isnot(None)))
+    return {number: code for number, code in rows}
+
+
 # ─── OpenF1 Session Drivers ──────────────────────────────────────────────────
 
 async def get_session_drivers(session: F1Session) -> list[dict]:
@@ -120,6 +142,7 @@ async def get_session_drivers(session: F1Session) -> list[dict]:
     Session pilotlarını döner.
     Biten session → Redis 24 saat cache.
     Aktif/upcoming → Redis 5 dakika cache.
+    OpenF1 erişilemezse (örn. global 401 kilidi) boş liste döner — exception fırlatmaz.
     """
     from app.core.redis_client import cache_get, cache_key, cache_set
 
@@ -132,7 +155,12 @@ async def get_session_drivers(session: F1Session) -> list[dict]:
     if cached:
         return cached
 
-    data = await openf1.fetch_session_drivers(session_key) or []
+    try:
+        data = await openf1.fetch_session_drivers(session_key) or []
+    except Exception:
+        logger.warning("OpenF1 drivers fetch failed for session_key=%s", session_key)
+        return []
+
     if data:
         ttl = 86_400 if _is_finished(session) else 300
         await cache_set(ck, data, ttl_seconds=ttl)

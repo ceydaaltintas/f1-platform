@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { Helmet } from 'react-helmet-async'
 import { seasonApi, client } from '../api/client'
+import { buildPageSEO } from '../utils/seo'
 import { SESSION_LABELS, type SessionType } from '../types/f1'
 import { RaceGlobe } from '../components/globe/RaceGlobe'
 
@@ -229,8 +231,18 @@ export function HomePage() {
   const lastRace = completedRaces.at(-1) as any
   const lastRacePodium: any[] = lastRace?.podium?.slice(0, 3) ?? []
 
+  const { title, description } = buildPageSEO({ path: '/' })
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+      <Helmet>
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:url" content="https://hotlap.live" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
 
       {/* ── Hero: Sol = Küre, Sağ = Metin ──────────────────── */}
       <section className="relative overflow-hidden">

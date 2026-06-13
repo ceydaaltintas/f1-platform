@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { Navbar } from './components/ui/Navbar'
 import { BottomNav } from './components/ui/BottomNav'
 import { F1Transition } from './components/ui/F1Transition'
+import { OnboardingOverlay } from './components/ui/OnboardingOverlay'
 import { HomePage } from './pages/HomePage'
 import { SeasonPage } from './pages/SeasonPage'
 import { SessionPage } from './pages/SessionPage'
@@ -39,6 +40,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </main>
       {!noNav && <BottomNav />}
       <F1Transition />
+      <OnboardingOverlay />
     </div>
   )
 }

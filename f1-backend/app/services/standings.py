@@ -208,3 +208,66 @@ async def get_season_results(year: int) -> list[dict]:
 
     await cache_set(ck, results, ttl_seconds=_ttl(year))
     return results
+
+
+async def get_weekend_fantasy_picks(year: int, round_number: int) -> list[dict]:
+    """
+    Son 3 yarışın sonuçlarına bakarak bu hafta için form skoru hesaplar.
+    Fantasy F1 oyuncularına pilot önerisi sunar.
+    """
+    ck = cache_key("fantasy_picks", year, round_number)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    # Son 3 yarışı çek
+    lookback = max(1, round_number - 3)
+    all_results: dict[str, list[dict]] = {}
+
+    for rn in range(lookback, round_number):
+        results = await jolpica.fetch_race_results(year, rn)
+        for r in results:
+            code = r.get("Driver", {}).get("code", "")
+            if not code:
+                continue
+            if code not in all_results:
+                all_results[code] = []
+            all_results[code].append({
+                "round": rn,
+                "position": int(r.get("position", 20)),
+                "points": float(r.get("points", 0)),
+                "grid": int(r.get("grid", 20)),
+                "status": r.get("status", ""),
+            })
+
+    # Form skoru hesapla (son yarışa daha fazla ağırlık)
+    WEIGHTS = [0.5, 0.3, 0.2]  # en yeni önce
+    picks = []
+    for code, races in all_results.items():
+        recent = sorted(races, key=lambda x: -x["round"])[:3]
+        score = 0.0
+        for i, race in enumerate(recent):
+            w = WEIGHTS[i] if i < len(WEIGHTS) else 0.1
+            # Puan + grid'den yükselme bonus
+            pos_score = max(0, 20 - race["position"]) * 2
+            grid_bonus = max(0, race["grid"] - race["position"])  # öne geçiş
+            dnf_penalty = -10 if race["status"] not in ("Finished", "+1 Lap", "+2 Laps") else 0
+            score += w * (pos_score + grid_bonus + dnf_penalty)
+
+        picks.append({
+            "code": code,
+            "form_score": round(score, 1),
+            "races": recent,
+            "avg_points": round(
+                sum(r["points"] for r in recent) / len(recent) if recent else 0, 1
+            ),
+            "avg_position": round(
+                sum(r["position"] for r in recent) / len(recent) if recent else 20, 1
+            ),
+        })
+
+    picks.sort(key=lambda x: -x["form_score"])
+    result = picks[:10]  # Top 10
+
+    await cache_set(ck, result, ttl_seconds=3600)
+    return result

@@ -10,6 +10,7 @@ Cache: Redis — aynı (telemetri + mod) kombinasyonu önbelleğe alınır.
 import hashlib
 import json
 import logging
+import re
 
 from app.core.config import settings
 from app.core.redis_client import cache_get, cache_set
@@ -39,29 +40,81 @@ def _anthropic_ok() -> bool:
                 and "placeholder" not in k.lower())
 
 
+# Prompt formatı değiştiğinde bu sayıyı artır — eski (yarım kalmış/markdown'lu)
+# önbellek girdilerini geçersiz kılar.
+PROMPT_VERSION = 7
+
+
 def _cache_key(payload: dict) -> str:
     digest = hashlib.md5(
-        json.dumps(payload, sort_keys=True, default=str).encode()
+        json.dumps({"v": PROMPT_VERSION, **payload}, sort_keys=True, default=str).encode()
     ).hexdigest()[:12]
     return f"ai:{digest}"
 
 
+def _clean_ai_text(text: str, driver_code: str | None = None) -> str:
+    """
+    AI çıktısını tek paragraflık düz metne indirger. Model FORMAT_RULES'a
+    uymasa bile (madde işareti, başlık, markdown, çok satırlılık) burada
+    temizlenir — kullanıcıya her zaman tutarlı, tek paragraf metin gider.
+    """
+    if not text:
+        return text
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    text = text.replace("**", "").replace("__", "").replace("##", "")
+    cleaned_lines = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        line = re.sub(r"^#{1,6}\s*", "", line)          # # Başlık
+        line = re.sub(r"^[-•*]\s+", "", line)            # - madde / • madde
+        line = re.sub(r"^\d+[.)]\s+", "", line)          # 1. madde
+        cleaned_lines.append(line)
+    joined = " ".join(cleaned_lines)
+    joined = re.sub(r"\s+", " ", joined).strip()
+    if driver_code:
+        # Model pilot kodunu yanlış büyük/küçük harfle yazabiliyor (örn. "LEc")
+        joined = re.sub(
+            rf"\b{re.escape(driver_code)}\b", driver_code.upper(), joined, flags=re.IGNORECASE
+        )
+    return joined
+
+
 # ─── Sistem promptları ───────────────────────────────────────────────────────
 
-BEGINNER_SYS = """
+FORMAT_RULES = """
+Biçim kuralları: Düz metin yaz. Markdown KULLANMA — yıldız (**), başlık (#),
+madde işareti (- veya •) veya numaralı liste (1. 2. 3.) ASLA kullanma, satır başı
+yapma. Akıcı, doğru yazım kuralları ile bitmiş cümlelerden oluşan TEK bir paragraf
+yaz ve belirtilen cümle sayısını AŞMA. Türkçe kelimeleri doğru yaz (örn. "sektör",
+"pilotun", "hızlı") — imla hatası, eksik harf veya hatalı karakter kullanma,
+başka dilden kelime sızdırma. Sana veride bir pilot kodu belirtilmişse SADECE o
+kodu kullan ve pilotun gerçek adını YAZMA (kod-isim eşleşmesini hatalı bilebilirsin).
+Veride pilot kodu belirtilmemişse hiçbir pilot kodu veya ismi ÜRETME — sadece
+"pilot" kelimesiyle anlat. Cümleyi her zaman tam bitir, yarım cümle ile bırakma.
+""".strip()
+
+BEGINNER_SYS = (
+    """
 Sen bir Formula 1 yorumcususun. F1'i yeni tanıyan birine anlatıyorsun.
 Kurallar:
 - Sade, günlük Türkçe kullan. Hiç teknik jargon yok.
 - "DRS" yerine "arka kanat açık", "frenleme noktası" yerine "fren anı" de.
-- 2-3 kısa, heyecanlı cümle. Pilotun o anda ne yaptığını anlat.
-""".strip()
+- En fazla 2-3 kısa, heyecanlı cümle. Pilotun o anda ne yaptığını anlat.
+""".strip() + "\n" + FORMAT_RULES
+)
 
-EXPERT_SYS = """
+EXPERT_SYS = (
+    """
 Sen bir F1 telemetri mühendisisin. Veriyi teknik derinlikte analiz et.
-Konular: frenleme noktası, trail braking, ERS konuşlandırma, traksiyon limiti,
+Aşağıdaki konulardan SADECE en alakalı 2-3'ünü seç ve bunlara odaklan:
+frenleme noktası, trail braking, ERS konuşlandırma, traksiyon limiti,
 tyre thermal management, apex hızı, minimum köşe hızı, delta analizi.
-4-5 teknik cümle. Tam terminoloji kullan.
-""".strip()
+Konuların tamamını sırayla ele ALMA — sadece en önemlilerini seç.
+En fazla 4-5 teknik cümle, tek paragraf. Tam terminoloji kullan.
+""".strip() + "\n" + FORMAT_RULES
+)
 
 
 # ─── Kural Tabanlı Yorum ─────────────────────────────────────────────────────
@@ -195,8 +248,12 @@ async def _groq_interpret(content: str, system: str) -> str:
     from groq import AsyncGroq
     client = AsyncGroq(api_key=settings.groq_api_key)
     resp = await client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        max_tokens=600,
+        # 70b model — 8b-instant'tan çok daha akıcı Türkçe üretiyor
+        model="llama-3.3-70b-versatile",
+        max_tokens=1024,
+        # Düşük temperature — yüksek değerlerde model bazen yabancı dilden
+        # kelime/karakter sızdırıyor (örn. "tốcaklık", "jeszcze")
+        temperature=0.3,
         messages=[
             {"role": "system", "content": system},
             {"role": "user",   "content": content},
@@ -212,7 +269,7 @@ async def _anthropic_interpret(content: str, system: str) -> str:
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     msg = await client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=400,
+        max_tokens=550,
         system=system,
         messages=[{"role": "user", "content": content}],
     )
@@ -383,19 +440,23 @@ async def interpret_point_comparison(
             logger.warning("Anthropic point compare başarısız: %s", e)
     if not text:
         text = _rule_based_compare(driver_a, driver_b, snap_a, snap_b, mode)
+    else:
+        text = _clean_ai_text(text)
 
     await cache_set(cache_k, {"text": text}, ttl_seconds=600)
     return text
 
 
-async def interpret_telemetry(snapshot: dict, mode: str = "beginner") -> str:
-    cache_k = _cache_key({"fn": "interpret", "mode": mode, **snapshot})
+async def interpret_telemetry(snapshot: dict, mode: str = "beginner", driver_code: str | None = None) -> str:
+    cache_k = _cache_key({"fn": "interpret", "mode": mode, "driver": driver_code, **snapshot})
     cached = await cache_get(cache_k)
     if cached:
         return cached["text"]
 
     system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
+    driver_line = f"Pilot kodu: {driver_code}\n" if driver_code else ""
     content = (
+        f"{driver_line}"
         f"Hız: {snapshot.get('speed')} km/sa | "
         f"Gaz: %{snapshot.get('throttle')} | "
         f"Fren: %{snapshot.get('brake')} | "
@@ -426,6 +487,8 @@ async def interpret_telemetry(snapshot: dict, mode: str = "beginner") -> str:
     if not text:
         text = _rule_based(snapshot, mode)
         source = "rule"
+    else:
+        text = _clean_ai_text(text, driver_code=driver_code)
 
     logger.debug("Yorum kaynağı: %s | mod: %s", source, mode)
     ttl = 3600 if source != "rule" else 300
@@ -452,7 +515,7 @@ async def summarize_lap(lap_info: dict, key_moments: list[dict], mode: str = "be
         f"Lastik: {compound}\n"
         f"S1={lap_info.get('sector1','?')}s  S2={lap_info.get('sector2','?')}s  S3={lap_info.get('sector3','?')}s\n"
         f"Önemli anlar:\n{moments_text}\n"
-        "Bu tur hakkında genel analiz yap — pilotyun güçlü ve zayıf noktalarını belirt."
+        "Bu tur hakkında genel analiz yap — pilotun güçlü ve zayıf noktalarını belirt."
     )
 
     text = ""
@@ -473,6 +536,8 @@ async def summarize_lap(lap_info: dict, key_moments: list[dict], mode: str = "be
             f"Sektörler: S1 {lap_info.get('sector1','?')}s | S2 {lap_info.get('sector2','?')}s | S3 {lap_info.get('sector3','?')}s. "
             f"{len(key_moments)} önemli an tespit edildi."
         )
+    else:
+        text = _clean_ai_text(text)
 
     await cache_set(cache_k, {"text": text}, ttl_seconds=3600)
     return text
@@ -519,6 +584,70 @@ async def compare_drivers(
             f"{driver_a} lastik: {lap_a.get('compound','?')}, "
             f"{driver_b} lastik: {lap_b.get('compound','?')}."
         )
+    else:
+        text = _clean_ai_text(text)
 
     await cache_set(cache_k, {"text": text}, ttl_seconds=3600)
+    return text
+
+
+async def explain_sectors(
+    driver_a: str, driver_b: str,
+    sectors: list[dict], compound_a: str | None, compound_b: str | None,
+    mode: str = "beginner",
+) -> str:
+    """Sektör bazlı zaman farklarının olası nedenlerini yorumlar."""
+    cache_k = _cache_key({
+        "fn": "sector_explain", "mode": mode,
+        "a": driver_a, "b": driver_b, "sectors": sectors,
+        "ca": compound_a, "cb": compound_b,
+    })
+    cached = await cache_get(cache_k)
+    if cached:
+        return cached["text"]
+
+    lines = []
+    for s in sectors:
+        d = s.get("delta")
+        ta, tb = s.get(f"time_{driver_a}"), s.get(f"time_{driver_b}")
+        faster = s.get("faster")
+        gap = abs(d) if d is not None else None
+        lines.append(
+            f"Sektör {s['sector']}: {driver_a}={ta}s, {driver_b}={tb}s — "
+            f"{faster} {gap:.3f}s daha hızlı" if gap is not None else
+            f"Sektör {s['sector']}: veri yok"
+        )
+
+    system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
+    content = (
+        f"{driver_a} (lastik: {compound_a or '?'}) ile {driver_b} (lastik: {compound_b or '?'}) "
+        f"arasındaki sektör bazlı tur zamanı karşılaştırması:\n"
+        + "\n".join(lines)
+        + "\nBu sektör farklarının pist üzerinde hangi sürüş davranışlarından "
+          "kaynaklanmış olabileceğini yorumla (örn. frenleme noktası, viraj çıkışı, "
+          "düzeklik hattı, lastik durumu)."
+    )
+
+    text = ""
+    if _groq_ok():
+        try:
+            text = await _groq_interpret(content, system)
+        except Exception as e:
+            logger.warning("Groq sector explain başarısız: %s", e)
+    if not text and _anthropic_ok():
+        try:
+            text = await _anthropic_interpret(content, system)
+        except Exception as e:
+            logger.warning("Anthropic sector explain başarısız: %s", e)
+    if not text:
+        biggest = max(sectors, key=lambda s: abs(s.get("delta") or 0))
+        text = (
+            f"En büyük fark Sektör {biggest['sector']}'de — {biggest.get('faster')} "
+            f"{abs(biggest.get('delta') or 0):.3f}s önde. Bu genellikle frenleme noktası, "
+            f"viraj çıkış hızı veya lastik durumundaki farklardan kaynaklanır."
+        )
+    else:
+        text = _clean_ai_text(text)
+
+    await cache_set(cache_k, {"text": text}, ttl_seconds=86_400)
     return text

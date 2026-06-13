@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { Helmet } from 'react-helmet-async'
 import { telemetryApi, client } from '../api/client'
 import { useUIStore } from '../store/uiStore'
 import { useCommunityStore } from '../store/communityStore'
@@ -50,6 +51,10 @@ function CommunityPanel({ sessionId, isLoggedIn }: { sessionId: number; isLogged
 import { formatLapTime } from '../utils/format'
 import { F1Loader } from '../components/ui/F1Loader'
 import { ErrorCard } from '../components/ui/ErrorCard'
+import { ShareCard } from '../components/ui/ShareCard'
+import { useShareCard } from '../hooks/useShareCard'
+import { SectorAnalysis } from '../components/telemetry/SectorAnalysis'
+import { HistoricalCompare } from '../components/telemetry/HistoricalCompare'
 
 const LAP_OPTIONS = ['fastest','1','2','3','4','5','10','15','20','30','40','50']
 
@@ -150,6 +155,7 @@ export function SessionPage() {
   } = useUIStore()
 
   const { connect: connectCommunity, disconnect: disconnectCommunity } = useCommunityStore()
+  const { cardRef: shareCardRef, share: shareAnalysis } = useShareCard()
   const [lapA, setLapA] = useState('fastest')
   const [lapB, setLapB] = useState('fastest')
   const [activeTab, setActiveTab] = useState<SessionTab>('telemetry')
@@ -299,6 +305,9 @@ export function SessionPage() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)', overflowX: 'clip' }}>
+      <Helmet>
+        <title>{`${telA.data ? primaryDriver + ' Telemetri — ' : ''}Oturum #${sid} · Hotlap`}</title>
+      </Helmet>
 
       {/* ── Sticky Header ─────────────────────────────────── */}
       <div className="sticky top-14 z-40 border-b"
@@ -521,6 +530,17 @@ export function SessionPage() {
             <SocMiniStrip sessionId={sid} driverCode={primaryDriver} />
           </>) : null}
 
+          {compareMode && (
+            <SectorAnalysis
+              sessionId={sid}
+              driverA={primaryDriver}
+              driverB={secondaryDriver}
+              colorA="#E10600"
+              colorB="#FF8700"
+              mode={insightMode}
+            />
+          )}
+
           {/* Anlık değerler */}
           {sp ? (
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 animate-fade-up">
@@ -540,6 +560,31 @@ export function SessionPage() {
             </div>
           )}
 
+          {/* Karşılaştırma analizi paylaşımı */}
+          {compareMode && telA.data && telB.data && (
+            <>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => shareAnalysis(`hotlap-${primaryDriver}-vs-${secondaryDriver}`)}
+                  className="flex items-center gap-2 px-4 py-2 text-[11px] border border-[#E10600]/40 text-[#E10600] rounded-lg hover:bg-[#E10600]/10 transition-all"
+                >
+                  <span>↗</span> Analizi Paylaş
+                </button>
+              </div>
+
+              {/* Görünmez kart — sadece yakalama için */}
+              <ShareCard
+                ref={shareCardRef}
+                sessionName={`${roundName} · ${sessionLabel}`}
+                driverA={primaryDriver}
+                driverB={secondaryDriver}
+                lapA={telA.data.lap}
+                lapB={telB.data.lap}
+                gapSeconds={(telA.data.lap.duration ?? 0) - (telB.data.lap.duration ?? 0)}
+              />
+            </>
+          )}
+
           {/* AI + Topluluk */}
           <div className="grid md:grid-cols-2 gap-4">
             <AIInsightPanel
@@ -551,6 +596,9 @@ export function SessionPage() {
             />
             <CommunityPanel sessionId={sid} isLoggedIn={isLoggedIn} />
           </div>
+
+          {/* Tarihsel karşılaştırma */}
+          <HistoricalCompare circuitName={sessionInfo.data?.round?.circuit_name} sessionDrivers={sessionDrivers} selectedDriver={primaryDriver} />
         </>}
 
         {/* ── 📋 ANALİZ ────────────────────────────────────── */}

@@ -154,16 +154,27 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver }: Pro
     }
   })
 
-  // SoC eğrisi — kendi filtresine göre
-  const socData = (eA?.soc_curve ?? []).filter(p => selectedSocLap === 'all' || p.lap === selectedSocLap)
-  const socStep = Math.max(1, Math.floor(socData.length / 150))
-  const socChartA = socData.filter((_, i) => i % socStep === 0).map(p => ({
-    idx: p.dist_m,
-    [`${dA} SoC`]: p.soc_pct,
-    speed: p.speed,
-    xmode: p.x_mode > 0.6 ? 85 : null,
-    lap: p.lap,
-  }))
+  // SoC eğrisi — kendi filtresine göre, A ve B aynı eksende
+  const socDataA = (eA?.soc_curve ?? []).filter(p => selectedSocLap === 'all' || p.lap === selectedSocLap)
+  const socDataB = (eB?.soc_curve ?? []).filter(p => selectedSocLap === 'all' || p.lap === selectedSocLap)
+  const socStep = Math.max(1, Math.floor(Math.max(socDataA.length, socDataB.length, 1) / 150))
+  const sampledA = socDataA.filter((_, i) => i % socStep === 0)
+  const sampledB = socDataB.filter((_, i) => i % socStep === 0)
+  const socChartA = Array.from({ length: Math.max(sampledA.length, sampledB.length) }, (_, i) => {
+    const a = sampledA[i]
+    const b = sampledB[i]
+    return {
+      idx: i,
+      [`${dA} SoC`]: a?.soc_pct,
+      [`${dA}_lap`]: a?.lap,
+      ...(eB ? {
+        [`${dB} SoC`]: b?.soc_pct,
+        [`${dB}_lap`]: b?.lap,
+      } : {}),
+      speed: a?.speed,
+      xmode: a && a.x_mode > 0.6 ? 105 : null,
+    }
+  })
 
   // Profile açıklama metinleri
   const aggrDesc = (v: number) => v >= 80 ? 'Çok agresif — her turda enerjiyi erken tüketiyor' : v >= 50 ? 'Dengeli deploy stratejisi' : 'Tutucu — enerjiyi yarışın sonuna saklıyor'
@@ -426,6 +437,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver }: Pro
                 </p>
                 <div className="flex gap-3 text-[11px] mono">
                   <span style={{ color:'#E10600' }}>■ {dA}</span>
+                  {eB && <span style={{ color:'#FF8700' }}>■ {dB}</span>}
                   <span style={{ color:'rgba(255,215,0,0.7)' }}>▏ X-mode</span>
                 </div>
               </div>
@@ -445,11 +457,17 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver }: Pro
                       tickFormatter={v => `${v}%`} width={40} />
                     <Tooltip
                       contentStyle={{ background:'rgba(5,8,15,0.97)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, fontFamily:'IBM Plex Mono,monospace', fontSize:11 }}
-                      formatter={(v:any, name:string) => name === 'xmode' ? null : [`${v}%`, name]}
+                      formatter={(v:any, name:string, item:any) => {
+                        if (name === 'xmode') return null
+                        const lapKey = name === `${dA} SoC` ? `${dA}_lap` : `${dB}_lap`
+                        const lap = item?.payload?.[lapKey]
+                        return [`${v}%${lap ? ` · Tur ${lap}` : ''}`, name]
+                      }}
                       labelFormatter={() => ''} />
                     <ReferenceLine y={20} stroke="rgba(225,6,0,0.3)" strokeDasharray="3 3"
                       label={{ value:'Kritik', position:'insideLeft', fill:'rgba(225,6,0,0.5)', fontSize:10 }} />
-                    <Line type="monotone" dataKey={`${dA} SoC`} stroke="#E10600" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey={`${dA} SoC`} stroke="#E10600" strokeWidth={2} dot={false} connectNulls />
+                    {eB && <Line type="monotone" dataKey={`${dB} SoC`} stroke="#FF8700" strokeWidth={2} dot={false} connectNulls />}
                     <Line type="monotone" dataKey="xmode" stroke="rgba(255,215,0,0.5)"
                       strokeWidth={0}
                       dot={(props:any) => {
