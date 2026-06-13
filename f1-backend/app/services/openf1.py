@@ -7,6 +7,7 @@ Tüm timestamp'ler ISO 8601 UTC formatındadır.
 """
 
 import logging
+import time
 from datetime import datetime
 from typing import Any
 
@@ -18,9 +19,38 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 BASE_URL = settings.openf1_base_url
+TOKEN_URL = "https://api.openf1.org/token"
 TIMEOUT = 20.0
 # OpenF1 ücretsiz tier: 3 istek/sn, 30 istek/dk
 HEADERS = {"Accept": "application/json"}
+
+# Paid plan: OAuth2 password grant ile Firebase JWT alınır (1 saat geçerli)
+_token_cache: dict[str, Any] = {"access_token": None, "expires_at": 0.0}
+
+
+async def _auth_headers() -> dict[str, str]:
+    """Geçerli bir Bearer token varsa header döner, yoksa yeni token alır."""
+    if not (settings.openf1_username and settings.openf1_password):
+        return {}
+
+    if _token_cache["access_token"] and _token_cache["expires_at"] > time.time() + 30:
+        return {"Authorization": f"Bearer {_token_cache['access_token']}"}
+
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        resp = await client.post(
+            TOKEN_URL,
+            data={
+                "username": settings.openf1_username,
+                "password": settings.openf1_password,
+                "grant_type": "password",
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    _token_cache["access_token"] = data["access_token"]
+    _token_cache["expires_at"] = time.time() + int(data["expires_in"])
+    return {"Authorization": f"Bearer {_token_cache['access_token']}"}
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
@@ -28,7 +58,8 @@ async def _get(path: str, params: dict | None = None) -> list[dict[str, Any]]:
     """OpenF1'e GET isteği gönderir. Her zaman liste döner."""
     import asyncio as _asyncio
     url = f"{BASE_URL}/{path}"
-    async with httpx.AsyncClient(timeout=TIMEOUT, headers=HEADERS) as client:
+    headers = {**HEADERS, **await _auth_headers()}
+    async with httpx.AsyncClient(timeout=TIMEOUT, headers=headers) as client:
         resp = await client.get(url, params={k: v for k, v in (params or {}).items() if v is not None})
         if resp.status_code == 429:
             retry_after = int(resp.headers.get("Retry-After", "60"))
@@ -289,7 +320,8 @@ async def fetch_positions(session_key: int) -> list[dict]:
     """Tüm pilotların anlık konum verilerini getirir (FIA timing)."""
     url = f"{BASE_URL}/position"
     try:
-        async with httpx.AsyncClient(timeout=120.0, headers=HEADERS) as client:
+        headers = {**HEADERS, **await _auth_headers()}
+        async with httpx.AsyncClient(timeout=120.0, headers=headers) as client:
             resp = await client.get(url, params={"session_key": session_key})
             resp.raise_for_status()
             return resp.json()

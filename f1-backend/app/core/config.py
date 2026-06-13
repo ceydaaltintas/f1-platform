@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     groq_api_key: str = ""
     openf1_base_url: str = "https://api.openf1.org/v1"
+    openf1_username: str = ""
+    openf1_password: str = ""
     jolpica_base_url: str = "https://api.jolpi.ca/ergast/f1"
 
     # CORS
