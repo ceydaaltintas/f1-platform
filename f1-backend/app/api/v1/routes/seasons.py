@@ -135,6 +135,44 @@ async def sync_round_sessions_endpoint(year: int, round_number: int, db: AsyncSe
     return {"round": rnd.round_number, "sessions_found": len(sessions), "laps_synced": laps_synced}
 
 
+@router.post("/seasons/fix_duplicate_ant_driver", status_code=200)
+async def fix_duplicate_ant_driver_endpoint(db: AsyncSession = Depends(get_db)):
+    """
+    Tek seferlik veri düzeltmesi: "ANT" koduna sahip iki sürücü kaydı
+    (gerçek Antonelli + takımsız hatalı duplicate) ve Hadjar/Lawson'ın
+    ters atanmış takımlarını düzeltir. İdempotenttir — düzeltilmişse no-op.
+    """
+    from sqlalchemy import update as sa_update
+    from app.models.f1 import Lap
+
+    result = {"ant_fixed": False, "had_law_fixed": False}
+
+    ant_drivers = (await db.execute(select(Driver).where(Driver.code == "ANT"))).scalars().all()
+    if len(ant_drivers) == 2:
+        real = next((d for d in ant_drivers if d.current_team_id is not None), None)
+        placeholder = next((d for d in ant_drivers if d.current_team_id is None), None)
+        if real and placeholder:
+            await db.execute(
+                sa_update(Lap).where(Lap.driver_id == placeholder.id).values(driver_id=real.id)
+            )
+            await db.delete(placeholder)
+            result["ant_fixed"] = True
+
+    rb_team = (await db.execute(select(Team).where(Team.name == "RB F1 Team"))).scalar_one_or_none()
+    rbull_team = (await db.execute(select(Team).where(Team.name == "Red Bull"))).scalar_one_or_none()
+    had = (await db.execute(select(Driver).where(Driver.code == "HAD"))).scalar_one_or_none()
+    law = (await db.execute(select(Driver).where(Driver.code == "LAW"))).scalar_one_or_none()
+    if rb_team and rbull_team and had and law:
+        if had.current_team_id == rb_team.id and law.current_team_id == rbull_team.id:
+            had.current_team_id = rbull_team.id
+            law.current_team_id = rb_team.id
+            result["had_law_fixed"] = True
+
+    await db.commit()
+    await cache_delete_pattern("leaderboard:*")
+    return result
+
+
 # ─── Rounds ──────────────────────────────────────────────────────────────────
 
 @router.get("/seasons/{year}/rounds", response_model=list[RoundOut])
