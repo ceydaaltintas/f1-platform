@@ -1319,6 +1319,59 @@ async def get_leaderboard(
     entries = _add_pos(entries, lead)
     entries = _mark_best(entries)
 
+    # ── Sıralama: Q1/Q2/Q3 segmentleri (OpenF1 session_result.duration) ────
+    segments: dict[str, list] = {}
+    if is_quali:
+        try:
+            results = await openf1.fetch_session_result(session_key)
+        except Exception as exc:
+            logger.warning("session_result alınamadı session_key=%s: %s", session_key, exc)
+            results = []
+
+        code_by_number = {d.get("driver_number"): d.get("name_acronym", "???") for d in drivers}
+        duration_by_code = {
+            code_by_number.get(r.get("driver_number")): r.get("duration")
+            for r in results
+        }
+        position_by_code = {
+            code_by_number.get(r.get("driver_number")): r.get("position")
+            for r in results
+        }
+
+        for e in entries:
+            durations = duration_by_code.get(e["code"])
+            if durations and len(durations) > 2 and durations[2] is not None:
+                e["q_segment"] = "Q3"
+            elif durations and len(durations) > 1 and durations[1] is not None:
+                e["q_segment"] = "Q2"
+            elif durations and durations[0] is not None:
+                e["q_segment"] = "Q1"
+
+        # Resmi sıralama (Q1'de elenen ama Q1'de daha hızlı tur atmış bir
+        # pilot, ham tur süresine göre sıralamada üst sıralara çıkabilir —
+        # session_result.position FIA'nın resmi klasmanını verir)
+        if position_by_code and all(e["code"] in position_by_code for e in entries):
+            entries.sort(key=lambda e: position_by_code[e["code"]])
+            lead = entries[0]["lap_time"]
+            for i, e in enumerate(entries):
+                e["position"] = i + 1
+                e["gap"] = round(e["lap_time"] - lead, 4) if i > 0 else 0.0
+
+        for seg_name, idx in (("Q1", 0), ("Q2", 1), ("Q3", 2)):
+            seg_entries = []
+            for e in entries:
+                durations = duration_by_code.get(e["code"])
+                if not durations or len(durations) <= idx or durations[idx] is None:
+                    continue
+                seg_e = dict(e)
+                seg_e["lap_time"] = durations[idx]
+                seg_entries.append(seg_e)
+            if seg_entries:
+                seg_entries.sort(key=lambda x: x["lap_time"])
+                seg_entries = _add_pos(seg_entries, seg_entries[0]["lap_time"])
+                seg_entries = _mark_best(seg_entries)
+                segments[seg_name] = seg_entries
+
     response = {
         "session_id":   session_id,
         "session_type": session.type,
@@ -1326,7 +1379,7 @@ async def get_leaderboard(
         "is_race":      False,
         "syncing":      False,
         "entries":      entries,
-        "segments":     {},  # Q segmentleri Lap tablosunda timestamp yok, şimdilik boş
+        "segments":     segments,
     }
     # 18+ pilot varsa 1 saat, eksikse 15 saniye (arka plan sync tamamlanınca dolar)
     ttl = 3600 if (session.status == "finished" and len(entries) >= 18) else 15

@@ -350,6 +350,17 @@ async def fetch_intervals(session_key: int) -> list[dict]:
     return await _get("intervals", {"session_key": session_key})
 
 
+# ─── Session Result ──────────────────────────────────────────────────────────
+
+async def fetch_session_result(session_key: int) -> list[dict]:
+    """
+    Oturum sonucu (pozisyon, dnf/dns/dsq ve sıralama için Q1/Q2/Q3 süreleri).
+    Sıralama oturumlarında `duration` alanı [Q1, Q2, Q3] sürelerini içerir
+    (elenen pilotlarda ilgili segmentler None'dur).
+    """
+    return await _get("session_result", {"session_key": session_key})
+
+
 # ─── Race Control ─────────────────────────────────────────────────────────────
 
 async def fetch_race_control(session_key: int) -> list[dict]:
