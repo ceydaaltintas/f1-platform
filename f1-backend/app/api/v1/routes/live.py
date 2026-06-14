@@ -577,6 +577,7 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
 
     result = {
         "session_id":  session_id,
+        "session_type": session.type,
         "entries":     entries,
         "current_lap": current_lap,
         "total_laps":  total_laps,

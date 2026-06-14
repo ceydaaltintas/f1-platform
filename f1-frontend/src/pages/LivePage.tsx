@@ -106,6 +106,10 @@ export function LivePage() {
   const flagStyle  = latestFlag ? FLAG_STYLE[latestFlag.flag] : null
   const entries: any[] = timing.data?.entries ?? []
   const raceFinished: boolean = !!timing.data?.race_finished
+  const sessionType: string | undefined = timing.data?.session_type
+  // Canlı strateji simülatörü (pit/yakalama analizi) sadece yarış formatlı
+  // session'larda anlamlı — antrenman/sıralama'da gösterilmez
+  const isRaceLike = isDemo || sessionType === 'race' || sessionType === 'sprint'
 
   const isLoading = timing.isLoading && rcMessages.isLoading
 
@@ -380,7 +384,7 @@ export function LivePage() {
           </div>
 
           {/* Canlı Simülatör */}
-          {entries.length > 0 && (
+          {entries.length > 0 && isRaceLike && (
             <LiveSimulator
               sessionId={effectiveSid}
               drivers={entries.map((e: any) => e.code).filter(Boolean)}
