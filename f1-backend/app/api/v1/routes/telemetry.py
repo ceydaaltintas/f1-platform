@@ -1051,7 +1051,7 @@ async def get_leaderboard(
       lap=N verilirse: o ana kadar kümülatif süreye göre dinamik sıralama.
     - Antrenman/Sıralama: OpenF1'den best lap, Q1/Q2/Q3 segmentleri.
     """
-    cache_k = cache_key("leaderboard", session_id, lap or "final")
+    cache_k = cache_key("leaderboard", session_id, lap or "final", "v2")
     cached  = await cache_get(cache_k)
     if cached:
         return cached
@@ -1076,6 +1076,11 @@ async def get_leaderboard(
                 raw_results = await jolpica.fetch_race_results(
                     season_obj.year, round_.round_number
                 )
+            except Exception as exc:
+                logger.warning("Jolpica yarış sonucu alınamadı: %s", exc)
+                raw_results = []
+
+            if raw_results:
                 race_entries = []
                 for r in raw_results:
                     drv     = r.get("Driver", {})
@@ -1122,9 +1127,75 @@ async def get_leaderboard(
                 # Bitmiş yarış sonuçları değişmez — 7 gün cache
                 await cache_set(cache_k, response, ttl_seconds=7 * 86_400)
                 return response
-            except Exception as exc:
-                logger.warning("Jolpica yarış sonucu alınamadı: %s", exc)
-                # Hata olursa OpenF1 lap-based sıralamaya düş
+
+            # Jolpica henüz bu yarışın sonuçlarını yayınlamadı — OpenF1'in
+            # resmi session_result'ı ile geçici sıralama göster (kısa cache,
+            # Jolpica yayınlayınca tam veriyle değişir).
+            try:
+                session_result = await openf1.fetch_session_result(session_key)
+            except Exception:
+                session_result = []
+
+            if session_result:
+                of1_drivers = await openf1.fetch_session_drivers(session_key)
+                info_map = {d.get("driver_number"): d for d in of1_drivers}
+
+                def _result_sort_key(r: dict) -> float:
+                    pos = r.get("position")
+                    return pos if pos is not None else 1000 - (r.get("number_of_laps") or 0)
+
+                race_entries = []
+                for r in sorted(session_result, key=_result_sort_key):
+                    dn = r.get("driver_number")
+                    d  = info_map.get(dn, {})
+                    pos = r.get("position")
+
+                    if r.get("dsq"):
+                        status, gap_str = "Disqualified", "DSQ"
+                    elif r.get("dns"):
+                        status, gap_str = "Did not start", "DNS"
+                    elif r.get("dnf"):
+                        status, gap_str = "Retired", "DNF"
+                    else:
+                        status = "Finished"
+                        gap = r.get("gap_to_leader")
+                        if pos == 1 or gap in (None, 0, 0.0):
+                            gap_str = ""
+                        elif isinstance(gap, str):
+                            gap_str = gap
+                        else:
+                            gap_str = f"+{gap:.3f}"
+
+                    race_entries.append({
+                        "position":    pos if pos is not None else len(race_entries) + 1,
+                        "code":        d.get("name_acronym", "???"),
+                        "full_name":   d.get("full_name", ""),
+                        "team_name":   d.get("team_name", ""),
+                        "team_colour": d.get("team_colour", "AAAAAA"),
+                        "gap_str":     gap_str,
+                        "status":      status,
+                        "fastest_lap": None,
+                        "fastest_lap_rank": None,
+                        "points":      0.0,
+                        "grid":        0,
+                        "lap_time":    None,
+                        "sector1":     None, "sector2": None, "sector3": None,
+                        "compound":    None,
+                        "gap":         0.0,
+                        "sector1_is_best": False,
+                        "sector2_is_best": False,
+                        "sector3_is_best": False,
+                    })
+                response = {
+                    "session_id":   session_id,
+                    "session_type": session.type,
+                    "is_quali":     False,
+                    "is_race":      True,
+                    "entries":      race_entries,
+                    "segments":     {},
+                }
+                await cache_set(cache_k, response, ttl_seconds=300)
+                return response
 
     drivers = await openf1.fetch_session_drivers(session_key)
     if not drivers:
