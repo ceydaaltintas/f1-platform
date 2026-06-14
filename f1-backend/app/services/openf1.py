@@ -266,6 +266,11 @@ async def fetch_location(
     return await _get("location", params)
 
 
+async def fetch_live_locations(session_key: int, since: str) -> list[dict]:
+    """Tüm pilotların belirli bir zamandan sonraki GPS konumlarını getirir (canlı harita için)."""
+    return await _get("location", {"session_key": session_key, "date>": since})
+
+
 async def fetch_track_map(session_key: int, driver_number: int, laps: list[dict]) -> list[dict]:
     """
     En hızlı turun GPS koordinatlarından pist haritası üretir.

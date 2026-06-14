@@ -106,10 +106,33 @@ def _gap_val(gap) -> float:
 # ─── Status ──────────────────────────────────────────────────────────────────
 
 @router.get("/status")
-async def live_status():
+async def live_status(db: AsyncSession = Depends(get_db)):
     """Aktif canlı oturum bilgisini döner."""
     active = await get_active_session()
     if active is None:
+        # Celery beat çalışmıyor olabilir — bu durumda canlı oturum otomatik
+        # aktivasyonu, sayfaları periyodik çağıran bu endpoint üzerinden yapılır.
+        # OpenF1'e aşırı istek atmamak için tespit en fazla ~50sn'de bir denenir.
+        lock_ck = cache_key("auto_detect_attempt")
+        if not await cache_get(lock_ck):
+            await cache_set(lock_ck, True, ttl_seconds=50)
+            year = _determine_current_season()
+            live = await auto_detect_live_session(year)
+            if live and live.get("session_key"):
+                result = await db.execute(
+                    select(Session).where(Session.session_key == live["session_key"])
+                )
+                session = result.scalar_one_or_none()
+                if session:
+                    await set_active_session(session.id, live["session_key"], year)
+                    session.status = "active"
+                    await db.commit()
+                    return {
+                        "live": True,
+                        "session_id": session.id,
+                        "session_key": live["session_key"],
+                        "year": year,
+                    }
         return {"live": False, "message": "Şu an canlı oturum yok"}
 
     # Worker her zaman çalışmayabilir — yarış bitmişse aktif oturumu burada da temizle
@@ -566,7 +589,11 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/{session_id}/positions_map")
 async def get_live_positions_map(session_id: int):
-    """Canlı araç GPS konumlarını pist haritasıyla aynı koordinat sisteminde döner."""
+    """Canlı araç GPS konumlarını pist haritasıyla aynı koordinat sisteminde döner.
+
+    /timing ile aynı yaklaşım: Celery worker'a bağlı kalmadan OpenF1'den
+    doğrudan ve kısa süreli (3sn) cache ile çekilir.
+    """
     active = await get_active_session()
     if active is None or active.get("session_id") != session_id:
         return {"session_id": session_id, "positions": []}
@@ -578,7 +605,28 @@ async def get_live_positions_map(session_id: int):
         # rate limit'e takılmamak için burada yeniden hesaplamıyoruz
         return {"session_id": session_id, "positions": []}
 
-    snapshot = await get_live_snapshot(session_key, "positions") or {}
+    ck = cache_key("live_positions_map", session_id)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+    try:
+        location_raw = await openf1.fetch_live_locations(session_key, since)
+    except Exception as e:
+        logger.warning("Pozisyon verisi çekilemedi: %s", e)
+        location_raw = []
+
+    # Her pilotun en son konumu
+    latest: dict[int, dict] = {}
+    for p in location_raw:
+        dn = p.get("driver_number")
+        if dn is None:
+            continue
+        prev = latest.get(dn)
+        if prev is None or (p.get("date") or "") > (prev.get("date") or ""):
+            latest[dn] = p
 
     # Pilot kodu/rengi — get_live_timing tarafından cache'lenir (ekstra OpenF1 isteği önler)
     num_to_info = await cache_get(cache_key("session_drivers_info", session_key)) or {}
@@ -586,10 +634,10 @@ async def get_live_positions_map(session_id: int):
     inactive_dns = set(await cache_get(cache_key("inactive_drivers", session_key)) or [])
 
     positions = []
-    for p in snapshot.get("positions", []):
+    for p in latest.values():
         dn = p.get("driver_number")
         x, y = p.get("x"), p.get("y")
-        if dn is None or x is None or y is None:
+        if x is None or y is None:
             continue
         if dn in inactive_dns:
             continue
@@ -602,7 +650,9 @@ async def get_live_positions_map(session_id: int):
             "y": round((y - bounds["y_min"]) * bounds["scale"], 1),
         })
 
-    return {"session_id": session_id, "positions": positions}
+    result = {"session_id": session_id, "positions": positions}
+    await cache_set(ck, result, ttl_seconds=3)
+    return result
 
 
 @router.get("/{session_id}/weather")
@@ -936,30 +986,52 @@ async def live_commentary(session_id: int, mode: str = "beginner"):
     session_key: int = active["session_key"]
 
     async def event_generator():
-        """30 saniyede bir AI yorum üretir ve SSE formatında gönderir."""
+        """30 saniyede bir AI yorum üretir ve SSE formatında gönderir.
+
+        Celery worker'a bağlı kalmadan çalışır: önce /timing endpoint'inin
+        kısa süreli cache'i (canlı sayfada zaten 8sn'de bir çekiliyor)
+        kullanılır, yoksa intervals doğrudan OpenF1'den çekilir.
+        """
         while True:
             try:
-                # En son timing snapshot'ını al
-                timing = await get_live_snapshot(session_key, "timing")
-                positions = await get_live_snapshot(session_key, "positions")
+                context = None
 
-                if timing:
-                    # Claude'a durumu özetle
-                    intervals = timing.get("intervals", [])
-                    top3 = sorted(intervals, key=lambda x: _gap_val(x.get("gap_to_leader")))[:3]
-
+                timing_result = await cache_get(cache_key("live_timing", session_id))
+                if timing_result and timing_result.get("entries"):
+                    top3 = timing_result["entries"][:3]
                     context = {
                         "leader": top3[0].get("driver_number") if top3 else "?",
                         "top3_gaps": [
-                            {
-                                "driver": iv.get("driver_number"),
-                                "gap": iv.get("gap_to_leader"),
-                            }
-                            for iv in top3
+                            {"driver": e.get("driver_number"), "gap": e.get("gap_to_leader")}
+                            for e in top3
                         ],
-                        "total_cars": len(intervals),
+                        "total_cars": len(timing_result["entries"]),
                     }
+                else:
+                    try:
+                        intervals = await openf1.fetch_intervals(session_key)
+                        latest_iv: dict[int, dict] = {}
+                        for iv in intervals:
+                            dn = iv.get("driver_number")
+                            if dn is None:
+                                continue
+                            if dn not in latest_iv or (iv.get("date", "") > latest_iv[dn].get("date", "")):
+                                latest_iv[dn] = iv
 
+                        top3 = sorted(latest_iv.values(), key=lambda x: _gap_val(x.get("gap_to_leader")))[:3]
+                        if top3:
+                            context = {
+                                "leader": top3[0].get("driver_number"),
+                                "top3_gaps": [
+                                    {"driver": iv.get("driver_number"), "gap": iv.get("gap_to_leader")}
+                                    for iv in top3
+                                ],
+                                "total_cars": len(latest_iv),
+                            }
+                    except Exception as e:
+                        logger.warning("Commentary veri çekme hatası: %s", e)
+
+                if context:
                     try:
                         commentary_text = await claude_ai.interpret_live_race(context, mode)
                     except Exception as e:
