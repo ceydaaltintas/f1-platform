@@ -496,6 +496,44 @@ async def interpret_telemetry(snapshot: dict, mode: str = "beginner", driver_cod
     return text
 
 
+# ─── Canlı Yarış Yorumu ──────────────────────────────────────────────────────
+
+RACE_BEGINNER_SYS = (
+    "Sen canlı bir F1 yarışını yorumlayan bir spikersın. Anlık yarış durumuna "
+    "bakarak kısa, heyecanlı, sade Türkçe bir yorum yap. Maksimum 2 cümle.\n" + FORMAT_RULES
+)
+
+RACE_EXPERT_SYS = (
+    "Sen canlı bir F1 yarışını yorumlayan teknik bir analistsin. Anlık yarış "
+    "durumuna bakarak kısa, teknik bir yorum yap. Maksimum 2 cümle.\n" + FORMAT_RULES
+)
+
+
+async def interpret_live_race(context: dict, mode: str = "beginner") -> str:
+    """Anlık yarış durumunu (lider, ilk 3 araç arası farklar vb.) yorumlar."""
+    system = RACE_BEGINNER_SYS if mode == "beginner" else RACE_EXPERT_SYS
+    content = f"Anlık durum: {json.dumps(context, ensure_ascii=False)}"
+
+    text = ""
+    if _groq_ok():
+        try:
+            text = await _groq_interpret(content, system)
+        except Exception as e:
+            logger.warning("Groq canlı yorum başarısız: %s", e)
+    if not text and _anthropic_ok():
+        try:
+            text = await _anthropic_interpret(content, system)
+        except Exception as e:
+            logger.warning("Anthropic canlı yorum başarısız: %s", e)
+    if not text:
+        leader = context.get("leader")
+        text = f"Yarış devam ediyor, #{leader} numaralı araç şu an liderlikte. Pist üzerinde mücadele sürüyor."
+    else:
+        text = _clean_ai_text(text)
+
+    return text
+
+
 async def summarize_lap(lap_info: dict, key_moments: list[dict], mode: str = "beginner") -> str:
     cache_k = _cache_key({"fn": "lap_summary", "mode": mode, "lap": lap_info})
     cached = await cache_get(cache_k)

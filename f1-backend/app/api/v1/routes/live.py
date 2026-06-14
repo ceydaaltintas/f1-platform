@@ -34,6 +34,34 @@ from app.services.sync import _determine_current_season
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/live", tags=["canlı yarış"])
 
+# Resmi yarış mesafesi tur sayıları (circuit_name → tur sayısı).
+# OpenF1 stint verisi sadece ŞU ANA KADAR koşulan turu verir, bu yüzden
+# toplam tur sayısı için sabit bir takvim haritası kullanılır.
+CIRCUIT_TOTAL_LAPS: dict[str, int] = {
+    "Albert Park Grand Prix Circuit": 58,
+    "Shanghai International Circuit": 56,
+    "Suzuka Circuit": 53,
+    "Miami International Autodrome": 57,
+    "Circuit Gilles Villeneuve": 70,
+    "Circuit de Monaco": 78,
+    "Circuit de Barcelona-Catalunya": 66,
+    "Red Bull Ring": 71,
+    "Silverstone Circuit": 52,
+    "Circuit de Spa-Francorchamps": 44,
+    "Hungaroring": 70,
+    "Circuit Park Zandvoort": 72,
+    "Autodromo Nazionale di Monza": 53,
+    "Madring": 57,
+    "Baku City Circuit": 51,
+    "Marina Bay Street Circuit": 62,
+    "Circuit of the Americas": 56,
+    "Autódromo Hermanos Rodríguez": 71,
+    "Autódromo José Carlos Pace": 71,
+    "Las Vegas Strip Street Circuit": 50,
+    "Losail International Circuit": 57,
+    "Yas Marina Circuit": 58,
+}
+
 
 # ─── Status ──────────────────────────────────────────────────────────────────
 
@@ -268,8 +296,11 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         except Exception:
             pass
 
-    # Toplam tur: stintlerden maksimum lap_end
-    if stints:
+    # Toplam tur: önce sabit takvim haritasından (resmi yarış mesafesi),
+    # bulunamazsa stintlerden maksimum lap_end (yedek değer)
+    circuit_name = session.round.circuit_name if session.round else None
+    total_laps = CIRCUIT_TOTAL_LAPS.get(circuit_name)
+    if total_laps is None and stints:
         max_lap_end = max((s.get("lap_end") or 0) for s in stints)
         if max_lap_end > 0:
             total_laps = max_lap_end
@@ -701,24 +732,8 @@ async def live_commentary(session_id: int, mode: str = "beginner"):
                         "total_cars": len(intervals),
                     }
 
-                    RACE_SYSTEM = (
-                        "Sen canlı bir F1 yarışını yorumlayan bir spikersın. "
-                        "Anlık yarış durumuna bakarak kısa, heyecanlı, "
-                        + ("sade Türkçe" if mode == "beginner" else "teknik")
-                        + " bir yorum yap. Maksimum 2 cümle."
-                    )
-
                     try:
-                        msg = await claude_ai.get_client().messages.create(
-                            model="claude-sonnet-4-20250514",
-                            max_tokens=200,
-                            system=RACE_SYSTEM,
-                            messages=[{
-                                "role": "user",
-                                "content": f"Anlık durum: {json.dumps(context, ensure_ascii=False)}",
-                            }],
-                        )
-                        commentary_text = msg.content[0].text if msg.content else ""
+                        commentary_text = await claude_ai.interpret_live_race(context, mode)
                     except Exception as e:
                         logger.warning("AI yorum hatası: %s", e)
                         commentary_text = ""

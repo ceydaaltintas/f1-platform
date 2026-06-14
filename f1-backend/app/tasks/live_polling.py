@@ -41,6 +41,7 @@ def poll_live_session(self) -> dict:
 async def _poll_async() -> dict:
     import httpx
     from app.core.config import settings
+    from app.services import openf1
     from app.services.live_session import (
         clear_active_session,
         check_openf1_live_status,
@@ -65,7 +66,8 @@ async def _poll_async() -> dict:
     base = settings.openf1_base_url
     results: dict[str, int] = {}
 
-    async with httpx.AsyncClient(timeout=8) as client:
+    headers = await openf1._auth_headers()
+    async with httpx.AsyncClient(timeout=8, headers=headers) as client:
 
         # ── 1. Anlık Pozisyonlar ────────────────────────────────────────
         try:
