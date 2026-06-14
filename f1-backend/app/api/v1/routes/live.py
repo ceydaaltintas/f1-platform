@@ -346,7 +346,26 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         try: return float(s.replace("+",""))
         except: return 9999.0
 
-    sorted_intervals = sorted(latest_iv.values(), key=lambda x: _gap_val(x.get("gap_to_leader")))
+    # En güncel interval timestamp'i = "şu an" (canlı veri akışının en tazesi)
+    _iv_dates = [iv.get("date") for iv in latest_iv.values() if iv.get("date")]
+    _live_ts  = max(_iv_dates) if _iv_dates else None
+
+    def _is_retired(iv_date: str | None) -> bool:
+        """Bir pilotun aralık verisi 90 saniyeden fazla güncellenmemişse
+        DNF/emekli olarak kabul edilir (pist dışı kaldı, yarış bitirmedi)."""
+        if not _live_ts or not iv_date:
+            return False
+        try:
+            d1 = datetime.fromisoformat(iv_date.replace("Z", "+00:00"))
+            d2 = datetime.fromisoformat(_live_ts.replace("Z", "+00:00"))
+            return (d2 - d1).total_seconds() > 90
+        except ValueError:
+            return False
+
+    active_ivs  = [iv for iv in latest_iv.values() if not _is_retired(iv.get("date"))]
+    retired_ivs = [iv for iv in latest_iv.values() if _is_retired(iv.get("date"))]
+
+    sorted_intervals = sorted(active_ivs, key=lambda x: _gap_val(x.get("gap_to_leader")))
 
     entries = []
     seen_dns: set = set()
@@ -370,6 +389,32 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             "gap_seconds":   _gap_val(raw_gap),
             "interval":      iv.get("interval"),
             "lapped":        "LAP" in str(raw_gap or "").upper(),
+            "compound":      stint.get("compound"),
+            "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
+            "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
+            "last_lap_time": last_lap_by_dn.get(dn),
+        })
+
+    # Aralık verisi eskimiş pilotlar (yarış sırasında DNF/emekli) — sona ekle
+    for iv in retired_ivs:
+        dn = iv.get("driver_number")
+        if dn is None:
+            continue
+        seen_dns.add(dn)
+        info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+        stint = latest_stint.get(dn, {})
+        entries.append({
+            "position":      len(entries) + 1,
+            "driver_number": dn,
+            "code":          info["code"],
+            "full_name":     info["full_name"],
+            "team_name":     info["team_name"],
+            "team_colour":   info["team_colour"],
+            "gap_to_leader": "DNF",
+            "gap_seconds":   99999.0,
+            "interval":      None,
+            "lapped":        False,
+            "status":        "DNF",
             "compound":      stint.get("compound"),
             "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
             "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),

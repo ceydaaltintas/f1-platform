@@ -319,7 +319,11 @@ async def get_track_map(
 
     result = {"session_id": session_id, "points": track_points, "count": len(track_points)}
     if track_points:  # Sadece veri varsa cache'le
-        await cache_set(cache_k, result, ttl_seconds=7 * 86_400)
+        # Aktif oturumda "en hızlı tur" yarış ilerledikçe değişebilir
+        # (örn. ilk turlarda sadece start turu mevcutsa onun şekli kullanılır) —
+        # kısa TTL ile daha temiz bir tur tamamlanınca harita kendini düzeltir.
+        ttl = 7 * 86_400 if session.status == "finished" else 300
+        await cache_set(cache_k, result, ttl_seconds=ttl)
     return result
 
 
