@@ -21,6 +21,7 @@ from app.core.redis_client import cache_get, cache_key, cache_set
 from app.models.f1 import Driver, EnergyAnalysisCache, Lap, OpenF1CarDataCache, Round, Season, Session
 from app.models.user import User
 from app.services import claude_ai, db_cache, jolpica, openf1
+from app.services.live_session import get_active_session
 from app.services import energy as energy_svc
 
 logger = logging.getLogger(__name__)
@@ -283,9 +284,12 @@ async def get_track_map(
     En hızlı turun GPS koordinatlarından pist haritası döner.
     x, y normalize koordinatlar; 0–1000 aralığında SVG-ready.
     """
+    active = await get_active_session()
+    is_live = active is not None and active.get("session_id") == session_id
+
     cache_k = cache_key("track_map", session_id, driver_code.upper())
     cached = await cache_get(cache_k)
-    if cached:
+    if cached and (cached.get("bounds") or not is_live):
         # track_bounds, track_map'ten daha kısa ömürlü olabilir — cache hit'te
         # de tazelenir ki positions_map yeniden OpenF1 isteği yapmak zorunda kalmasın
         if cached.get("bounds"):
@@ -303,8 +307,11 @@ async def get_track_map(
     if driver_number is None:
         raise HTTPException(404, "Pilot bulunamadı")
 
+    # Canlı oturumda eski "finished" snapshot'ı kullanma — bounds içermez ve
+    # positions_map'in pist sınırlarını hesaplayamamasına yol açar.
+
     # DB cache kontrolü — driver_number=-1 track map verisi için özel sentinel
-    if session.status == "finished":
+    if session.status == "finished" and not is_live:
         cached_row = await db.get(OpenF1CarDataCache, (session_key, -1))
         if cached_row:
             result = {"session_id": session_id, "points": cached_row.data, "count": len(cached_row.data)}
@@ -315,7 +322,7 @@ async def get_track_map(
     bounds = await openf1.fetch_track_map_with_bounds(session_key, driver_number, laps)
     track_points = bounds["points"]
 
-    if track_points and session.status == "finished":
+    if track_points and session.status == "finished" and not is_live:
         try:
             db.add(OpenF1CarDataCache(session_key=session_key, driver_number=-1, data=track_points))
             await db.commit()
@@ -328,7 +335,7 @@ async def get_track_map(
         # Aktif oturumda "en hızlı tur" yarış ilerledikçe değişebilir
         # (örn. ilk turlarda sadece start turu mevcutsa onun şekli kullanılır) —
         # kısa TTL ile daha temiz bir tur tamamlanınca harita kendini düzeltir.
-        ttl = 7 * 86_400 if session.status == "finished" else 300
+        ttl = 7 * 86_400 if (session.status == "finished" and not is_live) else 300
         await cache_set(cache_k, result, ttl_seconds=ttl)
         # Canlı araç konumlarını aynı koordinat sistemine eşlemek için sınırlar.
         # Track_map'in TTL'inden bağımsız uzun ömürlü tutulur — positions_map endpoint'i
