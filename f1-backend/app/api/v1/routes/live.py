@@ -24,6 +24,7 @@ from app.models.f1 import Session
 from app.services import claude_ai, openf1
 from app.services.live_session import (
     auto_detect_live_session,
+    check_openf1_live_status,
     clear_active_session,
     get_active_session,
     get_live_snapshot,
@@ -110,6 +111,27 @@ async def live_status():
     active = await get_active_session()
     if active is None:
         return {"live": False, "message": "Şu an canlı oturum yok"}
+
+    # Worker her zaman çalışmayabilir — yarış bitmişse aktif oturumu burada da temizle
+    # (anasayfadaki "CANLI YARIŞ" linki bitmiş yarışı göstermesin)
+
+    # 1) /timing zaten hesaplamışsa (lider total_laps'i tamamladı mı) onu kullan — ekstra istek yok
+    cached_timing = await cache_get(cache_key("live_timing", active["session_id"]))
+    if cached_timing and cached_timing.get("race_finished"):
+        await clear_active_session()
+        return {"live": False, "message": "Yarış bitti"}
+
+    # 2) Aksi halde OpenF1'in oturum durumunu sorgula
+    ck = cache_key("openf1_session_status", active["session_key"])
+    status = await cache_get(ck)
+    if status is None:
+        status = await check_openf1_live_status(active["session_key"])
+        await cache_set(ck, status, ttl_seconds=60)
+
+    if status == "finished":
+        await clear_active_session()
+        return {"live": False, "message": "Yarış bitti"}
+
     return {
         "live": True,
         "session_id": active["session_id"],
@@ -344,6 +366,11 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         if max_lap_end > 0:
             total_laps = max_lap_end
 
+    # Yarış bitti mi? Lider son turu (total_laps) tamamladıysa bayrak göster.
+    race_finished = bool(
+        current_lap is not None and total_laps is not None and current_lap >= total_laps
+    )
+
     # Driver kodlarını numaraya eşle
     num_to_info = {
         d["driver_number"]: {
@@ -367,109 +394,163 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         if dn not in latest_stint or (s.get("stint_number") or 0) > (latest_stint[dn].get("stint_number") or 0):
             latest_stint[dn] = s
 
-    # ── Her sürücünün EN SON interval kaydını al ──────────────────────────────
-    # intervals binlerce satır içerebilir; sürücü başına sadece max(date) olan alınır
-    latest_iv: dict[int, dict] = {}
-    for iv in intervals:
-        dn = iv.get("driver_number")
-        if dn is None:
-            continue
-        if dn not in latest_iv or (iv.get("date","") > latest_iv[dn].get("date","")):
-            latest_iv[dn] = iv
+    entries: list[dict] = []
 
-    # DNF/DNS pilotlar (emekli + hiç interval verisi olmayan) — positions_map'in
-    # ekstra OpenF1 isteği yapmadan filtreleyebilmesi için cache'lenir
-    inactive_dns = _inactive_driver_numbers(latest_iv, drivers)
-    await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
+    if race_finished:
+        # Yarış bittiyse OpenF1'in resmi sonuç listesi (session_result) kullanılır —
+        # intervals akışı yarış sonunda donduğu için lider dahil herkesin "son güncelleme"
+        # zamanı birbirine yakın olur ve DNF tespiti (interval bazlı) yanlış sonuç verir.
+        try:
+            session_result = await openf1.fetch_session_result(session_key)
+        except Exception:
+            session_result = []
 
-    active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
-    retired_ivs = [iv for iv in latest_iv.values() if iv.get("driver_number") in inactive_dns]
+        def _result_sort_key(r: dict) -> float:
+            pos = r.get("position")
+            if pos is not None:
+                return pos
+            return 1000 - (r.get("number_of_laps") or 0)
 
-    sorted_intervals = sorted(active_ivs, key=lambda x: _gap_val(x.get("gap_to_leader")))
+        for r in sorted(session_result, key=_result_sort_key):
+            dn = r.get("driver_number")
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            raw_gap = r.get("gap_to_leader")
 
-    entries = []
-    seen_dns: set = set()
+            if r.get("dsq"):
+                status, gap_to_leader, gap_seconds, lapped = "DSQ", "DSQ", 99999.0, False
+            elif r.get("dns"):
+                status, gap_to_leader, gap_seconds, lapped = "DNS", "DNS", 99999.0, False
+            elif r.get("dnf"):
+                status, gap_to_leader, gap_seconds, lapped = "DNF", "DNF", 99999.0, False
+            else:
+                status = None
+                gap_to_leader = raw_gap if raw_gap is not None else 0
+                gap_seconds   = _gap_val(raw_gap)
+                lapped        = "LAP" in str(raw_gap or "").upper()
 
-    for iv in sorted_intervals:
-        dn = iv.get("driver_number")
-        if dn is None:
-            continue
-        seen_dns.add(dn)
-        info    = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
-        stint   = latest_stint.get(dn, {})
-        raw_gap = iv.get("gap_to_leader")
-        entries.append({
-            "position":      len(entries) + 1,
-            "driver_number": dn,
-            "code":          info["code"],
-            "full_name":     info["full_name"],
-            "team_name":     info["team_name"],
-            "team_colour":   info["team_colour"],
-            "gap_to_leader": raw_gap,
-            "gap_seconds":   _gap_val(raw_gap),
-            "interval":      iv.get("interval"),
-            "lapped":        "LAP" in str(raw_gap or "").upper(),
-            "compound":      stint.get("compound"),
-            "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
-            "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
-            "last_lap_time": last_lap_by_dn.get(dn),
-        })
+            entry = {
+                "position":      len(entries) + 1,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "gap_to_leader": gap_to_leader,
+                "gap_seconds":   gap_seconds,
+                "interval":      None,
+                "lapped":        lapped,
+                "compound":      stint.get("compound"),
+                "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
+                "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
+                "last_lap_time": last_lap_by_dn.get(dn),
+                "number_of_laps": r.get("number_of_laps"),
+            }
+            if status:
+                entry["status"] = status
+            entries.append(entry)
 
-    # Aralık verisi eskimiş pilotlar (yarış sırasında DNF/emekli) — sona ekle
-    for iv in retired_ivs:
-        dn = iv.get("driver_number")
-        if dn is None:
-            continue
-        seen_dns.add(dn)
-        info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
-        stint = latest_stint.get(dn, {})
-        entries.append({
-            "position":      len(entries) + 1,
-            "driver_number": dn,
-            "code":          info["code"],
-            "full_name":     info["full_name"],
-            "team_name":     info["team_name"],
-            "team_colour":   info["team_colour"],
-            "gap_to_leader": "DNF",
-            "gap_seconds":   99999.0,
-            "interval":      None,
-            "lapped":        False,
-            "status":        "DNF",
-            "compound":      stint.get("compound"),
-            "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
-            "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
-            "last_lap_time": last_lap_by_dn.get(dn),
-        })
+        inactive_dns = {r.get("driver_number") for r in session_result if r.get("dnf") or r.get("dns") or r.get("dsq")}
+        await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
 
-    # Interval verisi olmayan pilotlar (DNF/DNS baştan) — sona ekle
-    for d in drivers:
-        dn = d.get("driver_number")
-        if dn is None or dn in seen_dns:
-            continue
-        info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
-        stint = latest_stint.get(dn, {})
-        entries.append({
-            "position":      len(entries) + 1,
-            "driver_number": dn,
-            "code":          info["code"],
-            "full_name":     info["full_name"],
-            "team_name":     info["team_name"],
-            "team_colour":   info["team_colour"],
-            "gap_to_leader": "DNS/DNF",
-            "gap_seconds":   99999.0,
-            "interval":      None,
-            "lapped":        False,
-            "status":        "DNS/DNF",
-            "compound":      stint.get("compound"),
-            "tyre_age":      None,
-            "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
-            "last_lap_time": None,
-        })
+    else:
+        # ── Her sürücünün EN SON interval kaydını al ──────────────────────────────
+        # intervals binlerce satır içerebilir; sürücü başına sadece max(date) olan alınır
+        latest_iv: dict[int, dict] = {}
+        for iv in intervals:
+            dn = iv.get("driver_number")
+            if dn is None:
+                continue
+            if dn not in latest_iv or (iv.get("date","") > latest_iv[dn].get("date","")):
+                latest_iv[dn] = iv
 
-    # Yarış bitti mi? Lider son turu (total_laps) tamamladıysa bayrak göster.
-    race_finished = bool(
-        current_lap is not None and total_laps is not None and current_lap >= total_laps
-    )
+        # DNF/DNS pilotlar (emekli + hiç interval verisi olmayan) — positions_map'in
+        # ekstra OpenF1 isteği yapmadan filtreleyebilmesi için cache'lenir
+        inactive_dns = _inactive_driver_numbers(latest_iv, drivers)
+        await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
+
+        active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
+        retired_ivs = [iv for iv in latest_iv.values() if iv.get("driver_number") in inactive_dns]
+
+        sorted_intervals = sorted(active_ivs, key=lambda x: _gap_val(x.get("gap_to_leader")))
+
+        seen_dns: set = set()
+
+        for iv in sorted_intervals:
+            dn = iv.get("driver_number")
+            if dn is None:
+                continue
+            seen_dns.add(dn)
+            info    = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint   = latest_stint.get(dn, {})
+            raw_gap = iv.get("gap_to_leader")
+            entries.append({
+                "position":      len(entries) + 1,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "gap_to_leader": raw_gap,
+                "gap_seconds":   _gap_val(raw_gap),
+                "interval":      iv.get("interval"),
+                "lapped":        "LAP" in str(raw_gap or "").upper(),
+                "compound":      stint.get("compound"),
+                "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
+                "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
+                "last_lap_time": last_lap_by_dn.get(dn),
+            })
+
+        # Aralık verisi eskimiş pilotlar (yarış sırasında DNF/emekli) — sona ekle
+        for iv in retired_ivs:
+            dn = iv.get("driver_number")
+            if dn is None:
+                continue
+            seen_dns.add(dn)
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            entries.append({
+                "position":      len(entries) + 1,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "gap_to_leader": "DNF",
+                "gap_seconds":   99999.0,
+                "interval":      None,
+                "lapped":        False,
+                "status":        "DNF",
+                "compound":      stint.get("compound"),
+                "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
+                "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
+                "last_lap_time": last_lap_by_dn.get(dn),
+            })
+
+        # Interval verisi olmayan pilotlar (DNF/DNS baştan) — sona ekle
+        for d in drivers:
+            dn = d.get("driver_number")
+            if dn is None or dn in seen_dns:
+                continue
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            entries.append({
+                "position":      len(entries) + 1,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "gap_to_leader": "DNS/DNF",
+                "gap_seconds":   99999.0,
+                "interval":      None,
+                "lapped":        False,
+                "status":        "DNS/DNF",
+                "compound":      stint.get("compound"),
+                "tyre_age":      None,
+                "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
+                "last_lap_time": None,
+            })
 
     result = {
         "session_id":  session_id,
