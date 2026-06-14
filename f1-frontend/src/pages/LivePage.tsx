@@ -105,6 +105,7 @@ export function LivePage() {
   const latestFlag = [...messages].reverse().find(m => m.flag && m.flag !== 'NONE')
   const flagStyle  = latestFlag ? FLAG_STYLE[latestFlag.flag] : null
   const entries: any[] = timing.data?.entries ?? []
+  const raceFinished: boolean = !!timing.data?.race_finished
 
   const isLoading = timing.isLoading && rcMessages.isLoading
 
@@ -134,14 +135,24 @@ export function LivePage() {
       <div className="border-b px-6 py-3 flex items-center justify-between flex-wrap gap-3"
         style={{ background: 'var(--s1)', borderColor: 'var(--b1)' }}>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={{ background: 'rgba(225,6,0,0.15)', border: '1px solid rgba(225,6,0,0.4)' }}>
-            <span className="w-2 h-2 rounded-full bg-[#E10600]"
-              style={{ animation: 'pulse-dot 1s infinite' }} />
-            <span className="text-[12px] font-bold mono text-[#E10600]">
-              {isDemo ? 'DEMO' : 'CANLI'}
-            </span>
-          </div>
+          {raceFinished && !isDemo ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.25)' }}>
+              <span>🏁</span>
+              <span className="text-[12px] font-bold mono" style={{ color: '#ffffff' }}>
+                YARIŞ BİTTİ
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+              style={{ background: 'rgba(225,6,0,0.15)', border: '1px solid rgba(225,6,0,0.4)' }}>
+              <span className="w-2 h-2 rounded-full bg-[#E10600]"
+                style={{ animation: 'pulse-dot 1s infinite' }} />
+              <span className="text-[12px] font-bold mono text-[#E10600]">
+                {isDemo ? 'DEMO' : 'CANLI'}
+              </span>
+            </div>
+          )}
           <div>
             <p className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
               {isDemo ? 'KANADA GP — DEMO GÖRÜNTÜLEMESİ' : 'CANLI YARIŞ TAKİBİ'}
@@ -374,6 +385,7 @@ export function LivePage() {
               sessionId={effectiveSid}
               drivers={entries.map((e: any) => e.code).filter(Boolean)}
               defaultDriver={entries[4]?.code ?? ''}
+              disabled={raceFinished}
             />
           )}
 

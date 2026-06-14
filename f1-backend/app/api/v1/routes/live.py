@@ -63,6 +63,34 @@ CIRCUIT_TOTAL_LAPS: dict[str, int] = {
 }
 
 
+# Bir pilotun aralık verisi, en güncel veriden 90s'den fazla eskiyse DNF/emekli kabul edilir
+RETIRED_THRESHOLD_SECONDS = 90
+
+
+def _inactive_driver_numbers(latest_iv: dict[int, dict], drivers: list[dict]) -> set:
+    """DNF/emekli pilotların driver_number'larını döner.
+
+    Yarış sonunda tüm pilotların interval akışı durur — bu yüzden eşik,
+    en güncel interval timestamp'ine (live_ts) göre relatiftir.
+    """
+    dates = [iv.get("date") for iv in latest_iv.values() if iv.get("date")]
+    live_ts = max(dates) if dates else None
+
+    def _is_retired(iv_date: str | None) -> bool:
+        if not live_ts or not iv_date:
+            return False
+        try:
+            d1 = datetime.fromisoformat(iv_date.replace("Z", "+00:00"))
+            d2 = datetime.fromisoformat(live_ts.replace("Z", "+00:00"))
+            return (d2 - d1).total_seconds() > RETIRED_THRESHOLD_SECONDS
+        except ValueError:
+            return False
+
+    inactive = {dn for dn, iv in latest_iv.items() if _is_retired(iv.get("date"))}
+    inactive |= {d.get("driver_number") for d in drivers if d.get("driver_number") not in latest_iv}
+    return inactive
+
+
 # Gap değerini float'a çevir (+2 LAPS → 9000+, 1:23.456 → saniye, sayı → float)
 def _gap_val(gap) -> float:
     if gap is None: return 9999.0
@@ -349,24 +377,13 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         if dn not in latest_iv or (iv.get("date","") > latest_iv[dn].get("date","")):
             latest_iv[dn] = iv
 
-    # En güncel interval timestamp'i = "şu an" (canlı veri akışının en tazesi)
-    _iv_dates = [iv.get("date") for iv in latest_iv.values() if iv.get("date")]
-    _live_ts  = max(_iv_dates) if _iv_dates else None
+    # DNF/DNS pilotlar (emekli + hiç interval verisi olmayan) — positions_map'in
+    # ekstra OpenF1 isteği yapmadan filtreleyebilmesi için cache'lenir
+    inactive_dns = _inactive_driver_numbers(latest_iv, drivers)
+    await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
 
-    def _is_retired(iv_date: str | None) -> bool:
-        """Bir pilotun aralık verisi 90 saniyeden fazla güncellenmemişse
-        DNF/emekli olarak kabul edilir (pist dışı kaldı, yarış bitirmedi)."""
-        if not _live_ts or not iv_date:
-            return False
-        try:
-            d1 = datetime.fromisoformat(iv_date.replace("Z", "+00:00"))
-            d2 = datetime.fromisoformat(_live_ts.replace("Z", "+00:00"))
-            return (d2 - d1).total_seconds() > 90
-        except ValueError:
-            return False
-
-    active_ivs  = [iv for iv in latest_iv.values() if not _is_retired(iv.get("date"))]
-    retired_ivs = [iv for iv in latest_iv.values() if _is_retired(iv.get("date"))]
+    active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
+    retired_ivs = [iv for iv in latest_iv.values() if iv.get("driver_number") in inactive_dns]
 
     sorted_intervals = sorted(active_ivs, key=lambda x: _gap_val(x.get("gap_to_leader")))
 
@@ -449,11 +466,17 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             "last_lap_time": None,
         })
 
+    # Yarış bitti mi? Lider son turu (total_laps) tamamladıysa bayrak göster.
+    race_finished = bool(
+        current_lap is not None and total_laps is not None and current_lap >= total_laps
+    )
+
     result = {
         "session_id":  session_id,
         "entries":     entries,
         "current_lap": current_lap,
         "total_laps":  total_laps,
+        "race_finished": race_finished,
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     await cache_set(ck, result, ttl_seconds=6)
@@ -478,12 +501,16 @@ async def get_live_positions_map(session_id: int):
 
     # Pilot kodu/rengi — get_live_timing tarafından cache'lenir (ekstra OpenF1 isteği önler)
     num_to_info = await cache_get(cache_key("session_drivers_info", session_key)) or {}
+    # DNF/DNS pilotlar — son bilinen konumda donmuş kalmasınlar
+    inactive_dns = set(await cache_get(cache_key("inactive_drivers", session_key)) or [])
 
     positions = []
     for p in snapshot.get("positions", []):
         dn = p.get("driver_number")
         x, y = p.get("x"), p.get("y")
         if dn is None or x is None or y is None:
+            continue
+        if dn in inactive_dns:
             continue
         info = num_to_info.get(str(dn)) or num_to_info.get(dn) or {"code": str(dn), "team_colour": "#888888"}
         positions.append({
@@ -588,36 +615,56 @@ async def live_simulate(
         try: return float(s.replace("+",""))
         except: return 0.0
 
+    # DNF/DNS pilotlar — bu endpoint'in kendi interval verisinden hesaplanır
+    # (get_live_timing'in cache'lediği inactive_drivers'a bağımlı olmadan)
+    inactive_dns = _inactive_driver_numbers(latest_iv_sim, drivers)
+
     sorted_ivs = sorted(latest_iv_sim.values(), key=lambda x: _gap(x.get("gap_to_leader")))
     pos_map: dict[int, int] = {}
     gap_map: dict[int, float] = {}
     for i, iv in enumerate(sorted_ivs):
         dn = iv.get("driver_number")
+        if dn in inactive_dns:
+            continue
         if dn not in pos_map:
-            pos_map[dn] = i + 1
+            pos_map[dn] = len(pos_map) + 1
             gap_map[dn] = _gap(iv.get("gap_to_leader"))
 
     target_pos = pos_map.get(target_num, 99)
     target_gap = gap_map.get(target_num, 0.0)
     is_lapped  = target_gap >= 9000  # "+X LAP" durumu
 
-    # Her sürücünün son 5 clean turundaki ort tur süresi
-    async def _avg_pace(dn: int) -> float | None:
+    # Tüm pilotların tur verisi — tek istekle (her pilot için ayrı /laps çağrısı
+    # OpenF1 rate limit'ini hızla tüketiyordu), kısa süreliğine cache'lenir
+    all_laps_ck = cache_key("session_all_laps", session_key)
+    all_laps = await cache_get(all_laps_ck)
+    if all_laps is None:
         try:
-            laps = await openf1.fetch_laps(session_key, dn)
-            clean = [
-                l["lap_duration"] for l in laps
-                if l.get("lap_duration") and not l.get("is_pit_out_lap")
-            ]
-            if not clean: return None
-            fastest = min(clean)
-            valid = [t for t in clean if t <= fastest * 1.06]
-            return sum(sorted(valid)[-5:]) / len(sorted(valid)[-5:]) if valid else None
-        except:
-            return None
+            all_laps = await openf1.fetch_all_session_laps(session_key)
+        except Exception:
+            all_laps = []
+        await cache_set(all_laps_ck, all_laps, ttl_seconds=20)
+
+    laps_by_dn: dict[int, list[dict]] = {}
+    for l in all_laps:
+        dn = l.get("driver_number")
+        if dn is not None:
+            laps_by_dn.setdefault(dn, []).append(l)
+
+    # Her sürücünün son 5 clean turundaki ort tur süresi
+    def _avg_pace(dn: int) -> float | None:
+        laps = laps_by_dn.get(dn, [])
+        clean = [
+            l["lap_duration"] for l in laps
+            if l.get("lap_duration") and not l.get("is_pit_out_lap")
+        ]
+        if not clean: return None
+        fastest = min(clean)
+        valid = [t for t in clean if t <= fastest * 1.06]
+        return sum(sorted(valid)[-5:]) / len(sorted(valid)[-5:]) if valid else None
 
     # Hedef sürücünün pace'i
-    target_pace = await _avg_pace(target_num)
+    target_pace = _avg_pace(target_num)
 
     # Laplı pilot için basit mesaj dön
     if is_lapped:
@@ -629,7 +676,7 @@ async def live_simulate(
             "lapped":            True,
             "laps_down":         laps_down,
             "message":           f"{driver_code.upper()} {laps_down} tur geride — simülasyon geçerli değil",
-            "avg_pace":          await _avg_pace(target_num),
+            "avg_pace":          target_pace,
             "pit_loss_estimate": PIT_LOSS,
             "catch_analysis":    [],
             "pit_scenario":      {"position_after_pit": target_pos, "cars_still_ahead": [], "cars_overtaken": []},
@@ -647,7 +694,7 @@ async def live_simulate(
         if gap_to_catch <= 0:
             continue
 
-        their_pace = await _avg_pace(dn)
+        their_pace = _avg_pace(dn)
         if target_pace and their_pace:
             pace_diff = their_pace - target_pace  # pozitif = hedef daha hızlı
             if pace_diff > 0.05:

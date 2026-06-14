@@ -13,9 +13,10 @@ interface Props {
   sessionId: number
   drivers: string[]          // mevcut pilotlar (dropdown için)
   defaultDriver?: string
+  disabled?: boolean         // yarış bittiyse true
 }
 
-export function LiveSimulator({ sessionId, drivers, defaultDriver = '' }: Props) {
+export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled = false }: Props) {
   const [selectedDriver, setSelectedDriver] = useState(defaultDriver)
   const [enabled, setEnabled] = useState(false)
 
@@ -24,13 +25,13 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '' }: Props)
     queryFn:  () =>
       client.get(`/live/${sessionId}/simulate?driver_code=${selectedDriver}`)
         .then(r => r.data),
-    enabled:  enabled && !!selectedDriver,
+    enabled:  enabled && !!selectedDriver && !disabled,
     staleTime: 10_000,
-    refetchInterval: enabled ? 15_000 : false,
+    refetchInterval: enabled && !disabled ? 15_000 : false,
   })
 
   const runSim = () => {
-    if (!selectedDriver) return
+    if (!selectedDriver || disabled) return
     setEnabled(true)
     setTimeout(() => refetch(), 50)
   }
@@ -53,12 +54,21 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '' }: Props)
       </div>
 
       <div className="p-4 space-y-4">
+        {disabled && (
+          <div className="rounded-xl p-3 text-center"
+            style={{ background:'rgba(255,255,255,0.04)', border:'1px solid var(--b1)' }}>
+            <p className="text-[12px]" style={{ color:'var(--t3)' }}>
+              🏁 Yarış bitti — canlı simülasyon artık çalıştırılamaz.
+            </p>
+          </div>
+        )}
         {/* Pilot seçici + Simüle Et */}
         <div className="flex gap-3">
           <select
             value={selectedDriver}
             onChange={e => { setSelectedDriver(e.target.value); setEnabled(false) }}
-            className="flex-1 px-3 py-2.5 rounded-xl text-[13px] font-bold mono cursor-pointer"
+            disabled={disabled}
+            className="flex-1 px-3 py-2.5 rounded-xl text-[13px] font-bold mono cursor-pointer disabled:opacity-40"
             style={{
               background: 'var(--s2)', border: '1px solid var(--b1)',
               color: selectedDriver ? '#E10600' : 'var(--t3)', outline: 'none',
@@ -71,7 +81,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '' }: Props)
           </select>
           <button
             onClick={runSim}
-            disabled={!selectedDriver || isLoading}
+            disabled={!selectedDriver || isLoading || disabled}
             className="px-4 py-2.5 rounded-xl text-[12px] font-bold transition-all disabled:opacity-40"
             style={{ background: '#E10600', color: 'white' }}>
             {isLoading ? '⏳' : '▶ Simüle Et'}
