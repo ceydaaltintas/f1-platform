@@ -315,6 +315,8 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         }
         for d in drivers
     }
+    # positions_map endpoint'i için pilot kodu/rengi cache'le (ekstra OpenF1 isteği önler)
+    await cache_set(cache_key("session_drivers_info", session_key), num_to_info, ttl_seconds=3600)
     # Stintlerden: son stint (lastik) + toplam stint sayısı (pit count = stint - 1)
     latest_stint: dict[int, dict] = {}
     stint_count:  dict[int, int]  = {}
@@ -455,6 +457,41 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
     }
     await cache_set(ck, result, ttl_seconds=6)
     return result
+
+
+@router.get("/{session_id}/positions_map")
+async def get_live_positions_map(session_id: int):
+    """Canlı araç GPS konumlarını pist haritasıyla aynı koordinat sisteminde döner."""
+    active = await get_active_session()
+    if active is None or active.get("session_id") != session_id:
+        return {"session_id": session_id, "positions": []}
+
+    session_key = active["session_key"]
+    bounds = await cache_get(cache_key("track_bounds", session_id))
+    if not bounds:
+        return {"session_id": session_id, "positions": []}
+
+    snapshot = await get_live_snapshot(session_key, "positions") or {}
+
+    # Pilot kodu/rengi — get_live_timing tarafından cache'lenir (ekstra OpenF1 isteği önler)
+    num_to_info = await cache_get(cache_key("session_drivers_info", session_key)) or {}
+
+    positions = []
+    for p in snapshot.get("positions", []):
+        dn = p.get("driver_number")
+        x, y = p.get("x"), p.get("y")
+        if dn is None or x is None or y is None:
+            continue
+        info = num_to_info.get(str(dn)) or num_to_info.get(dn) or {"code": str(dn), "team_colour": "#888888"}
+        positions.append({
+            "driver_number": dn,
+            "code": info["code"],
+            "color": info.get("team_colour", "#888888"),
+            "x": round((x - bounds["x_min"]) * bounds["scale"], 1),
+            "y": round((y - bounds["y_min"]) * bounds["scale"], 1),
+        })
+
+    return {"session_id": session_id, "positions": positions}
 
 
 @router.get("/{session_id}/weather")

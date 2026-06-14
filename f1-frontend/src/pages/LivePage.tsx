@@ -73,6 +73,13 @@ export function LivePage() {
     staleTime: 86_400_000,
     enabled: !!effectiveSid && !isNaN(effectiveSid),
   })
+  const positionsMap = useQuery({
+    queryKey: ['positions_map', effectiveSid],
+    queryFn:  () => client.get(`/live/${effectiveSid}/positions_map`).then(r => r.data),
+    refetchInterval: 4_000,
+    staleTime: 0,
+    enabled: !isDemo && !!effectiveSid && !isNaN(effectiveSid),
+  })
 
   // SSE yorumu — sadece gerçek yarış modunda
   const [commentary, setCommentary] = useState('')
@@ -353,7 +360,11 @@ export function LivePage() {
                 <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>Pist yükleniyor...</p>
               </div>
             ) : (
-              <TrackMap points={trackMap.data?.points ?? []} showCorners height={240} />
+              <TrackMap
+                points={trackMap.data?.points ?? []}
+                livePositions={positionsMap.data?.positions ?? []}
+                showCorners height={240}
+              />
             )}
           </div>
 

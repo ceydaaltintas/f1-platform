@@ -271,9 +271,21 @@ async def fetch_track_map(session_key: int, driver_number: int, laps: list[dict]
     En hızlı turun GPS koordinatlarından pist haritası üretir.
     x, y koordinatları normalize edilmiş SVG-ready formatta döner.
     """
+    result = await fetch_track_map_with_bounds(session_key, driver_number, laps)
+    return result["points"]
+
+
+async def fetch_track_map_with_bounds(session_key: int, driver_number: int, laps: list[dict]) -> dict:
+    """
+    Pist haritasını ve normalize için kullanılan sınırları (x_min, y_min, scale)
+    birlikte döner — canlı araç konumlarını aynı koordinat sistemine
+    eşlemek için kullanılır.
+    """
+    empty = {"points": [], "x_min": 0.0, "y_min": 0.0, "scale": 1.0}
+
     lap = find_lap(laps, "fastest")
     if lap is None:
-        return []
+        return empty
 
     date_start = lap.get("date_start")
     lap_duration = lap.get("lap_duration", 120)
@@ -288,15 +300,15 @@ async def fetch_track_map(session_key: int, driver_number: int, laps: list[dict]
         points = await fetch_location(session_key, driver_number, date_start, date_end)
     except Exception as e:
         logger.warning("Track map location fetch başarısız: %s", e)
-        return []
+        return empty
     if not points:
-        return []
+        return empty
 
     # Normalize: -500..+500 → 0..1000 (SVG koordinat sistemi)
     xs = [p["x"] for p in points if p.get("x") is not None]
     ys = [p["y"] for p in points if p.get("y") is not None]
     if not xs or not ys:
-        return []
+        return empty
 
     x_min, x_max = min(xs), max(xs)
     y_min, y_max = min(ys), max(ys)
@@ -304,7 +316,7 @@ async def fetch_track_map(session_key: int, driver_number: int, laps: list[dict]
     y_range = y_max - y_min or 1
     scale = 1000 / max(x_range, y_range)
 
-    return [
+    norm_points = [
         {
             "x": round((p["x"] - x_min) * scale, 1) if p.get("x") is not None else None,
             "y": round((p["y"] - y_min) * scale, 1) if p.get("y") is not None else None,
@@ -312,6 +324,8 @@ async def fetch_track_map(session_key: int, driver_number: int, laps: list[dict]
         for p in points
         if p.get("x") is not None and p.get("y") is not None
     ]
+
+    return {"points": norm_points, "x_min": x_min, "y_min": y_min, "scale": scale}
 
 
 # ─── Stints ──────────────────────────────────────────────────────────────────

@@ -308,7 +308,8 @@ async def get_track_map(
             return result
 
     laps = await db_cache.get_laps(session, driver_number, db)
-    track_points = await openf1.fetch_track_map(session_key, driver_number, laps)
+    bounds = await openf1.fetch_track_map_with_bounds(session_key, driver_number, laps)
+    track_points = bounds["points"]
 
     if track_points and session.status == "finished":
         try:
@@ -324,6 +325,12 @@ async def get_track_map(
         # kısa TTL ile daha temiz bir tur tamamlanınca harita kendini düzeltir.
         ttl = 7 * 86_400 if session.status == "finished" else 300
         await cache_set(cache_k, result, ttl_seconds=ttl)
+        # Canlı araç konumlarını aynı koordinat sistemine eşlemek için sınırlar
+        await cache_set(
+            cache_key("track_bounds", session_id),
+            {"x_min": bounds["x_min"], "y_min": bounds["y_min"], "scale": bounds["scale"]},
+            ttl_seconds=ttl,
+        )
     return result
 
 

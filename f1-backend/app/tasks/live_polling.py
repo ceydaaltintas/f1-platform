@@ -69,17 +69,27 @@ async def _poll_async() -> dict:
     headers = await openf1._auth_headers()
     async with httpx.AsyncClient(timeout=8, headers=headers) as client:
 
-        # ── 1. Anlık Pozisyonlar ────────────────────────────────────────
+        # ── 1. Anlık GPS Konumları ────────────────────────────────────────
+        # /position pilotun sıralama numarasını (1., 2. ...) döner, x/y/z içermez.
+        # GPS koordinatları için /location kullanılır — son ~10 saniyelik
+        # pencereyle sınırlandırılır (tüm pilotlar için, rate limit'e takılmamak adına).
         try:
-            resp = await client.get(f"{base}/position", params={"session_key": session_key})
+            from datetime import timedelta
+            since = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+            resp = await client.get(
+                f"{base}/location",
+                params={"session_key": session_key, "date>": since},
+            )
             if resp.status_code == 200:
-                positions_raw = resp.json()
+                location_raw = resp.json()
                 # Her pilotun en son konumunu al
                 latest: dict[int, dict] = {}
-                for p in positions_raw:
+                for p in location_raw:
                     dn = p.get("driver_number")
                     if dn is not None:
-                        latest[dn] = p
+                        prev = latest.get(dn)
+                        if prev is None or (p.get("date") or "") > (prev.get("date") or ""):
+                            latest[dn] = p
                 positions = list(latest.values())
 
                 payload = {

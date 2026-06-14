@@ -2,10 +2,12 @@ import { useRef, useState, useMemo, useEffect } from 'react'
 import type { TrackPoint, TelemetryPoint } from '../../types/f1'
 
 interface DriverPos { ratio: number; code: string; color: string }
+interface LivePos { x: number; y: number; code: string; color: string }
 
 interface Props {
   points: TrackPoint[]
   driverPositions?: DriverPos[]
+  livePositions?: LivePos[]
   speedTelemetry?: TelemetryPoint[]
   compareTelemetry?: TelemetryPoint[]
   primaryColor?: string
@@ -81,7 +83,7 @@ function speedColor(spd: number): string {
 }
 
 export function TrackMap({
-  points, driverPositions = [],
+  points, driverPositions = [], livePositions = [],
   speedTelemetry, compareTelemetry,
   primaryColor = '#E10600', compareColor = '#FF8700',
   primaryLabel, compareLabel,
@@ -319,6 +321,20 @@ export function TrackMap({
             </g>
           )
         })}
+
+        {/* Canlı GPS konumları */}
+        {livePositions.map(lp => (
+          <g key={`live-${lp.code}`}>
+            <circle cx={lp.x} cy={lp.y} r={20} fill={lp.color + '12'} stroke={lp.color + '30'} strokeWidth={2}>
+              <animate attributeName="r" values="16;24;16" dur="1.5s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.7;0;0.7" dur="1.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx={lp.x} cy={lp.y} r={10} fill={lp.color} stroke="#05080f" strokeWidth={3} />
+            <text x={lp.x} y={lp.y - 17} textAnchor="middle" fontSize={13} fontWeight="bold"
+              fontFamily="IBM Plex Mono,monospace" fill={lp.color}
+              stroke="#05080f" strokeWidth={4} paintOrder="stroke">{lp.code}</text>
+          </g>
+        ))}
 
         {/* Pilot konumu */}
         {driverPositions.map(dp => {
