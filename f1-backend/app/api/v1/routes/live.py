@@ -63,6 +63,17 @@ CIRCUIT_TOTAL_LAPS: dict[str, int] = {
 }
 
 
+# Gap değerini float'a çevir (+2 LAPS → 9000+, 1:23.456 → saniye, sayı → float)
+def _gap_val(gap) -> float:
+    if gap is None: return 9999.0
+    s = str(gap).strip()
+    if "LAP" in s.upper():
+        try: return 9000.0 + float(s.split()[0].replace("+",""))
+        except: return 9999.0
+    try: return float(s.replace("+",""))
+    except: return 9999.0
+
+
 # ─── Status ──────────────────────────────────────────────────────────────────
 
 @router.get("/status")
@@ -338,16 +349,6 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         if dn not in latest_iv or (iv.get("date","") > latest_iv[dn].get("date","")):
             latest_iv[dn] = iv
 
-    # Gap değerini float'a çevir (+2 LAPS → 9000+, 1:23.456 → saniye, sayı → float)
-    def _gap_val(gap) -> float:
-        if gap is None: return 9999.0
-        s = str(gap).strip()
-        if "LAP" in s.upper():
-            try: return 9000.0 + float(s.split()[0].replace("+",""))
-            except: return 9999.0
-        try: return float(s.replace("+",""))
-        except: return 9999.0
-
     # En güncel interval timestamp'i = "şu an" (canlı veri akışının en tazesi)
     _iv_dates = [iv.get("date") for iv in latest_iv.values() if iv.get("date")]
     _live_ts  = max(_iv_dates) if _iv_dates else None
@@ -469,6 +470,8 @@ async def get_live_positions_map(session_id: int):
     session_key = active["session_key"]
     bounds = await cache_get(cache_key("track_bounds", session_id))
     if not bounds:
+        # track_map endpoint henüz çağrılmamış (sayfa yüklenince frontend çağırır) —
+        # rate limit'e takılmamak için burada yeniden hesaplamıyoruz
         return {"session_id": session_id, "positions": []}
 
     snapshot = await get_live_snapshot(session_key, "positions") or {}
@@ -800,7 +803,7 @@ async def live_commentary(session_id: int, mode: str = "beginner"):
                 if timing:
                     # Claude'a durumu özetle
                     intervals = timing.get("intervals", [])
-                    top3 = sorted(intervals, key=lambda x: (x.get("gap_to_leader") or 0))[:3]
+                    top3 = sorted(intervals, key=lambda x: _gap_val(x.get("gap_to_leader")))[:3]
 
                     context = {
                         "leader": top3[0].get("driver_number") if top3 else "?",

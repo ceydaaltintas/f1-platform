@@ -325,11 +325,13 @@ async def get_track_map(
         # kısa TTL ile daha temiz bir tur tamamlanınca harita kendini düzeltir.
         ttl = 7 * 86_400 if session.status == "finished" else 300
         await cache_set(cache_k, result, ttl_seconds=ttl)
-        # Canlı araç konumlarını aynı koordinat sistemine eşlemek için sınırlar
+        # Canlı araç konumlarını aynı koordinat sistemine eşlemek için sınırlar.
+        # Track_map'in TTL'inden bağımsız uzun ömürlü tutulur — positions_map endpoint'i
+        # bu cache'e bağımlı, sık sık expire olup boş kalmasın.
         await cache_set(
             cache_key("track_bounds", session_id),
             {"x_min": bounds["x_min"], "y_min": bounds["y_min"], "scale": bounds["scale"]},
-            ttl_seconds=ttl,
+            ttl_seconds=3600,
         )
     return result
 
