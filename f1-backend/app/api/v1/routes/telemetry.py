@@ -286,6 +286,10 @@ async def get_track_map(
     cache_k = cache_key("track_map", session_id, driver_code.upper())
     cached = await cache_get(cache_k)
     if cached:
+        # track_bounds, track_map'ten daha kısa ömürlü olabilir — cache hit'te
+        # de tazelenir ki positions_map yeniden OpenF1 isteği yapmak zorunda kalmasın
+        if cached.get("bounds"):
+            await cache_set(cache_key("track_bounds", session_id), cached["bounds"], ttl_seconds=3600)
         return cached
 
     session = await _resolve_session(session_id, db)
@@ -318,7 +322,8 @@ async def get_track_map(
         except Exception:
             await db.rollback()
 
-    result = {"session_id": session_id, "points": track_points, "count": len(track_points)}
+    bounds_data = {"x_min": bounds["x_min"], "y_min": bounds["y_min"], "scale": bounds["scale"]}
+    result = {"session_id": session_id, "points": track_points, "count": len(track_points), "bounds": bounds_data}
     if track_points:  # Sadece veri varsa cache'le
         # Aktif oturumda "en hızlı tur" yarış ilerledikçe değişebilir
         # (örn. ilk turlarda sadece start turu mevcutsa onun şekli kullanılır) —
@@ -328,11 +333,7 @@ async def get_track_map(
         # Canlı araç konumlarını aynı koordinat sistemine eşlemek için sınırlar.
         # Track_map'in TTL'inden bağımsız uzun ömürlü tutulur — positions_map endpoint'i
         # bu cache'e bağımlı, sık sık expire olup boş kalmasın.
-        await cache_set(
-            cache_key("track_bounds", session_id),
-            {"x_min": bounds["x_min"], "y_min": bounds["y_min"], "scale": bounds["scale"]},
-            ttl_seconds=3600,
-        )
+        await cache_set(cache_key("track_bounds", session_id), bounds_data, ttl_seconds=3600)
     return result
 
 
