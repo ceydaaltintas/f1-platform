@@ -13,6 +13,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.redis_client import cache_delete, cache_get, cache_set, get_redis
+from app.services import openf1
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,8 @@ async def check_openf1_live_status(session_key: int) -> str:
     Döner: "live" | "finished" | "unknown"
     """
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        headers = await openf1._auth_headers()
+        async with httpx.AsyncClient(timeout=10, headers=headers) as client:
             resp = await client.get(
                 f"{settings.openf1_base_url}/sessions",
                 params={"session_key": session_key},
@@ -83,7 +85,8 @@ async def auto_detect_live_session(year: int) -> dict | None:
     Bulursa {"session_key": int, "meeting_key": int, "name": str} döner.
     """
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        headers = await openf1._auth_headers()
+        async with httpx.AsyncClient(timeout=15, headers=headers) as client:
             resp = await client.get(
                 f"{settings.openf1_base_url}/sessions",
                 params={"year": year},
