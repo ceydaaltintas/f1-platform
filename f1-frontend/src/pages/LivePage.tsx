@@ -13,6 +13,9 @@ import { LiveSimulator } from '../components/live/LiveSimulator'
 import { COMPOUND_COLORS } from '../types/f1'
 import { formatLapTime, formatGap } from '../utils/format'
 
+const QUALI_COLOR: Record<string, string> = { Q1: '#FF8700', Q2: '#00D2BE', Q3: '#E10600' }
+const QUALI_SEGMENT_NAMES_ORDER = ['Q1', 'Q2', 'Q3'] as const
+
 const TEAM_COLOR: Record<string, string> = {
   VER: '#3671C6', NOR: '#FF8000', LEC: '#E8002D', HAM: '#27F4D2',
   RUS: '#27F4D2', PIA: '#FF8000', SAI: '#E8002D', ANT: '#27F4D2',
@@ -60,6 +63,13 @@ export function LivePage() {
     staleTime: 0,
     enabled: !!effectiveSid && !isNaN(effectiveSid),
   })
+  const radio = useQuery({
+    queryKey: ['live-radio', effectiveSid],
+    queryFn:  () => client.get(`/live/${effectiveSid}/radio`).then(r => r.data),
+    refetchInterval: isDemo ? 60_000 : 15_000,
+    staleTime: 0,
+    enabled: !!effectiveSid && !isNaN(effectiveSid),
+  })
   const weather = useQuery({
     queryKey: ['live-weather', effectiveSid],
     queryFn:  () => client.get(`/live/${effectiveSid}/weather`).then(r => r.data),
@@ -101,6 +111,7 @@ export function LivePage() {
     return () => clearInterval(id)
   }, [])
 
+  const radioClips: any[] = radio.data?.clips ?? []
   const messages: any[] = rcMessages.data?.messages ?? []
   const latestFlag = [...messages].reverse().find(m => m.flag && m.flag !== 'NONE')
   const flagStyle  = latestFlag ? FLAG_STYLE[latestFlag.flag] : null
@@ -110,6 +121,10 @@ export function LivePage() {
   // Canlı strateji simülatörü (pit/yakalama analizi) sadece yarış formatlı
   // session'larda anlamlı — antrenman/sıralama'da gösterilmez
   const isRaceLike = isDemo || sessionType === 'race' || sessionType === 'sprint'
+  // Sıralama oturumunda Q1/Q2/Q3 segmentlerine göre standings gösterilir
+  const isQuali = sessionType === 'qualifying' || sessionType === 'sprint_qualifying'
+  const activeSegment: string | undefined = timing.data?.active_segment
+  const qualiSegments: Record<string, any[]> = timing.data?.segments ?? {}
 
   const isLoading = timing.isLoading && rcMessages.isLoading
 
@@ -204,7 +219,7 @@ export function LivePage() {
         <div className="border-b overflow-hidden"
           style={{ background: 'var(--s1)', borderColor: 'var(--b1)' }}>
           <div className="ticker-wrap">
-            <div className="ticker-inner gap-8 px-6 py-2">
+            <div className="ticker-inner ticker-slow gap-8 px-6 py-2">
               {[...messages.slice(0,15), ...messages.slice(0,15)].map((m: any, i: number) => {
                 const color = m.flag === 'RED' ? '#E10600'
                   : m.flag === 'SC' || m.flag === 'VSC' ? '#FF8700'
@@ -232,8 +247,18 @@ export function LivePage() {
           <div className="flex items-center justify-between px-5 py-3.5 border-b"
             style={{ borderColor: 'var(--b1)' }}>
             <p className="text-[13px] font-bold text-white">Sıralama</p>
-            {/* Tur sayacı */}
-            {timing.data?.current_lap && (
+            {/* Aktif segment (sıralama) veya tur sayacı (yarış) */}
+            {isQuali && activeSegment ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg"
+                style={{ background: (QUALI_COLOR[activeSegment] ?? '#888') + '18',
+                         border: `1px solid ${(QUALI_COLOR[activeSegment] ?? '#888')}40` }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: QUALI_COLOR[activeSegment] ?? '#888', animation: 'pulse-dot 1s infinite' }} />
+                <span className="text-[10px] mono" style={{ color: 'var(--t3)' }}>AKTİF</span>
+                <span className="text-[16px] font-black mono leading-none" style={{ color: QUALI_COLOR[activeSegment] ?? '#888' }}>
+                  {activeSegment}
+                </span>
+              </div>
+            ) : timing.data?.current_lap && (
               <div className="flex items-baseline gap-1 px-3 py-1 rounded-lg"
                 style={{ background: 'rgba(225,6,0,0.1)', border: '1px solid rgba(225,6,0,0.2)' }}>
                 <span className="text-[10px] mono mr-1" style={{ color: 'var(--t3)' }}>TUR</span>
@@ -250,6 +275,7 @@ export function LivePage() {
           </div>
 
           {/* Tablo — scroll yok, tüm pilotlar görünür */}
+          {!isQuali && (
           <table style={{
             width: '100%', borderCollapse: 'collapse',
             fontFamily: 'IBM Plex Mono, monospace',
@@ -257,6 +283,7 @@ export function LivePage() {
           }}>
             <colgroup>
               <col style={{ width: 28 }}  />{/* P */}
+              <col style={{ width: 30 }}  />{/* Pozisyon değişimi */}
               <col style={{ width: 6 }}   />{/* renk */}
               <col />{/* Pilot — kalan alanı kaplar */}
               <col style={{ width: 88 }}  />{/* Fark */}
@@ -269,6 +296,7 @@ export function LivePage() {
                            background: 'rgba(255,255,255,0.02)' }}>
                 {[
                   { label: 'P',      align: 'left'  },
+                  { label: '',       align: 'center' },
                   { label: '',       align: 'left'  },
                   { label: 'PİLOT', align: 'left'  },
                   { label: 'FARK',   align: 'right' },
@@ -287,7 +315,7 @@ export function LivePage() {
             </thead>
             <tbody>
               {entries.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center',
+                <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center',
                   color: 'rgba(240,244,255,0.2)', fontSize: 12 }}>
                   Veri yükleniyor...
                 </td></tr>
@@ -307,6 +335,17 @@ export function LivePage() {
                       {e.position}
                     </td>
 
+                    {/* Pozisyon değişimi (başlangıca göre) — pasif pilotlarda gösterilmez */}
+                    <td style={{ padding: '7px 2px', textAlign: 'center', fontSize: 10, fontWeight: 800 }}>
+                      {e.status ? null : e.position_change > 0 ? (
+                        <span style={{ color: '#00D2BE' }}>▲{e.position_change}</span>
+                      ) : e.position_change < 0 ? (
+                        <span style={{ color: '#f87171' }}>▼{Math.abs(e.position_change)}</span>
+                      ) : (
+                        <span style={{ color: 'rgba(240,244,255,0.18)' }}>—</span>
+                      )}
+                    </td>
+
                     {/* Takım renk çubuğu */}
                     <td style={{ padding: '0 2px' }}>
                       <div style={{ width: 3, height: 18, borderRadius: 2, background: color, margin: 'auto' }} />
@@ -314,8 +353,17 @@ export function LivePage() {
 
                     {/* Pilot adı + takım */}
                     <td style={{ padding: '6px 8px 6px 4px', overflow: 'hidden' }}>
-                      <div style={{ fontSize: 12, fontWeight: 900, color: 'white',
-                        lineHeight: 1, whiteSpace: 'nowrap' }}>{e.code}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, lineHeight: 1 }}>
+                        <span style={{ fontSize: 12, fontWeight: 900, color: 'white',
+                          whiteSpace: 'nowrap' }}>{e.code}</span>
+                        {e.in_pit && (
+                          <span style={{
+                            fontSize: 8, fontWeight: 900, padding: '1.5px 4px', borderRadius: 4,
+                            background: 'rgba(255,135,0,0.15)', color: '#FF8700',
+                            border: '1px solid rgba(255,135,0,0.35)', letterSpacing: '0.05em',
+                          }}>PİT</span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 8, color: 'rgba(240,244,255,0.22)', marginTop: 1,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {e.team_name}
@@ -360,6 +408,115 @@ export function LivePage() {
               })}
             </tbody>
           </table>
+          )}
+
+          {/* Sıralama: aktif segment standings + tamamlanan segmentler */}
+          {isQuali && (
+          <table style={{
+            width: '100%', borderCollapse: 'collapse',
+            fontFamily: 'IBM Plex Mono, monospace',
+            tableLayout: 'fixed',
+          }}>
+            <colgroup>
+              <col style={{ width: 28 }}  />{/* P */}
+              <col style={{ width: 6 }}   />{/* renk */}
+              <col />{/* Pilot */}
+              <col style={{ width: 88 }}  />{/* En iyi tur */}
+              <col style={{ width: 80 }}  />{/* Fark */}
+            </colgroup>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)',
+                           background: 'rgba(255,255,255,0.02)' }}>
+                {[
+                  { label: 'P',        align: 'left'  },
+                  { label: '',         align: 'left'  },
+                  { label: 'PİLOT',    align: 'left'  },
+                  { label: 'EN İYİ TUR', align: 'right' },
+                  { label: 'FARK',     align: 'right' },
+                ].map(({ label, align }, i) => (
+                  <th key={i} style={{
+                    padding: '7px 6px', textAlign: align as any,
+                    fontSize: 9, fontWeight: 600, letterSpacing: '0.1em',
+                    color: 'rgba(240,244,255,0.22)',
+                    overflow: 'hidden', whiteSpace: 'nowrap',
+                  }}>{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {entries.length === 0 ? (
+                <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center',
+                  color: 'rgba(240,244,255,0.2)', fontSize: 12 }}>
+                  Veri yükleniyor...
+                </td></tr>
+              ) : entries.map((e: any) => {
+                const color = e.team_colour ?? TEAM_COLOR[e.code] ?? '#888'
+                const hasTime = e.lap_time != null
+                return (
+                  <tr key={e.code}
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    onMouseEnter={ev => (ev.currentTarget.style.background='rgba(255,255,255,0.03)')}
+                    onMouseLeave={ev => (ev.currentTarget.style.background='transparent')}>
+
+                    <td style={{ padding: '7px 6px', fontSize: 12, fontWeight: 900,
+                      color: e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.25)' }}>
+                      {e.position}
+                    </td>
+
+                    <td style={{ padding: '0 2px' }}>
+                      <div style={{ width: 3, height: 18, borderRadius: 2, background: color, margin: 'auto' }} />
+                    </td>
+
+                    <td style={{ padding: '6px 8px 6px 4px', overflow: 'hidden' }}>
+                      <div style={{ fontSize: 12, fontWeight: 900, color: 'white',
+                        lineHeight: 1, whiteSpace: 'nowrap' }}>{e.code}</div>
+                      <div style={{ fontSize: 8, color: 'rgba(240,244,255,0.22)', marginTop: 1,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {e.team_name}
+                      </div>
+                    </td>
+
+                    <td style={{ padding: '7px 6px', textAlign: 'right', fontSize: 11, fontWeight: 700,
+                      color: e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.85)' }}>
+                      {hasTime ? formatLapTime(e.lap_time) : '—'}
+                    </td>
+
+                    <td style={{ padding: '7px 6px', textAlign: 'right', fontSize: 10, fontWeight: 600,
+                      color: e.position === 1 ? 'rgba(240,244,255,0.28)' : 'rgba(240,244,255,0.75)' }}>
+                      {!hasTime ? '—' : e.position === 1 ? 'LDR' : (e.gap < 60 ? `+${e.gap.toFixed(3)}` : `+${formatLapTime(e.gap)}`)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          )}
+
+          {/* Tamamlanan segment sonuçları (örn. Q2 aktifken Q1 sonuçları) */}
+          {isQuali && Object.keys(qualiSegments).length > 0 && (
+            <div className="border-t" style={{ borderColor: 'var(--b1)' }}>
+              {QUALI_SEGMENT_NAMES_ORDER.filter(seg => qualiSegments[seg]?.length).map(seg => (
+                <div key={seg} className="px-4 py-2.5 border-b" style={{ borderColor: 'var(--b1)' }}>
+                  <p className="text-[10px] mono font-bold mb-1.5" style={{ color: QUALI_COLOR[seg] }}>
+                    {seg} SONUÇLARI ({qualiSegments[seg].length})
+                  </p>
+                  <div className="space-y-1">
+                    {qualiSegments[seg].map((e: any) => (
+                      <div key={e.code} className="flex items-center gap-2 text-[11px] mono">
+                        <span style={{ width: 18, color: e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.3)', fontWeight: 900 }}>{e.position}</span>
+                        <span style={{ width: 3, height: 14, borderRadius: 2, background: e.team_colour ?? TEAM_COLOR[e.code] ?? '#888' }} />
+                        <span style={{ color: 'white', fontWeight: 700 }}>{e.code}</span>
+                        <span style={{ marginLeft: 'auto', color: 'rgba(240,244,255,0.6)' }}>{formatLapTime(e.lap_time)}</span>
+                        <span style={{ width: 64, textAlign: 'right', color: 'rgba(240,244,255,0.35)' }}>
+                          {e.position === 1 ? 'LDR' : `+${e.gap.toFixed(3)}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Sağ: Pist + Simülatör + RC + AI ──────────────────────── */}
@@ -453,6 +610,41 @@ export function LivePage() {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Takım Radyoları */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--b1)' }}>
+              <span className="text-base">📻</span>
+              <p className="text-[13px] font-bold text-white">Takım Radyoları</p>
+              {radioClips.length > 0 && (
+                <span className="text-[10px] mono ml-auto" style={{ color: 'var(--t3)' }}>
+                  {radioClips.length} kayıt
+                </span>
+              )}
+            </div>
+            <div className="p-3 space-y-2 overflow-y-auto" style={{ maxHeight: 280 }}>
+              {radioClips.length === 0 ? (
+                <p className="text-[12px] mono text-center py-4" style={{ color: 'var(--t3)' }}>
+                  Henüz radyo kaydı yok
+                </p>
+              ) : radioClips.map((c: any, i: number) => (
+                <div key={`${c.recording_url}-${i}`}
+                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg"
+                  style={{ background: 'var(--s2)', border: '1px solid var(--b1)' }}>
+                  <div style={{ width: 3, height: 28, borderRadius: 2, background: c.team_colour ?? '#888', flexShrink: 0 }} />
+                  <div style={{ minWidth: 46, flexShrink: 0 }}>
+                    <p className="text-[12px] font-black mono text-white leading-none">{c.code}</p>
+                    {c.date && (
+                      <p className="text-[9px] mono mt-0.5" style={{ color: 'rgba(240,244,255,0.25)' }}>
+                        {new Date(c.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </p>
+                    )}
+                  </div>
+                  <audio controls preload="none" src={c.recording_url} style={{ flex: 1, height: 30 }} />
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -242,6 +242,11 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                   style={{ borderColor: 'var(--b1)' }}>
                   <span>📡</span>
                   <p className="text-[12px] font-bold text-white">Yakalama Analizi</p>
+                  {data.remaining_laps != null && (
+                    <span className="text-[10px] mono ml-auto" style={{ color: 'var(--t3)' }}>
+                      Kalan {data.remaining_laps} tur
+                    </span>
+                  )}
                 </div>
                 <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
                   {data.catch_analysis.map((c: any) => (
@@ -265,9 +270,16 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                           </p>
                         </div>
                       ) : (
-                        <span className="text-[11px] mono" style={{ color: '#f87171' }}>
-                          Yakalanamaz
-                        </span>
+                        <div className="text-right">
+                          <span className="text-[11px] mono" style={{ color: '#f87171' }}>
+                            Yakalanamaz
+                          </span>
+                          {c.reason && (
+                            <p className="text-[9px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
+                              {c.reason}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}

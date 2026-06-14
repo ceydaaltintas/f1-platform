@@ -114,6 +114,7 @@ body {
   animation: ticker 24s linear infinite;
 }
 .ticker-inner:hover { animation-play-state: paused; }
+.ticker-inner.ticker-slow { animation-duration: 48s; }
 
 /* ── Inputs ────────────────────────────────────────────── */
 input[type='range'] { cursor: pointer; accent-color: var(--red); }

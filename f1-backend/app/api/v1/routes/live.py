@@ -10,7 +10,7 @@ GET  /live/{session_id}/commentary  → SSE: AI canlı yorum akışı
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -101,6 +101,41 @@ def _gap_val(gap) -> float:
         except: return 9999.0
     try: return float(s.replace("+",""))
     except: return 9999.0
+
+
+# Ortalama pit lane kaybı (saniye) — piste göre değişir (pit yolu uzunluğu/hız limiti).
+# Bulunamayan pistler için varsayılan PIT_LOSS_DEFAULT kullanılır.
+PIT_LOSS_DEFAULT = 22.0
+CIRCUIT_PIT_LOSS: dict[str, float] = {
+    "Albert Park Grand Prix Circuit": 19.0,
+    "Shanghai International Circuit": 24.0,
+    "Suzuka Circuit": 27.0,
+    "Miami International Autodrome": 19.0,
+    "Circuit Gilles Villeneuve": 17.0,
+    "Circuit de Monaco": 22.0,
+    "Circuit de Barcelona-Catalunya": 21.0,
+    "Red Bull Ring": 19.0,
+    "Silverstone Circuit": 21.0,
+    "Circuit de Spa-Francorchamps": 25.0,
+    "Hungaroring": 21.0,
+    "Circuit Park Zandvoort": 21.0,
+    "Autodromo Nazionale di Monza": 24.0,
+    "Madring": 21.0,
+    "Baku City Circuit": 18.0,
+    "Marina Bay Street Circuit": 28.0,
+    "Circuit of the Americas": 21.0,
+    "Autódromo Hermanos Rodríguez": 22.0,
+    "Autódromo José Carlos Pace": 19.0,
+    "Las Vegas Strip Street Circuit": 20.0,
+    "Losail International Circuit": 24.0,
+    "Yas Marina Circuit": 21.0,
+}
+
+
+# Sıralama segment sırası ve bir önceki segmentten elenme sınırı
+# (Q1 → Q2'ye 15 pilot geçer, Q2 → Q3'e 10 pilot geçer)
+QUALI_SEGMENT_NAMES: tuple[str, ...] = ("Q1", "Q2", "Q3")
+QUALI_SEGMENT_CUTOFF: dict[int, int | None] = {0: None, 1: 15, 2: 10}
 
 
 # ─── Status ──────────────────────────────────────────────────────────────────
@@ -338,6 +373,125 @@ async def get_snapshot(session_id: int, kind: str):
 
 # ─── Polling tabanlı canlı veri endpoint'leri ────────────────────────────────
 
+async def _build_live_quali_timing(session_id: int, session, session_key: int, ck: str) -> dict:
+    """Canlı sıralama oturumu: aktif segment (Q1/Q2/Q3) standings + tamamlanan segment sonuçları.
+
+    OpenF1 session_result.duration = [Q1, Q2, Q3] süreleri (elenenlerde None).
+    Aktif segment, herhangi bir pilotun en yüksek dolu duration index'ine göre
+    belirlenir. Önceki segmentte elenen pilotlar (session_result.position,
+    Q1→Q2 sınırı 15, Q2→Q3 sınırı 10) aktif segment standings'inden çıkarılır —
+    bu sayede "Q2 başlayınca Q1'de elenenler listede görünmez" davranışı sağlanır.
+    """
+    drivers = await openf1.fetch_session_drivers(session_key)
+    try:
+        results = await openf1.fetch_session_result(session_key)
+    except Exception as exc:
+        logger.warning("session_result alınamadı session_key=%s: %s", session_key, exc)
+        results = []
+
+    num_to_info = {
+        d["driver_number"]: {
+            "code":        d.get("name_acronym", "???"),
+            "full_name":   d.get("full_name", ""),
+            "team_name":   d.get("team_name", ""),
+            "team_colour": f"#{d.get('team_colour','888888')}",
+        }
+        for d in drivers
+    }
+    await cache_set(cache_key("session_drivers_info", session_key), num_to_info, ttl_seconds=3600)
+
+    duration_by_dn = {r.get("driver_number"): r.get("duration") for r in results}
+    position_by_dn = {r.get("driver_number"): r.get("position") for r in results}
+
+    # Aktif segment: herhangi bir pilotun en yüksek dolu duration index'i
+    active_idx = 0
+    for durations in duration_by_dn.values():
+        if not durations:
+            continue
+        for idx in (2, 1, 0):
+            if len(durations) > idx and durations[idx] is not None:
+                active_idx = max(active_idx, idx)
+                break
+    active_segment = QUALI_SEGMENT_NAMES[active_idx]
+    cutoff = QUALI_SEGMENT_CUTOFF[active_idx]
+
+    # ── Aktif segment standings ──────────────────────────────────────────────
+    entries: list[dict] = []
+    for d in drivers:
+        dn = d.get("driver_number")
+        position = position_by_dn.get(dn)
+        # Önceki segmentte elenen (resmi pozisyonu cutoff'un altında kalan) pilotlar hariç
+        if cutoff is not None and position is not None and position > cutoff:
+            continue
+
+        info = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+        durations = duration_by_dn.get(dn)
+        lap_time = durations[active_idx] if durations and len(durations) > active_idx else None
+        prev_time = durations[active_idx - 1] if (active_idx > 0 and durations and len(durations) > active_idx - 1) else None
+
+        entries.append({
+            "driver_number": dn,
+            "code":          info["code"],
+            "full_name":     info["full_name"],
+            "team_name":     info["team_name"],
+            "team_colour":   info["team_colour"],
+            "lap_time":      lap_time,
+            "_prev_time":    prev_time,
+        })
+
+    def _sort_key(e: dict):
+        if e["lap_time"] is not None:
+            return (0, e["lap_time"])
+        if e["_prev_time"] is not None:
+            return (1, e["_prev_time"])
+        return (2, e["driver_number"])
+
+    entries.sort(key=_sort_key)
+    lead_time = next((e["lap_time"] for e in entries if e["lap_time"] is not None), None)
+    for i, e in enumerate(entries):
+        e["position"] = i + 1
+        e["gap"] = round(e["lap_time"] - lead_time, 4) if (i > 0 and e["lap_time"] is not None and lead_time is not None) else 0.0
+        del e["_prev_time"]
+
+    # ── Tamamlanan segment sonuçları (örn. Q2 aktifken Q1 sonuçları) ─────────
+    segments: dict[str, list] = {}
+    for idx in range(active_idx):
+        seg_entries = []
+        for d in drivers:
+            dn = d.get("driver_number")
+            durations = duration_by_dn.get(dn)
+            if not durations or len(durations) <= idx or durations[idx] is None:
+                continue
+            info = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            seg_entries.append({
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "lap_time":      durations[idx],
+            })
+        if seg_entries:
+            seg_entries.sort(key=lambda x: x["lap_time"])
+            lead = seg_entries[0]["lap_time"]
+            for i, e in enumerate(seg_entries):
+                e["position"] = i + 1
+                e["gap"] = round(e["lap_time"] - lead, 4) if i > 0 else 0.0
+            segments[QUALI_SEGMENT_NAMES[idx]] = seg_entries
+
+    result = {
+        "session_id":     session_id,
+        "session_type":   session.type,
+        "is_quali":       True,
+        "active_segment": active_segment,
+        "entries":        entries,
+        "segments":       segments,
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }
+    await cache_set(ck, result, ttl_seconds=6)
+    return result
+
+
 @router.get("/{session_id}/timing")
 async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
     """
@@ -356,9 +510,14 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
     session     = await _resolve_session(session_id, db)
     session_key = await _require_session_key(session, db)
 
+    if session.type in ("qualifying", "sprint_qualifying"):
+        return await _build_live_quali_timing(session_id, session, session_key, ck)
+
     drivers   = await openf1.fetch_session_drivers(session_key)
     intervals = await openf1.fetch_intervals(session_key)
     stints    = await openf1.fetch_stints(session_key)
+    pit_data  = await openf1.fetch_pit_data(session_key)
+    positions = await openf1.fetch_positions(session_key)
 
     # Mevcut tur + her pilotun son tur süresi
     current_lap = None
@@ -417,6 +576,48 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         if dn not in latest_stint or (s.get("stint_number") or 0) > (latest_stint[dn].get("stint_number") or 0):
             latest_stint[dn] = s
 
+    # Başlangıç pozisyonu: position akışındaki her pilotun ilk (en eski) kaydı
+    start_position: dict[int, int] = {}
+    for p in sorted(positions, key=lambda x: x.get("date") or ""):
+        dn  = p.get("driver_number")
+        pos = p.get("position")
+        if dn is not None and pos is not None and dn not in start_position:
+            start_position[dn] = pos
+
+    # Şu an pitte olan pilotlar: en güncel pit kaydı henüz "tamamlanmamışsa"
+    # (pit_duration yoksa ve kayıt yeni ise) veya pit süresi devam ediyorsa
+    now = datetime.now(timezone.utc)
+    latest_pit: dict[int, dict] = {}
+    for p in pit_data:
+        dn = p.get("driver_number")
+        if dn is None:
+            continue
+        if dn not in latest_pit or (p.get("date","") > latest_pit[dn].get("date","")):
+            latest_pit[dn] = p
+
+    in_pit_set: set[int] = set()
+    for dn, p in latest_pit.items():
+        date_str = p.get("date")
+        if not date_str:
+            continue
+        try:
+            pit_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        duration = p.get("pit_duration")
+        if duration is not None:
+            pit_end = pit_dt + timedelta(seconds=float(duration))
+            if pit_dt - timedelta(seconds=2) <= now <= pit_end + timedelta(seconds=5):
+                in_pit_set.add(dn)
+        elif (now - pit_dt).total_seconds() < 60:
+            in_pit_set.add(dn)
+
+    def _pos_change(dn: int | None, current_pos: int | None) -> tuple[int | None, int | None]:
+        sp = start_position.get(dn) if dn is not None else None
+        if sp is None or current_pos is None:
+            return None, sp
+        return sp - current_pos, sp
+
     entries: list[dict] = []
 
     if race_finished:
@@ -452,8 +653,10 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 gap_seconds   = _gap_val(raw_gap)
                 lapped        = "LAP" in str(raw_gap or "").upper()
 
+            position = len(entries) + 1
+            change, sp = (None, None) if status else _pos_change(dn, position)
             entry = {
-                "position":      len(entries) + 1,
+                "position":      position,
                 "driver_number": dn,
                 "code":          info["code"],
                 "full_name":     info["full_name"],
@@ -468,6 +671,9 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
                 "last_lap_time": last_lap_by_dn.get(dn),
                 "number_of_laps": r.get("number_of_laps"),
+                "in_pit":          False,
+                "position_change": change,
+                "start_position":  sp,
             }
             if status:
                 entry["status"] = status
@@ -507,8 +713,10 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             info    = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
             stint   = latest_stint.get(dn, {})
             raw_gap = iv.get("gap_to_leader")
+            position = len(entries) + 1
+            change, sp = _pos_change(dn, position)
             entries.append({
-                "position":      len(entries) + 1,
+                "position":      position,
                 "driver_number": dn,
                 "code":          info["code"],
                 "full_name":     info["full_name"],
@@ -522,6 +730,9 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
                 "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
                 "last_lap_time": last_lap_by_dn.get(dn),
+                "in_pit":          dn in in_pit_set,
+                "position_change": change,
+                "start_position":  sp,
             })
 
         # Aralık verisi eskimiş pilotlar (yarış sırasında DNF/emekli) — sona ekle
@@ -532,8 +743,10 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             seen_dns.add(dn)
             info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
             stint = latest_stint.get(dn, {})
+            position = len(entries) + 1
+            change, sp = None, None
             entries.append({
-                "position":      len(entries) + 1,
+                "position":      position,
                 "driver_number": dn,
                 "code":          info["code"],
                 "full_name":     info["full_name"],
@@ -548,6 +761,9 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
                 "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
                 "last_lap_time": last_lap_by_dn.get(dn),
+                "in_pit":          False,
+                "position_change": change,
+                "start_position":  sp,
             })
 
         # Interval verisi olmayan pilotlar (DNF/DNS baştan) — sona ekle
@@ -557,8 +773,10 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 continue
             info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
             stint = latest_stint.get(dn, {})
+            position = len(entries) + 1
+            change, sp = None, None
             entries.append({
-                "position":      len(entries) + 1,
+                "position":      position,
                 "driver_number": dn,
                 "code":          info["code"],
                 "full_name":     info["full_name"],
@@ -573,6 +791,9 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 "tyre_age":      None,
                 "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
                 "last_lap_time": None,
+                "in_pit":          False,
+                "position_change": change,
+                "start_position":  sp,
             })
 
     result = {
@@ -708,7 +929,8 @@ async def live_simulate(
     session     = await _resolve_session(session_id, db)
     session_key = await _require_session_key(session, db)
 
-    PIT_LOSS = 22.0  # saniye — ortalama pit stop + pit lane kaybı
+    circuit_name = session.round.circuit_name if session.round else None
+    PIT_LOSS = CIRCUIT_PIT_LOSS.get(circuit_name, PIT_LOSS_DEFAULT)  # saniye — piste göre ortalama pit kaybı
 
     # Tüm sürücüleri çek
     drivers   = await openf1.fetch_session_drivers(session_key)
@@ -798,6 +1020,24 @@ async def live_simulate(
         if dn is not None:
             laps_by_dn.setdefault(dn, []).append(l)
 
+    # Mevcut tur (lider üzerinden) + kalan tur sayısı — yakalama tahminleri
+    # bu kalan tur sayısıyla sınırlandırılır (örn. 28 tur kaldıysa 94 tur
+    # gerektiren bir yakalama "yakalanamaz" sayılır).
+    total_laps = CIRCUIT_TOTAL_LAPS.get(circuit_name)
+    if total_laps is None and stints:
+        max_lap_end = max((s.get("lap_end") or 0) for s in stints)
+        if max_lap_end > 0:
+            total_laps = max_lap_end
+
+    lead_dn = next((dn for dn, pos in pos_map.items() if pos == 1), None)
+    current_lap = None
+    if lead_dn is not None:
+        lead_laps = laps_by_dn.get(lead_dn, [])
+        if lead_laps:
+            current_lap = max((l.get("lap_number") or 0) for l in lead_laps) or None
+
+    remaining_laps = (total_laps - current_lap) if (total_laps is not None and current_lap is not None) else None
+
     # Her sürücünün son 5 clean turundaki ort tur süresi
     def _avg_pace(dn: int) -> float | None:
         laps = laps_by_dn.get(dn, [])
@@ -820,6 +1060,9 @@ async def live_simulate(
             "driver_code":       driver_code.upper(),
             "current_position":  target_pos,
             "current_gap":       target_gap,
+            "current_lap":       current_lap,
+            "total_laps":        total_laps,
+            "remaining_laps":    remaining_laps,
             "lapped":            True,
             "laps_down":         laps_down,
             "message":           f"{driver_code.upper()} {laps_down} tur geride — simülasyon geçerli değil",
@@ -846,7 +1089,10 @@ async def live_simulate(
             pace_diff = their_pace - target_pace  # pozitif = hedef daha hızlı
             if pace_diff > 0.05:
                 laps_to_catch = gap_to_catch / pace_diff
-                catch_results.append({
+                # Yarışta kalan tur sayısından fazla tur gerektiren bir yakalama
+                # gerçekçi değildir — "yakalanamaz" sayılır
+                catchable = remaining_laps is None or laps_to_catch <= remaining_laps
+                entry = {
                     "ahead_code":      code,
                     "ahead_pos":       pos,
                     "gap_seconds":     round(gap_to_catch, 2),
@@ -854,8 +1100,14 @@ async def live_simulate(
                     "laps_to_catch":   round(laps_to_catch, 1),
                     "target_pace":     round(target_pace, 3),
                     "ahead_pace":      round(their_pace, 3),
-                    "catchable":       True,
-                })
+                    "catchable":       catchable,
+                }
+                if not catchable:
+                    entry["reason"] = (
+                        f"Yarış sonuna kadar yetişmiyor — ~{laps_to_catch:.0f} tur gerekir, "
+                        f"{remaining_laps} tur kaldı"
+                    )
+                catch_results.append(entry)
             else:
                 catch_results.append({
                     "ahead_code":  code,
@@ -920,12 +1172,17 @@ async def live_simulate(
                 else f"Riskli! {num_to_code.get(closest_behind_dn,'???')}'ya sadece {gap_margin:.1f}s önde, pit kaybı {PIT_LOSS:.0f}s."
             ),
         }
+        if remaining_laps is not None and remaining_laps <= 2:
+            optimal_pit_info["message"] += f" (Not: yarışta sadece {remaining_laps} tur kaldı, pit stratejisinin faydası sınırlı.)"
 
     result = {
         "driver_code":       driver_code.upper(),
         "current_position":  target_pos,
         "current_gap":       round(target_gap, 2),
         "avg_pace":          round(target_pace, 3) if target_pace else None,
+        "current_lap":       current_lap,
+        "total_laps":        total_laps,
+        "remaining_laps":    remaining_laps,
         "pit_loss_estimate": PIT_LOSS,
         "catch_analysis":    catch_results,
         "pit_scenario": {
@@ -962,6 +1219,42 @@ async def get_race_control(session_id: int, db: AsyncSession = Depends(get_db)):
     )
     result = {"session_id": session_id, "messages": sorted_msgs[:40]}
     await cache_set(ck, result, ttl_seconds=8)
+    return result
+
+
+@router.get("/{session_id}/radio")
+async def get_team_radio(session_id: int, db: AsyncSession = Depends(get_db)):
+    """Pilot/takım radyo kayıtları — en yeni üstte."""
+    from app.api.v1.routes.telemetry import _resolve_session, _require_session_key
+
+    ck = cache_key("team_radio", session_id)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    session     = await _resolve_session(session_id, db)
+    session_key = await _require_session_key(session, db)
+
+    recordings = await openf1.fetch_team_radio(session_key)
+    # Pilot kodu/rengi — get_live_timing tarafından cache'lenir (ekstra OpenF1 isteği önler)
+    num_to_info = await cache_get(cache_key("session_drivers_info", session_key)) or {}
+
+    clips = []
+    for r in recordings:
+        dn  = r.get("driver_number")
+        info = num_to_info.get(str(dn)) or num_to_info.get(dn) or {}
+        clips.append({
+            "date":          r.get("date"),
+            "driver_number": dn,
+            "code":          info.get("code", str(dn)),
+            "full_name":     info.get("full_name", ""),
+            "team_colour":   info.get("team_colour", "#888888"),
+            "recording_url": r.get("recording_url"),
+        })
+
+    clips.sort(key=lambda c: c.get("date") or "", reverse=True)
+    result = {"session_id": session_id, "clips": clips[:30]}
+    await cache_set(ck, result, ttl_seconds=15)
     return result
 
 

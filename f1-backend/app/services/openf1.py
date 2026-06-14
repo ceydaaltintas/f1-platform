@@ -369,6 +369,13 @@ async def fetch_intervals(session_key: int) -> list[dict]:
     return await _get("intervals", {"session_key": session_key})
 
 
+# ─── Pit ─────────────────────────────────────────────────────────────────────
+
+async def fetch_pit_data(session_key: int) -> list[dict]:
+    """Pit giriş kayıtlarını getirir (date, driver_number, lap_number, pit_duration)."""
+    return await _get("pit", {"session_key": session_key})
+
+
 # ─── Session Result ──────────────────────────────────────────────────────────
 
 async def fetch_session_result(session_key: int) -> list[dict]:
@@ -385,3 +392,10 @@ async def fetch_session_result(session_key: int) -> list[dict]:
 async def fetch_race_control(session_key: int) -> list[dict]:
     """Bayrak, güvenlik arabası ve yarış kontrol mesajlarını getirir."""
     return await _get("race_control", {"session_key": session_key})
+
+
+# ─── Team Radio ────────────────────────────────────────────────────────────────
+
+async def fetch_team_radio(session_key: int) -> list[dict]:
+    """Pilot/takım radyo kayıtlarını getirir (date, driver_number, recording_url)."""
+    return await _get("team_radio", {"session_key": session_key})
