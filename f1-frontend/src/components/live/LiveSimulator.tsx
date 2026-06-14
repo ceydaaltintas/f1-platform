@@ -89,6 +89,16 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
         </div>
 
         {/* Sonuçlar */}
+        {data?.retired && (
+          <div className="rounded-xl p-4 text-center"
+            style={{ background:'rgba(255,255,255,0.04)', border:'1px solid var(--b1)' }}>
+            <p className="text-xl mb-1">🏁</p>
+            <p className="text-[13px] font-semibold" style={{ color:'var(--t2)' }}>
+              {data.message}
+            </p>
+          </div>
+        )}
+
         {data?.lapped && (
           <div className="rounded-xl p-4 text-center"
             style={{ background:'rgba(255,135,0,0.08)', border:'1px solid rgba(255,135,0,0.25)' }}>
@@ -102,7 +112,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
           </div>
         )}
 
-        {data && !data.lapped && (
+        {data && !data.lapped && !data.retired && (
           <div className="space-y-3">
             {/* Mevcut durum */}
             <div className="flex items-center gap-4 px-4 py-3 rounded-xl"

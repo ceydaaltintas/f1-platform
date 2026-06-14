@@ -619,6 +619,21 @@ async def live_simulate(
     # (get_live_timing'in cache'lediği inactive_drivers'a bağımlı olmadan)
     inactive_dns = _inactive_driver_numbers(latest_iv_sim, drivers)
 
+    # Hedef pilot DNF/emekli ise simülasyon anlamsız — bilgi mesajı dön
+    if target_num in inactive_dns:
+        return {
+            "driver_code":       driver_code.upper(),
+            "current_position":  None,
+            "current_gap":       None,
+            "retired":           True,
+            "message":           f"{driver_code.upper()} yarışı tamamlamadı (DNF) — simülasyon geçerli değil",
+            "avg_pace":          None,
+            "pit_loss_estimate": PIT_LOSS,
+            "catch_analysis":    [],
+            "pit_scenario":      {"position_after_pit": None, "cars_still_ahead": [], "cars_overtaken": []},
+            "optimal_pit":       None,
+        }
+
     sorted_ivs = sorted(latest_iv_sim.values(), key=lambda x: _gap(x.get("gap_to_leader")))
     pos_map: dict[int, int] = {}
     gap_map: dict[int, float] = {}
