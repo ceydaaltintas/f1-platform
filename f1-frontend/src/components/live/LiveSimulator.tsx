@@ -32,8 +32,13 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
 
   const runSim = () => {
     if (!selectedDriver || disabled) return
-    setEnabled(true)
-    setTimeout(() => refetch(), 50)
+    if (enabled) {
+      // Zaten etkinse (aynı pilot için tekrar basıldıysa) doğrudan yeniden çek
+      refetch()
+    } else {
+      // İlk etkinleştirme — sorgu enabled olunca otomatik ilk isteği yapar
+      setEnabled(true)
+    }
   }
 
   return (

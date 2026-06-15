@@ -38,14 +38,20 @@ async def get_current_user(
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(body: UserRegister, db: AsyncSession = Depends(get_db)):
-    # Tekrar kayıt kontrolü
-    existing = await db.execute(
-        select(User).where((User.email == body.email) | (User.username == body.username))
-    )
-    if existing.scalar_one_or_none():
+    # Aynı e-posta ile birden fazla hesap açılmasını engelle
+    existing_email = await db.execute(select(User).where(User.email == body.email))
+    if existing_email.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Bu e-posta veya kullanıcı adı zaten kullanılıyor",
+            detail="Bu e-posta adresiyle kayıtlı bir hesap zaten var",
+        )
+
+    # Kullanıcı adı tekil olmalı
+    existing_username = await db.execute(select(User).where(User.username == body.username))
+    if existing_username.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu kullanıcı adı zaten kullanılıyor, lütfen başka bir ad seçin",
         )
 
     user = User(

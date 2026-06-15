@@ -262,9 +262,9 @@ function PollCreateForm({ sessionId, onCreated }: {
   )
 }
 
-interface Props { sessionId: number; userId: string | null; isAuthenticated: boolean }
+interface Props { sessionId: number; userId: string | null; isAuthenticated: boolean; refetchInterval?: number }
 
-export function PollWidget({ sessionId, userId, isAuthenticated }: Props) {
+export function PollWidget({ sessionId, userId, isAuthenticated, refetchInterval }: Props) {
   const { polls, setInitialPolls, addPoll, removePoll } = useCommunityStore()
   const queryClient = useQueryClient()
 
@@ -272,6 +272,7 @@ export function PollWidget({ sessionId, userId, isAuthenticated }: Props) {
     queryKey: ['polls', sessionId],
     queryFn: () => client.get<Poll[]>(`/sessions/${sessionId}/polls`).then(r => r.data),
     staleTime: 30_000,
+    refetchInterval,
   })
 
   useEffect(() => { if (pollsData) setInitialPolls(pollsData) }, [pollsData])

@@ -10,8 +10,40 @@ import { useQuery } from '@tanstack/react-query'
 import { client } from '../api/client'
 import { TrackMap } from '../components/trackmap/TrackMap'
 import { LiveSimulator } from '../components/live/LiveSimulator'
+import { CommentFeed } from '../components/community/CommentFeed'
+import { PollWidget } from '../components/community/PollWidget'
 import { COMPOUND_COLORS } from '../types/f1'
 import { formatLapTime, formatGap } from '../utils/format'
+
+// Canlı yarışta yorum/anket akışı için yenileme süresi
+const LIVE_COMMUNITY_REFRESH = 12_000
+
+// ── Topluluk paneli (yorum + anket sekmeli) ───────────────────────────────────
+function LiveCommunityPanel({ sessionId, isLoggedIn }: { sessionId: number; isLoggedIn: boolean }) {
+  const [tab, setTab] = useState<'comments' | 'polls'>('comments')
+  return (
+    <div className="card overflow-hidden flex flex-col">
+      <div className="flex border-b" style={{ borderColor: 'var(--b1)' }}>
+        {(['comments', 'polls'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className="flex-1 py-3 text-[12px] font-semibold transition-all"
+            style={tab === t
+              ? { background: 'rgba(225,6,0,0.08)', color: '#E10600',
+                  borderBottom: '2px solid #E10600' }
+              : { color: 'var(--t3)', borderBottom: '2px solid transparent' }}>
+            {t === 'comments' ? '💬 Yorumlar' : '📊 Anketler'}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 min-h-0" style={{ maxHeight: 360, overflowY: 'auto' }}>
+        {tab === 'comments'
+          ? <CommentFeed sessionId={sessionId} isAuthenticated={isLoggedIn} refetchInterval={LIVE_COMMUNITY_REFRESH} />
+          : <PollWidget sessionId={sessionId} userId={null} isAuthenticated={isLoggedIn} refetchInterval={LIVE_COMMUNITY_REFRESH} />
+        }
+      </div>
+    </div>
+  )
+}
 
 const QUALI_COLOR: Record<string, string> = { Q1: '#FF8700', Q2: '#00D2BE', Q3: '#E10600' }
 const QUALI_SEGMENT_NAMES_ORDER = ['Q1', 'Q2', 'Q3'] as const
@@ -47,6 +79,7 @@ export function LivePage() {
   const isDemo = sessionId === 'demo'
   // Demo için gerçek Kanada GP verisi kullan
   const effectiveSid = isDemo ? DEMO_SESSION_ID : Number(sessionId)
+  const isLoggedIn = !!localStorage.getItem('access_token')
   const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
   const timing = useQuery({
@@ -647,6 +680,11 @@ export function LivePage() {
               ))}
             </div>
           </div>
+
+          {/* Topluluk: Yorumlar + Anketler */}
+          {!!effectiveSid && !isNaN(effectiveSid) && (
+            <LiveCommunityPanel sessionId={effectiveSid} isLoggedIn={isLoggedIn} />
+          )}
         </div>
       </div>
 

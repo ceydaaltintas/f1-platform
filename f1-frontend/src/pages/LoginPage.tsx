@@ -24,7 +24,16 @@ export function LoginPage() {
       navigate('/')
     } catch (e: any) {
       const d = e.response?.data?.detail
-      setError(typeof d === 'string' ? d : 'Kullanıcı adı veya şifre hatalı')
+      if (typeof d === 'string') {
+        // Backend'den gelen anlamlı hata (örn. "Bu e-posta adresiyle kayıtlı bir hesap zaten var")
+        setError(d)
+      } else if (Array.isArray(d) && d.length > 0) {
+        // Pydantic doğrulama hataları (örn. "Şifre en az 8 karakter olmalı")
+        const msg = String(d[0]?.msg ?? '').replace(/^Value error,\s*/, '')
+        setError(msg || 'Girdiğiniz bilgileri kontrol edin')
+      } else {
+        setError(tab === 'login' ? 'E-posta veya şifre hatalı' : 'Kayıt sırasında bir hata oluştu')
+      }
     } finally { setLoading(false) }
   }
 

@@ -206,9 +206,10 @@ interface FeedProps {
   lapNumber?: number
   isAuthenticated: boolean
   className?: string
+  refetchInterval?: number
 }
 
-export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className }: FeedProps) {
+export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className, refetchInterval }: FeedProps) {
   const { comments, addComment, updateComment, removeComment, setInitialComments } = useCommunityStore()
   const queryClient = useQueryClient()
   const listRef = useRef<HTMLDivElement>(null)
@@ -220,6 +221,7 @@ export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className }
         params: { lap: lapNumber, page: 1, page_size: 50 },
       }).then(r => r.data.items as Comment[]),
     staleTime: 30_000,
+    refetchInterval,
   })
 
   useEffect(() => { if (data) setInitialComments(data) }, [data])
