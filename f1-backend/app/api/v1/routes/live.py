@@ -539,28 +539,54 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         logger.warning("fetch_positions hatası: %s", e)
         positions = []
 
-    # Mevcut tur + her pilotun son tur süresi
+    # Her pilotun tur verilerini çek
     current_lap = None
     total_laps  = None
     last_lap_by_dn: dict[int, float | None] = {}
+    best_lap_by_dn: dict[int, float | None] = {}
+    lap_count_by_dn: dict[int, int] = {}
 
-    if drivers:
-        lead_dn = drivers[0].get("driver_number")
-        try:
-            lead_laps = await openf1.fetch_laps(session_key, lead_dn)
-            if lead_laps:
-                current_lap = max(
-                    (l.get("lap_number") or 0) for l in lead_laps
-                ) or None
-                # Lider için son temiz tur süresi
-                clean = [l for l in lead_laps if l.get("lap_duration") and not l.get("is_pit_out_lap")]
-                if clean:
-                    last_lap_by_dn[lead_dn] = clean[-1].get("lap_duration")
-        except Exception:
-            pass
-
-    # Toplam tur ve yarış bitiş kontrolü sadece yarış oturumları için
     is_race = session.type in ("race", "sprint")
+    is_practice = session.type in ("practice1", "practice2", "practice3")
+
+    if is_practice:
+        # Antrenman: tüm pilotların turlarını çek
+        import asyncio as _aio
+        async def _fetch_driver_laps(dn: int):
+            try:
+                return dn, await openf1.fetch_laps(session_key, dn)
+            except Exception:
+                return dn, []
+        tasks = [_fetch_driver_laps(d.get("driver_number")) for d in drivers if d.get("driver_number")]
+        results = await _aio.gather(*tasks)
+        for dn, laps_data in results:
+            if not laps_data:
+                continue
+            clean = [l for l in laps_data if l.get("lap_duration") and not l.get("is_pit_out_lap")]
+            all_with_time = [l for l in laps_data if l.get("lap_duration")]
+            lap_count_by_dn[dn] = len(all_with_time)
+            if clean:
+                best = min(clean, key=lambda l: l["lap_duration"])
+                best_lap_by_dn[dn] = best["lap_duration"]
+                last_lap_by_dn[dn] = clean[-1].get("lap_duration")
+            elif all_with_time:
+                best_lap_by_dn[dn] = min(l["lap_duration"] for l in all_with_time)
+                last_lap_by_dn[dn] = all_with_time[-1].get("lap_duration")
+    else:
+        # Yarış/sıralama: sadece lider pilotun turlarını çek
+        if drivers:
+            lead_dn = drivers[0].get("driver_number")
+            try:
+                lead_laps = await openf1.fetch_laps(session_key, lead_dn)
+                if lead_laps:
+                    current_lap = max(
+                        (l.get("lap_number") or 0) for l in lead_laps
+                    ) or None
+                    clean = [l for l in lead_laps if l.get("lap_duration") and not l.get("is_pit_out_lap")]
+                    if clean:
+                        last_lap_by_dn[lead_dn] = clean[-1].get("lap_duration")
+            except Exception:
+                pass
     if is_race:
         circuit_name = session.round.circuit_name if session.round else None
         total_laps = CIRCUIT_TOTAL_LAPS.get(circuit_name)
@@ -640,7 +666,82 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
 
     entries: list[dict] = []
 
-    if race_finished:
+    if is_practice:
+        # ── Antrenman sıralaması: en iyi tur süresine göre ──────────────────
+        best_leader = min(best_lap_by_dn.values()) if best_lap_by_dn else None
+
+        # En iyi tur süresi olan pilotlar → sıralı
+        sorted_dns = sorted(
+            [dn for dn in best_lap_by_dn if best_lap_by_dn[dn] is not None],
+            key=lambda dn: best_lap_by_dn[dn]
+        )
+        for dn in sorted_dns:
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            best  = best_lap_by_dn[dn]
+            gap   = round(best - best_leader, 3) if best_leader and best else None
+            position = len(entries) + 1
+
+            def _fmt_lap(t: float | None) -> str | None:
+                if t is None:
+                    return None
+                mins = int(t // 60)
+                secs = t - mins * 60
+                return f"{mins}:{secs:06.3f}" if mins else f"{secs:.3f}"
+
+            entries.append({
+                "position":      position,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "gap_to_leader": f"+{gap:.3f}" if gap and gap > 0 else "LDR",
+                "gap_seconds":   gap or 0,
+                "interval":      None,
+                "lapped":        False,
+                "compound":      stint.get("compound"),
+                "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
+                "pit_count":     max(0, (stint_count.get(dn, 1) - 1)),
+                "last_lap_time": _fmt_lap(last_lap_by_dn.get(dn)),
+                "best_lap_time": _fmt_lap(best),
+                "lap_count":     lap_count_by_dn.get(dn, 0),
+                "in_pit":          dn in in_pit_set,
+                "position_change": None,
+                "start_position":  None,
+            })
+
+        # Henüz tur atmamış pilotlar
+        seen_dns = {dn for dn in sorted_dns}
+        for d in drivers:
+            dn = d.get("driver_number")
+            if dn is None or dn in seen_dns:
+                continue
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            entries.append({
+                "position":      len(entries) + 1,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "gap_to_leader": None,
+                "gap_seconds":   99999.0,
+                "interval":      None,
+                "lapped":        False,
+                "compound":      stint.get("compound"),
+                "tyre_age":      None,
+                "pit_count":     0,
+                "last_lap_time": None,
+                "best_lap_time": None,
+                "lap_count":     0,
+                "in_pit":          dn in in_pit_set,
+                "position_change": None,
+                "start_position":  None,
+            })
+
+    elif race_finished:
         # Yarış bittiyse OpenF1'in resmi sonuç listesi (session_result) kullanılır —
         # intervals akışı yarış sonunda donduğu için lider dahil herkesin "son güncelleme"
         # zamanı birbirine yakın olur ve DNF tespiti (interval bazlı) yanlış sonuç verir.

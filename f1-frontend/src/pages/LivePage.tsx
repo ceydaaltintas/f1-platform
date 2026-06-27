@@ -168,6 +168,7 @@ export function LivePage() {
   // Canlı strateji simülatörü (pit/yakalama analizi) sadece yarış formatlı
   // session'larda anlamlı — antrenman/sıralama'da gösterilmez
   const isRaceLike = isDemo || sessionType === 'race' || sessionType === 'sprint'
+  const isPractice = sessionType?.startsWith('practice')
   // Sıralama oturumunda Q1/Q2/Q3 segmentlerine göre standings gösterilir
   const isQuali = sessionType === 'qualifying' || sessionType === 'sprint_qualifying'
   const activeSegment: string | undefined = timing.data?.active_segment
@@ -333,10 +334,10 @@ export function LivePage() {
               <col style={{ width: 30 }}  />{/* Pozisyon değişimi */}
               <col style={{ width: 6 }}   />{/* renk */}
               <col />{/* Pilot — kalan alanı kaplar */}
-              <col style={{ width: 88 }}  />{/* Fark */}
-              <col style={{ width: 80 }}  />{/* Aralık */}
+              <col style={{ width: isPractice ? 88 : 88 }}  />{/* Fark / En İyi */}
+              <col style={{ width: 80 }}  />{/* Aralık / Son Tur */}
               <col style={{ width: 26 }}  />{/* Lastik */}
-              <col style={{ width: 26 }}  />{/* Pit */}
+              <col style={{ width: 26 }}  />{/* Pit / Tur */}
             </colgroup>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)',
@@ -346,10 +347,10 @@ export function LivePage() {
                   { label: '',       align: 'center' },
                   { label: '',       align: 'left'  },
                   { label: 'PİLOT', align: 'left'  },
-                  { label: 'FARK',   align: 'right' },
-                  { label: 'ARALIK', align: 'right' },
+                  { label: isPractice ? 'EN İYİ' : 'FARK', align: 'right' },
+                  { label: isPractice ? 'FARK' : 'ARALIK', align: 'right' },
                   { label: 'L',      align: 'right' },
-                  { label: 'PIT',    align: 'right' },
+                  { label: isPractice ? 'TUR' : 'PIT', align: 'right' },
                 ].map(({ label, align }, i) => (
                   <th key={i} style={{
                     padding: '7px 6px', textAlign: align as any,
@@ -417,20 +418,29 @@ export function LivePage() {
                       </div>
                     </td>
 
-                    {/* Fark */}
+                    {/* Sütun 5: Antrenman→En İyi Tur, Yarış→Fark */}
                     <td style={{ padding: '7px 6px', textAlign: 'right', fontSize: 10, fontWeight: 600,
                       whiteSpace: 'nowrap', overflow: 'hidden',
-                      color: e.status === 'DNS/DNF' ? 'rgba(240,244,255,0.25)'
+                      color: isPractice
+                        ? (e.position === 1 ? '#a855f7' : 'rgba(240,244,255,0.75)')
+                        : e.status === 'DNS/DNF' ? 'rgba(240,244,255,0.25)'
                         : e.lapped ? '#f87171'
                         : e.position === 1 ? 'rgba(240,244,255,0.28)'
                         : 'rgba(240,244,255,0.75)' }}>
-                      {e.status === 'DNS/DNF' ? 'DNS/DNF' : formatGap(e.gap_to_leader, e.position === 1)}
+                      {isPractice
+                        ? (e.best_lap_time ?? '—')
+                        : e.status === 'DNS/DNF' ? 'DNS/DNF' : formatGap(e.gap_to_leader, e.position === 1)}
                     </td>
 
-                    {/* Aralık */}
+                    {/* Sütun 6: Antrenman→Fark, Yarış→Aralık */}
                     <td style={{ padding: '7px 6px', textAlign: 'right', fontSize: 10,
-                      color: 'rgba(240,244,255,0.32)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                      {e.interval ? formatGap(e.interval, false) : '—'}
+                      color: isPractice
+                        ? (e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.5)')
+                        : 'rgba(240,244,255,0.32)',
+                      whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      {isPractice
+                        ? (e.gap_to_leader ?? '—')
+                        : e.interval ? formatGap(e.interval, false) : '—'}
                     </td>
 
                     {/* Lastik */}
@@ -445,10 +455,12 @@ export function LivePage() {
                       ) : <span style={{ color: 'rgba(240,244,255,0.2)', fontSize: 10 }}>—</span>}
                     </td>
 
-                    {/* Pit */}
+                    {/* Sütun 8: Antrenman→Tur sayısı, Yarış→Pit */}
                     <td style={{ padding: '7px 6px', textAlign: 'right', fontSize: 11, fontWeight: 700,
-                      color: e.pit_count > 0 ? '#FF8700' : 'rgba(240,244,255,0.2)' }}>
-                      {e.pit_count ?? 0}
+                      color: isPractice
+                        ? (e.lap_count > 0 ? 'rgba(240,244,255,0.5)' : 'rgba(240,244,255,0.2)')
+                        : e.pit_count > 0 ? '#FF8700' : 'rgba(240,244,255,0.2)' }}>
+                      {isPractice ? (e.lap_count ?? 0) : (e.pit_count ?? 0)}
                     </td>
                   </tr>
                 )
