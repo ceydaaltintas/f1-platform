@@ -294,7 +294,30 @@ export function LivePage() {
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3.5 border-b"
             style={{ borderColor: 'var(--b1)' }}>
-            <p className="text-[13px] font-bold text-white">Sıralama</p>
+            <div className="flex items-center gap-3">
+              <p className="text-[13px] font-bold text-white">Sıralama</p>
+              {(() => {
+                const clock = timing.data?.session_clock
+                if (!clock?.remaining_s && clock?.remaining_s !== 0) return null
+                const serverRemaining = clock.remaining_s
+                const serverTs = timing.data?.ts ? new Date(timing.data.ts).getTime() : Date.now()
+                const elapsed = (Date.now() - serverTs) / 1000
+                const remaining = Math.max(0, Math.round(serverRemaining - elapsed))
+                const mins = Math.floor(remaining / 60)
+                const secs = remaining % 60
+                const isLow = remaining < 120
+                return (
+                  <span className="text-[12px] mono font-bold px-2 py-0.5 rounded"
+                    style={{
+                      color: isLow ? '#E10600' : '#00D2BE',
+                      background: isLow ? 'rgba(225,6,0,0.1)' : 'rgba(0,210,190,0.08)',
+                      border: `1px solid ${isLow ? 'rgba(225,6,0,0.3)' : 'rgba(0,210,190,0.2)'}`,
+                    }}>
+                    {mins}:{String(secs).padStart(2, '0')}
+                  </span>
+                )
+              })()}
+            </div>
             {/* Aktif segment (sıralama) veya tur sayacı (yarış) */}
             {isQuali && activeSegment ? (
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg"

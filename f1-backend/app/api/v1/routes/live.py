@@ -137,6 +137,43 @@ CIRCUIT_PIT_LOSS: dict[str, float] = {
 QUALI_SEGMENT_NAMES: tuple[str, ...] = ("Q1", "Q2", "Q3")
 QUALI_SEGMENT_CUTOFF: dict[int, int | None] = {0: None, 1: 15, 2: 10}
 
+SESSION_DURATION_MINUTES: dict[str, int] = {
+    "practice1": 60, "practice2": 60, "practice3": 60,
+    "sprint_qualifying": 44,
+}
+QUALI_SEGMENT_DURATION: dict[str, int] = {"Q1": 18, "Q2": 15, "Q3": 12}
+
+
+def _build_session_clock(session, active_segment: str | None = None) -> dict | None:
+    """Oturum saat bilgisi: geçen süre, toplam süre, kalan süre."""
+    if session.session_date is None:
+        return None
+
+    start = session.session_date
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    elapsed_s = max(0, (now - start).total_seconds())
+
+    if session.type in ("qualifying", "sprint_qualifying") and active_segment:
+        total_min = QUALI_SEGMENT_DURATION.get(active_segment)
+    else:
+        total_min = SESSION_DURATION_MINUTES.get(session.type)
+
+    if total_min is None:
+        return {"elapsed_s": int(elapsed_s)}
+
+    total_s = total_min * 60
+    remaining_s = max(0, total_s - elapsed_s)
+
+    return {
+        "elapsed_s": int(elapsed_s),
+        "total_s": total_s,
+        "remaining_s": int(remaining_s),
+        "total_min": total_min,
+    }
+
 
 # ─── Status ──────────────────────────────────────────────────────────────────
 
@@ -592,6 +629,8 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
                 e["gap"] = round(e["lap_time"] - lead, 4) if i > 0 else 0.0
             segments[QUALI_SEGMENT_NAMES[idx]] = seg_entries
 
+    session_clock = _build_session_clock(session, active_segment)
+
     result = {
         "session_id":     session_id,
         "session_type":   session.type,
@@ -599,6 +638,7 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
         "active_segment": active_segment,
         "entries":        entries,
         "segments":       segments,
+        "session_clock":  session_clock,
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     await cache_set(ck, result, ttl_seconds=6)
@@ -1065,6 +1105,9 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 "start_position":  sp,
             })
 
+    # Oturum saat bilgisi (antrenman/sıralama için kalan süre)
+    session_clock = _build_session_clock(session)
+
     result = {
         "session_id":  session_id,
         "session_type": session.type,
@@ -1072,6 +1115,7 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         "current_lap": current_lap,
         "total_laps":  total_laps,
         "race_finished": race_finished,
+        "session_clock": session_clock,
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     await cache_set(ck, result, ttl_seconds=6)
