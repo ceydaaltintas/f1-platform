@@ -144,12 +144,13 @@ SESSION_DURATION_MINUTES: dict[str, int] = {
 QUALI_SEGMENT_DURATION: dict[str, int] = {"Q1": 18, "Q2": 15, "Q3": 12}
 
 
-def _build_session_clock(session, active_segment: str | None = None) -> dict | None:
+def _build_session_clock(session, active_segment: str | None = None,
+                         segment_start: datetime | None = None) -> dict | None:
     """Oturum saat bilgisi: geçen süre, toplam süre, kalan süre."""
-    if session.session_date is None:
+    start = segment_start or session.session_date
+    if start is None:
         return None
 
-    start = session.session_date
     if start.tzinfo is None:
         start = start.replace(tzinfo=timezone.utc)
 
@@ -480,20 +481,37 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
                 break
 
     # session_result boşsa → race_control mesajlarından segment tespiti
+    rc_messages: list[dict] = []
+    segment_start_time: datetime | None = None
     if active_idx == 0 and not duration_by_dn:
         try:
             rc_messages = await openf1.fetch_race_control(session_key)
-            started_count = sum(1 for m in rc_messages if (m.get("message") or "").strip() == "SESSION STARTED")
-            # 1 started = Q1, 2 = Q2, 3 = Q3
-            if started_count >= 3:
+            start_times: list[datetime] = []
+            for m in rc_messages:
+                if (m.get("message") or "").strip() == "SESSION STARTED":
+                    ts = m.get("date", "")
+                    if ts:
+                        try:
+                            start_times.append(datetime.fromisoformat(ts.replace("Z", "+00:00")))
+                        except ValueError:
+                            pass
+            if len(start_times) >= 3:
                 active_idx = 2
-            elif started_count >= 2:
+                segment_start_time = start_times[2]
+            elif len(start_times) >= 2:
                 active_idx = 1
+                segment_start_time = start_times[1]
+            elif start_times:
+                segment_start_time = start_times[0]
         except Exception:
             pass
 
     active_segment = QUALI_SEGMENT_NAMES[active_idx]
     cutoff = QUALI_SEGMENT_CUTOFF[active_idx]
+
+    # Q1 elenenleri: önceki segment'teki en kötü 5 pilotu bulmak için
+    # tüm turları çekip segmente göre filtreleyeceğiz
+    q1_eliminated_dns: set[int] = set()
 
     # session_result boşsa veya lap_time yoksa → her pilotun turlarını çek
     has_segment_data = any(
@@ -510,9 +528,49 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
             all_laps = await openf1.fetch_all_session_laps(session_key)
         except Exception:
             all_laps = []
+
+        # Segment başlangıç zamanından sonraki turları filtrele
+        if segment_start_time and active_idx > 0:
+            # Önce Q1 sonuçlarını hesapla (elenen pilotları bulmak için)
+            q1_best: dict[int, float] = {}
+            for l in all_laps:
+                dn = l.get("driver_number")
+                ts_str = l.get("date_start") or l.get("date") or ""
+                dur = l.get("lap_duration")
+                if dn is None or not dur or l.get("is_pit_out_lap"):
+                    continue
+                if ts_str:
+                    try:
+                        lap_ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        if lap_ts < segment_start_time:
+                            if dn not in q1_best or dur < q1_best[dn]:
+                                q1_best[dn] = dur
+                    except ValueError:
+                        pass
+            if q1_best:
+                sorted_q1 = sorted(q1_best.items(), key=lambda x: x[1])
+                # 16. ve sonrası elenir (ilk 15 kalır)
+                q1_eliminated_dns = {dn for dn, _ in sorted_q1[15:]}
+
+            # Aktif segment turlarını filtrele
+            segment_laps = []
+            for l in all_laps:
+                ts_str = l.get("date_start") or l.get("date") or ""
+                if ts_str:
+                    try:
+                        lap_ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        if lap_ts >= segment_start_time:
+                            segment_laps.append(l)
+                    except ValueError:
+                        segment_laps.append(l)
+                else:
+                    segment_laps.append(l)
+        else:
+            segment_laps = all_laps
+
         # Pilota göre grupla
         laps_by_dn: dict[int, list] = {}
-        for l in all_laps:
+        for l in segment_laps:
             dn = l.get("driver_number")
             if dn is not None:
                 laps_by_dn.setdefault(dn, []).append(l)
@@ -581,9 +639,11 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
             del e["_prev_time"]
     else:
         # session_result yoksa → tur verisinden en iyi tura göre sıralama
+        # Elenen pilotları filtrele
+        eliminated = q1_eliminated_dns if active_idx >= 1 else set()
         best_leader = min(best_lap_by_dn.values()) if best_lap_by_dn else None
         sorted_dns = sorted(
-            [dn for dn in best_lap_by_dn if best_lap_by_dn[dn] is not None],
+            [dn for dn in best_lap_by_dn if best_lap_by_dn[dn] is not None and dn not in eliminated],
             key=lambda dn: best_lap_by_dn[dn]
         )
         for dn in sorted_dns:
@@ -607,11 +667,11 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
                 "lap_count":     lap_count_by_dn.get(dn, 0),
             })
 
-        # Henüz tur atmamış pilotlar
+        # Henüz tur atmamış pilotlar (elenenleri hariç tut)
         seen = {dn for dn in sorted_dns}
         for d in drivers:
             dn = d.get("driver_number")
-            if dn is None or dn in seen:
+            if dn is None or dn in seen or dn in eliminated:
                 continue
             info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
             stint = latest_stint.get(dn, {})
@@ -657,7 +717,7 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
                 e["gap"] = round(e["lap_time"] - lead, 4) if i > 0 else 0.0
             segments[QUALI_SEGMENT_NAMES[idx]] = seg_entries
 
-    session_clock = _build_session_clock(session, active_segment)
+    session_clock = _build_session_clock(session, active_segment, segment_start_time)
 
     result = {
         "session_id":     session_id,
