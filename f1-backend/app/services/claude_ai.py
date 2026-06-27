@@ -498,20 +498,40 @@ async def interpret_telemetry(snapshot: dict, mode: str = "beginner", driver_cod
 
 # ─── Canlı Yarış Yorumu ──────────────────────────────────────────────────────
 
-RACE_BEGINNER_SYS = (
-    "Sen canlı bir F1 yarışını yorumlayan bir spikersın. Anlık yarış durumuna "
-    "bakarak kısa, heyecanlı, sade Türkçe bir yorum yap. Maksimum 2 cümle.\n" + FORMAT_RULES
-)
+LIVE_SYS_TEMPLATES = {
+    "race": {
+        "beginner": "Sen canlı bir F1 yarışını yorumlayan bir spikersın. Anlık yarış durumuna bakarak kısa, heyecanlı, sade Türkçe bir yorum yap. Maksimum 2 cümle.\n",
+        "expert": "Sen canlı bir F1 yarışını yorumlayan teknik bir analistsin. Anlık yarış durumuna bakarak kısa, teknik bir yorum yap. Maksimum 2 cümle.\n",
+    },
+    "practice": {
+        "beginner": "Sen canlı bir F1 antrenman seansını yorumlayan bir spikersın. Pilotların tur sürelerini, lastik seçimlerini ve performanslarını kısa, sade Türkçe yorumla. Maksimum 2 cümle.\n",
+        "expert": "Sen canlı bir F1 antrenman seansını yorumlayan teknik bir analistsin. Tur süreleri, sektör bazlı performans ve lastik stratejileri hakkında kısa teknik yorum yap. Maksimum 2 cümle.\n",
+    },
+    "qualifying": {
+        "beginner": "Sen canlı bir F1 sıralama turlarını yorumlayan bir spikersın. Pilotların sıralama performansını, en iyi turlarını ve eleme durumlarını kısa, heyecanlı, sade Türkçe yorumla. Maksimum 2 cümle.\n",
+        "expert": "Sen canlı bir F1 sıralama turlarını yorumlayan teknik bir analistsin. Sektör süreleri, lastik stratejileri ve pole pozisyonu mücadelesi hakkında kısa teknik yorum yap. Maksimum 2 cümle.\n",
+    },
+}
 
-RACE_EXPERT_SYS = (
-    "Sen canlı bir F1 yarışını yorumlayan teknik bir analistsin. Anlık yarış "
-    "durumuna bakarak kısa, teknik bir yorum yap. Maksimum 2 cümle.\n" + FORMAT_RULES
-)
+LIVE_FALLBACK = {
+    "race": "Yarış devam ediyor, #{leader} numaralı araç liderlikte.",
+    "practice": "Antrenman devam ediyor, #{leader} numaralı araç en hızlı tur süresine sahip.",
+    "qualifying": "Sıralama turları devam ediyor, #{leader} numaralı araç en hızlı.",
+}
 
 
 async def interpret_live_race(context: dict, mode: str = "beginner") -> str:
-    """Anlık yarış durumunu (lider, ilk 3 araç arası farklar vb.) yorumlar."""
-    system = RACE_BEGINNER_SYS if mode == "beginner" else RACE_EXPERT_SYS
+    """Anlık oturum durumunu yorumlar — yarış, antrenman veya sıralama."""
+    session_type = context.get("session_type", "race")
+    if session_type.startswith("practice"):
+        category = "practice"
+    elif session_type in ("qualifying", "sprint_qualifying"):
+        category = "qualifying"
+    else:
+        category = "race"
+
+    templates = LIVE_SYS_TEMPLATES.get(category, LIVE_SYS_TEMPLATES["race"])
+    system = templates.get(mode, templates["beginner"]) + FORMAT_RULES
     content = f"Anlık durum: {json.dumps(context, ensure_ascii=False)}"
 
     text = ""
@@ -527,7 +547,8 @@ async def interpret_live_race(context: dict, mode: str = "beginner") -> str:
             logger.warning("Anthropic canlı yorum başarısız: %s", e)
     if not text:
         leader = context.get("leader")
-        text = f"Yarış devam ediyor, #{leader} numaralı araç şu an liderlikte. Pist üzerinde mücadele sürüyor."
+        fallback = LIVE_FALLBACK.get(category, LIVE_FALLBACK["race"])
+        text = fallback.format(leader=leader)
     else:
         text = _clean_ai_text(text)
 

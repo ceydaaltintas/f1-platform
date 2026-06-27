@@ -1613,12 +1613,15 @@ async def live_commentary(session_id: int, mode: str = "beginner"):
                 context = None
 
                 timing_result = await cache_get(cache_key("live_timing", session_id))
+                session_type = timing_result.get("session_type", "race") if timing_result else "race"
                 if timing_result and timing_result.get("entries"):
                     top3 = timing_result["entries"][:3]
                     context = {
-                        "leader": top3[0].get("driver_number") if top3 else "?",
+                        "session_type": session_type,
+                        "leader": top3[0].get("code", top3[0].get("driver_number")) if top3 else "?",
                         "top3_gaps": [
-                            {"driver": e.get("driver_number"), "gap": e.get("gap_to_leader")}
+                            {"driver": e.get("code", e.get("driver_number")), "gap": e.get("gap_to_leader"),
+                             "best_lap": e.get("best_lap_time"), "compound": e.get("compound")}
                             for e in top3
                         ],
                         "total_cars": len(timing_result["entries"]),

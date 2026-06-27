@@ -689,8 +689,8 @@ export function LivePage() {
                 ) : (
                   <p className="text-[12px] italic w-full text-center" style={{ color:'var(--t3)' }}>
                     {isDemo
-                      ? 'AI yorumu canlı yarış sırasında aktif olur'
-                      : 'Yarış başladığında yorum başlayacak...'}
+                      ? 'AI yorumu canlı oturum sırasında aktif olur'
+                      : 'Yorum bekleniyor...'}
                   </p>
                 )}
               </div>
