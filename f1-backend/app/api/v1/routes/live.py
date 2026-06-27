@@ -222,7 +222,7 @@ async def live_status(db: AsyncSession = Depends(get_db)):
     # Worker her zaman çalışmayabilir — yarış bitmişse aktif oturumu burada da temizle
     # (anasayfadaki "CANLI YARIŞ" linki bitmiş yarışı göstermesin)
 
-    # 1) /timing zaten hesaplamışsa (lider total_laps'i tamamladı mı) onu kullan — ekstra istek yok
+    # 1) /timing zaten hesaplamışsa onu kullan — ekstra istek yok
     cached_timing = await cache_get(cache_key("live_timing", active["session_id"]))
     if cached_timing and cached_timing.get("race_finished"):
         await clear_active_session()

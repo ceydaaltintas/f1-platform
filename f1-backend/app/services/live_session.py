@@ -65,14 +65,24 @@ async def check_openf1_live_status(session_key: int) -> str:
             )
             resp.raise_for_status()
             data = resp.json()
-            if not data:
+            if not data or not isinstance(data, list):
+                logger.warning("OpenF1 session status beklenmeyen format: %s", str(data)[:200])
                 return "unknown"
             session = data[0]
             status = (session.get("session_status") or "").lower()
             if status in ("started", "active", "aborted"):
                 return "live"
-            if status in ("finished", "complete"):
+            if status in ("finished", "complete", "finalised"):
                 return "finished"
+            # date_end geçmişse finished say
+            date_end_str = session.get("date_end")
+            if date_end_str:
+                try:
+                    date_end = datetime.fromisoformat(date_end_str.replace("Z", "+00:00"))
+                    if date_end < datetime.now(timezone.utc):
+                        return "finished"
+                except ValueError:
+                    pass
             return "unknown"
     except Exception as e:
         logger.warning("OpenF1 canlılık kontrolü başarısız: %s", e)
