@@ -382,12 +382,20 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
     Q1→Q2 sınırı 15, Q2→Q3 sınırı 10) aktif segment standings'inden çıkarılır —
     bu sayede "Q2 başlayınca Q1'de elenenler listede görünmez" davranışı sağlanır.
     """
-    drivers = await openf1.fetch_session_drivers(session_key)
+    try:
+        drivers = await openf1.fetch_session_drivers(session_key)
+    except Exception as e:
+        logger.warning("fetch_session_drivers hatası (quali): %s", e)
+        drivers = []
     try:
         results = await openf1.fetch_session_result(session_key)
     except Exception as exc:
         logger.warning("session_result alınamadı session_key=%s: %s", session_key, exc)
         results = []
+    try:
+        stints = await openf1.fetch_stints(session_key)
+    except Exception:
+        stints = []
 
     num_to_info = {
         d["driver_number"]: {
@@ -399,6 +407,13 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
         for d in drivers
     }
     await cache_set(cache_key("session_drivers_info", session_key), num_to_info, ttl_seconds=3600)
+
+    latest_stint: dict[int, dict] = {}
+    for s in stints:
+        dn = s.get("driver_number")
+        if dn is not None:
+            if dn not in latest_stint or (s.get("stint_number") or 0) > (latest_stint[dn].get("stint_number") or 0):
+                latest_stint[dn] = s
 
     duration_by_dn = {r.get("driver_number"): r.get("duration") for r in results}
     position_by_dn = {r.get("driver_number"): r.get("position") for r in results}
@@ -415,43 +430,141 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
     active_segment = QUALI_SEGMENT_NAMES[active_idx]
     cutoff = QUALI_SEGMENT_CUTOFF[active_idx]
 
+    # session_result boşsa veya lap_time yoksa → her pilotun turlarını çek
+    has_segment_data = any(
+        d and len(d) > active_idx and d[active_idx] is not None
+        for d in duration_by_dn.values()
+    )
+
+    best_lap_by_dn: dict[int, float | None] = {}
+    last_lap_by_dn: dict[int, float | None] = {}
+    lap_count_by_dn: dict[int, int] = {}
+
+    if not has_segment_data and drivers:
+        import asyncio as _aio
+        async def _fetch_driver_laps(dn: int):
+            try:
+                return dn, await openf1.fetch_laps(session_key, dn)
+            except Exception:
+                return dn, []
+        tasks = [_fetch_driver_laps(d.get("driver_number")) for d in drivers if d.get("driver_number")]
+        laps_results = await _aio.gather(*tasks)
+        for dn, laps_data in laps_results:
+            if not laps_data:
+                continue
+            clean = [l for l in laps_data if l.get("lap_duration") and not l.get("is_pit_out_lap")]
+            all_with_time = [l for l in laps_data if l.get("lap_duration")]
+            lap_count_by_dn[dn] = len(all_with_time)
+            if clean:
+                best_lap_by_dn[dn] = min(l["lap_duration"] for l in clean)
+                last_lap_by_dn[dn] = clean[-1].get("lap_duration")
+            elif all_with_time:
+                best_lap_by_dn[dn] = min(l["lap_duration"] for l in all_with_time)
+                last_lap_by_dn[dn] = all_with_time[-1].get("lap_duration")
+
     # ── Aktif segment standings ──────────────────────────────────────────────
     entries: list[dict] = []
-    for d in drivers:
-        dn = d.get("driver_number")
-        position = position_by_dn.get(dn)
-        # Önceki segmentte elenen (resmi pozisyonu cutoff'un altında kalan) pilotlar hariç
-        if cutoff is not None and position is not None and position > cutoff:
-            continue
 
-        info = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
-        durations = duration_by_dn.get(dn)
-        lap_time = durations[active_idx] if durations and len(durations) > active_idx else None
-        prev_time = durations[active_idx - 1] if (active_idx > 0 and durations and len(durations) > active_idx - 1) else None
+    def _fmt_lap(t: float | None) -> str | None:
+        if t is None:
+            return None
+        mins = int(t // 60)
+        secs = t - mins * 60
+        return f"{mins}:{secs:06.3f}" if mins else f"{secs:.3f}"
 
-        entries.append({
-            "driver_number": dn,
-            "code":          info["code"],
-            "full_name":     info["full_name"],
-            "team_name":     info["team_name"],
-            "team_colour":   info["team_colour"],
-            "lap_time":      lap_time,
-            "_prev_time":    prev_time,
-        })
+    if has_segment_data:
+        # session_result verisi var → segment bazlı sıralama
+        for d in drivers:
+            dn = d.get("driver_number")
+            position = position_by_dn.get(dn)
+            if cutoff is not None and position is not None and position > cutoff:
+                continue
 
-    def _sort_key(e: dict):
-        if e["lap_time"] is not None:
-            return (0, e["lap_time"])
-        if e["_prev_time"] is not None:
-            return (1, e["_prev_time"])
-        return (2, e["driver_number"])
+            info = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            durations = duration_by_dn.get(dn)
+            lap_time = durations[active_idx] if durations and len(durations) > active_idx else None
+            prev_time = durations[active_idx - 1] if (active_idx > 0 and durations and len(durations) > active_idx - 1) else None
+            stint = latest_stint.get(dn, {})
 
-    entries.sort(key=_sort_key)
-    lead_time = next((e["lap_time"] for e in entries if e["lap_time"] is not None), None)
-    for i, e in enumerate(entries):
-        e["position"] = i + 1
-        e["gap"] = round(e["lap_time"] - lead_time, 4) if (i > 0 and e["lap_time"] is not None and lead_time is not None) else 0.0
-        del e["_prev_time"]
+            entries.append({
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "lap_time":      lap_time,
+                "best_lap_time": _fmt_lap(lap_time),
+                "compound":      stint.get("compound"),
+                "lap_count":     lap_count_by_dn.get(dn, 0),
+                "_prev_time":    prev_time,
+            })
+
+        def _sort_key(e: dict):
+            if e["lap_time"] is not None:
+                return (0, e["lap_time"])
+            if e["_prev_time"] is not None:
+                return (1, e["_prev_time"])
+            return (2, e["driver_number"])
+
+        entries.sort(key=_sort_key)
+        lead_time = next((e["lap_time"] for e in entries if e["lap_time"] is not None), None)
+        for i, e in enumerate(entries):
+            e["position"] = i + 1
+            gap_val = round(e["lap_time"] - lead_time, 3) if (i > 0 and e["lap_time"] is not None and lead_time is not None) else 0.0
+            e["gap"] = gap_val
+            e["gap_to_leader"] = f"+{gap_val:.3f}" if gap_val > 0 else ("LDR" if e["lap_time"] is not None else None)
+            del e["_prev_time"]
+    else:
+        # session_result yoksa → tur verisinden en iyi tura göre sıralama
+        best_leader = min(best_lap_by_dn.values()) if best_lap_by_dn else None
+        sorted_dns = sorted(
+            [dn for dn in best_lap_by_dn if best_lap_by_dn[dn] is not None],
+            key=lambda dn: best_lap_by_dn[dn]
+        )
+        for dn in sorted_dns:
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            best  = best_lap_by_dn[dn]
+            gap   = round(best - best_leader, 3) if best_leader and best else None
+            entries.append({
+                "position":      len(entries) + 1,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "lap_time":      best,
+                "best_lap_time": _fmt_lap(best),
+                "gap":           gap or 0.0,
+                "gap_to_leader": f"+{gap:.3f}" if gap and gap > 0 else "LDR",
+                "last_lap_time": _fmt_lap(last_lap_by_dn.get(dn)),
+                "compound":      stint.get("compound"),
+                "lap_count":     lap_count_by_dn.get(dn, 0),
+            })
+
+        # Henüz tur atmamış pilotlar
+        seen = {dn for dn in sorted_dns}
+        for d in drivers:
+            dn = d.get("driver_number")
+            if dn is None or dn in seen:
+                continue
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            entries.append({
+                "position":      len(entries) + 1,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "lap_time":      None,
+                "best_lap_time": None,
+                "gap":           0.0,
+                "gap_to_leader": None,
+                "last_lap_time": None,
+                "compound":      stint.get("compound"),
+                "lap_count":     0,
+            })
 
     # ── Tamamlanan segment sonuçları (örn. Q2 aktifken Q1 sonuçları) ─────────
     segments: dict[str, list] = {}
