@@ -135,7 +135,7 @@ CIRCUIT_PIT_LOSS: dict[str, float] = {
 # Sıralama segment sırası ve bir önceki segmentten elenme sınırı
 # (Q1 → Q2'ye 15 pilot geçer, Q2 → Q3'e 10 pilot geçer)
 QUALI_SEGMENT_NAMES: tuple[str, ...] = ("Q1", "Q2", "Q3")
-QUALI_SEGMENT_CUTOFF: dict[int, int | None] = {0: None, 1: 15, 2: 10}
+QUALI_SEGMENT_CUTOFF: dict[int, int | None] = {0: None, 1: 16, 2: 10}
 
 SESSION_DURATION_MINUTES: dict[str, int] = {
     "practice1": 60, "practice2": 60, "practice3": 60,
@@ -550,7 +550,7 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
             if q1_best:
                 sorted_q1 = sorted(q1_best.items(), key=lambda x: x[1])
                 # 16. ve sonrası elenir (ilk 15 kalır)
-                q1_eliminated_dns = {dn for dn, _ in sorted_q1[15:]}
+                q1_eliminated_dns = {dn for dn, _ in sorted_q1[16:]}
 
             # Aktif segment turlarını filtrele
             segment_laps = []
