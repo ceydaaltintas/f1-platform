@@ -559,18 +559,18 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         except Exception:
             pass
 
-    # Toplam tur: önce sabit takvim haritasından (resmi yarış mesafesi),
-    # bulunamazsa stintlerden maksimum lap_end (yedek değer)
-    circuit_name = session.round.circuit_name if session.round else None
-    total_laps = CIRCUIT_TOTAL_LAPS.get(circuit_name)
-    if total_laps is None and stints:
-        max_lap_end = max((s.get("lap_end") or 0) for s in stints)
-        if max_lap_end > 0:
-            total_laps = max_lap_end
+    # Toplam tur ve yarış bitiş kontrolü sadece yarış oturumları için
+    is_race = session.type in ("race", "sprint")
+    if is_race:
+        circuit_name = session.round.circuit_name if session.round else None
+        total_laps = CIRCUIT_TOTAL_LAPS.get(circuit_name)
+        if total_laps is None and stints:
+            max_lap_end = max((s.get("lap_end") or 0) for s in stints)
+            if max_lap_end > 0:
+                total_laps = max_lap_end
 
-    # Yarış bitti mi? Lider son turu (total_laps) tamamladıysa bayrak göster.
     race_finished = bool(
-        current_lap is not None and total_laps is not None and current_lap >= total_laps
+        is_race and current_lap is not None and total_laps is not None and current_lap >= total_laps
     )
 
     # Driver kodlarını numaraya eşle

@@ -305,7 +305,7 @@ export function LivePage() {
                   {activeSegment}
                 </span>
               </div>
-            ) : timing.data?.current_lap && (
+            ) : isRaceLike && timing.data?.current_lap ? (
               <div className="flex items-baseline gap-1 px-3 py-1 rounded-lg"
                 style={{ background: 'rgba(225,6,0,0.1)', border: '1px solid rgba(225,6,0,0.2)' }}>
                 <span className="text-[10px] mono mr-1" style={{ color: 'var(--t3)' }}>TUR</span>
@@ -318,7 +318,7 @@ export function LivePage() {
                   </span>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Tablo — scroll yok, tüm pilotlar görünür */}
