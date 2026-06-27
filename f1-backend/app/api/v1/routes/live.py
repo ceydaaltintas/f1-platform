@@ -705,6 +705,42 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
 
         seen_dns: set = set()
 
+        # Interval verisi henüz yoksa (oturum yeni başladı) → positions verisinden sırala
+        if not sorted_intervals and positions:
+            latest_pos: dict[int, dict] = {}
+            for p in positions:
+                dn = p.get("driver_number")
+                if dn is not None:
+                    if dn not in latest_pos or (p.get("date","") > latest_pos[dn].get("date","")):
+                        latest_pos[dn] = p
+            sorted_by_pos = sorted(latest_pos.values(), key=lambda x: x.get("position", 999))
+            for p in sorted_by_pos:
+                dn = p.get("driver_number")
+                if dn is None:
+                    continue
+                seen_dns.add(dn)
+                info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+                stint = latest_stint.get(dn, {})
+                entries.append({
+                    "position":      p.get("position", len(entries) + 1),
+                    "driver_number": dn,
+                    "code":          info["code"],
+                    "full_name":     info["full_name"],
+                    "team_name":     info["team_name"],
+                    "team_colour":   info["team_colour"],
+                    "gap_to_leader": None,
+                    "gap_seconds":   0,
+                    "interval":      None,
+                    "lapped":        False,
+                    "compound":      stint.get("compound"),
+                    "tyre_age":      None,
+                    "pit_count":     0,
+                    "last_lap_time": None,
+                    "in_pit":          dn in in_pit_set,
+                    "position_change": None,
+                    "start_position":  None,
+                })
+
         for iv in sorted_intervals:
             dn = iv.get("driver_number")
             if dn is None:

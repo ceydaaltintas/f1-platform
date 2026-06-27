@@ -322,6 +322,30 @@ async def get_track_map(
     bounds = await openf1.fetch_track_map_with_bounds(session_key, driver_number, laps)
     track_points = bounds["points"]
 
+    # Fallback: GPS verisi yoksa aynı round'daki daha önceki session'dan çek
+    if not track_points and session.round_id:
+        from sqlalchemy import select as sa_select
+        from app.models.f1 import Session as SessionModel
+        fallback_result = await db.execute(
+            sa_select(SessionModel).where(
+                SessionModel.round_id == session.round_id,
+                SessionModel.id != session_id,
+                SessionModel.session_key.isnot(None),
+                SessionModel.status == "finished",
+            ).order_by(SessionModel.session_date.desc())
+        )
+        for fallback_s in fallback_result.scalars().all():
+            try:
+                fb_laps = await db_cache.get_laps(fallback_s, driver_number, db)
+                fb_bounds = await openf1.fetch_track_map_with_bounds(fallback_s.session_key, driver_number, fb_laps)
+                if fb_bounds["points"]:
+                    bounds = fb_bounds
+                    track_points = fb_bounds["points"]
+                    logger.info("Track map fallback: session %d → %d", session_id, fallback_s.id)
+                    break
+            except Exception:
+                continue
+
     if track_points and session.status == "finished" and not is_live:
         try:
             db.add(OpenF1CarDataCache(session_key=session_key, driver_number=-1, data=track_points))
