@@ -805,9 +805,18 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         duration = p.get("pit_duration")
         if duration is not None:
             pit_end = pit_dt + timedelta(seconds=float(duration))
-            if pit_dt - timedelta(seconds=2) <= now <= pit_end + timedelta(seconds=5):
+            if pit_dt - timedelta(seconds=2) <= now <= pit_end + timedelta(seconds=8):
                 in_pit_set.add(dn)
-        elif (now - pit_dt).total_seconds() < 60:
+        elif (now - pit_dt).total_seconds() < 90:
+            in_pit_set.add(dn)
+
+    # Stints'den ek pit tespiti: is_pit_out_lap olan tur henüz gelmemişse pitte
+    for s in stints:
+        dn = s.get("driver_number")
+        if dn is None or dn in in_pit_set:
+            continue
+        # Stint henüz tamamlanmamışsa (lap_end yok veya tyre_age_at_end yok) pitte olabilir
+        if s.get("lap_end") is None and s.get("stint_number", 0) > 1:
             in_pit_set.add(dn)
 
     def _pos_change(dn: int | None, current_pos: int | None) -> tuple[int | None, int | None]:
