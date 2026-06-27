@@ -12,7 +12,7 @@ import { TrackMap } from '../components/trackmap/TrackMap'
 import { LiveSimulator } from '../components/live/LiveSimulator'
 import { CommentFeed } from '../components/community/CommentFeed'
 import { PollWidget } from '../components/community/PollWidget'
-import { COMPOUND_COLORS } from '../types/f1'
+import { COMPOUND_COLORS, SESSION_LABELS, type SessionType } from '../types/f1'
 import { formatLapTime, formatGap } from '../utils/format'
 
 // Canlı yarışta yorum/anket akışı için yenileme süresi
@@ -82,6 +82,18 @@ export function LivePage() {
   const isLoggedIn = !!localStorage.getItem('access_token')
   const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+  const sessionInfo = useQuery({
+    queryKey: ['session-info', effectiveSid],
+    queryFn:  () => client.get(`/sessions/${effectiveSid}`).then(r => r.data),
+    staleTime: 300_000,
+    enabled: !isDemo && !!effectiveSid && !isNaN(effectiveSid),
+  })
+  const sessionTitle = isDemo
+    ? 'Kanada Grand Prix 2026'
+    : sessionInfo.data
+      ? `${sessionInfo.data.round?.name ?? ''} — ${SESSION_LABELS[sessionInfo.data.type as SessionType] ?? sessionInfo.data.type}`
+      : `Oturum #${effectiveSid}`
+
   const timing = useQuery({
     queryKey: ['live-timing', effectiveSid],
     queryFn:  () => client.get(`/live/${effectiveSid}/timing`).then(r => r.data),
@@ -114,6 +126,8 @@ export function LivePage() {
     queryKey: ['track_map', effectiveSid, 'VER'],
     queryFn:  () => client.get(`/sessions/${effectiveSid}/track_map?driver_code=VER`).then(r => r.data),
     staleTime: 86_400_000,
+    retry: 3,
+    refetchInterval: (query) => (query.state.data?.points?.length ? false : 30_000),
     enabled: !!effectiveSid && !isNaN(effectiveSid),
   })
   const positionsMap = useQuery({
@@ -210,7 +224,7 @@ export function LivePage() {
               {isDemo ? 'KANADA GP — DEMO GÖRÜNTÜLEMESİ' : 'CANLI YARIŞ TAKİBİ'}
             </p>
             <p className="text-[14px] font-bold text-white">
-              {isDemo ? 'Kanada Grand Prix 2026' : `Oturum #${effectiveSid}`}
+              {sessionTitle}
             </p>
           </div>
           {isDemo && (
@@ -560,9 +574,11 @@ export function LivePage() {
             <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
               <p className="text-[13px] font-bold text-white">Pist Haritası</p>
             </div>
-            {trackMap.isLoading ? (
+            {trackMap.isLoading || !trackMap.data?.points?.length ? (
               <div className="flex items-center justify-center h-48">
-                <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>Pist yükleniyor...</p>
+                <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
+                  {trackMap.isLoading ? 'Pist yükleniyor...' : 'Pist verisi bekleniyor...'}
+                </p>
               </div>
             ) : (
               <TrackMap
