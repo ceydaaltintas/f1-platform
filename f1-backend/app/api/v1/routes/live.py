@@ -175,6 +175,18 @@ def _build_session_clock(session, active_segment: str | None = None) -> dict | N
     }
 
 
+async def _mark_session_finished(session_id: int, db: AsyncSession) -> None:
+    """Oturum bittiğinde DB status'unu finished olarak günceller."""
+    try:
+        result = await db.execute(select(Session).where(Session.id == session_id))
+        session = result.scalar_one_or_none()
+        if session and session.status == "active":
+            session.status = "finished"
+            await db.commit()
+    except Exception as e:
+        logger.warning("Session %d finished güncelleme hatası: %s", session_id, e)
+
+
 # ─── Status ──────────────────────────────────────────────────────────────────
 
 @router.get("/status")
@@ -214,6 +226,7 @@ async def live_status(db: AsyncSession = Depends(get_db)):
     cached_timing = await cache_get(cache_key("live_timing", active["session_id"]))
     if cached_timing and cached_timing.get("race_finished"):
         await clear_active_session()
+        await _mark_session_finished(active["session_id"], db)
         return {"live": False, "message": "Yarış bitti"}
 
     # 2) Aksi halde OpenF1'in oturum durumunu sorgula
@@ -225,7 +238,8 @@ async def live_status(db: AsyncSession = Depends(get_db)):
 
     if status == "finished":
         await clear_active_session()
-        return {"live": False, "message": "Yarış bitti"}
+        await _mark_session_finished(active["session_id"], db)
+        return {"live": False, "message": "Oturum bitti"}
 
     return {
         "live": True,
