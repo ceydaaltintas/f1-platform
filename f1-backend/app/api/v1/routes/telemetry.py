@@ -318,9 +318,14 @@ async def get_track_map(
             await cache_set(cache_k, result, ttl_seconds=7 * 86_400)
             return result
 
-    laps = await db_cache.get_laps(session, driver_number, db)
-    bounds = await openf1.fetch_track_map_with_bounds(session_key, driver_number, laps)
-    track_points = bounds["points"]
+    try:
+        laps = await db_cache.get_laps(session, driver_number, db)
+        bounds = await openf1.fetch_track_map_with_bounds(session_key, driver_number, laps)
+        track_points = bounds["points"]
+    except Exception as e:
+        logger.warning("Track map ana çağrı hatası (session %d): %s", session_id, e)
+        bounds = {"points": [], "x_min": 0, "y_min": 0, "scale": 1}
+        track_points = []
 
     # Fallback: GPS verisi yoksa aynı round'daki daha önceki session'dan çek
     if not track_points and session.round_id:

@@ -513,11 +513,31 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
     if session.type in ("qualifying", "sprint_qualifying"):
         return await _build_live_quali_timing(session_id, session, session_key, ck)
 
-    drivers   = await openf1.fetch_session_drivers(session_key)
-    intervals = await openf1.fetch_intervals(session_key)
-    stints    = await openf1.fetch_stints(session_key)
-    pit_data  = await openf1.fetch_pit_data(session_key)
-    positions = await openf1.fetch_positions(session_key)
+    try:
+        drivers = await openf1.fetch_session_drivers(session_key)
+    except Exception as e:
+        logger.warning("fetch_session_drivers hatası: %s", e)
+        drivers = []
+    try:
+        intervals = await openf1.fetch_intervals(session_key)
+    except Exception as e:
+        logger.warning("fetch_intervals hatası: %s", e)
+        intervals = []
+    try:
+        stints = await openf1.fetch_stints(session_key)
+    except Exception as e:
+        logger.warning("fetch_stints hatası: %s", e)
+        stints = []
+    try:
+        pit_data = await openf1.fetch_pit_data(session_key)
+    except Exception as e:
+        logger.warning("fetch_pit_data hatası: %s", e)
+        pit_data = []
+    try:
+        positions = await openf1.fetch_positions(session_key)
+    except Exception as e:
+        logger.warning("fetch_positions hatası: %s", e)
+        positions = []
 
     # Mevcut tur + her pilotun son tur süresi
     current_lap = None

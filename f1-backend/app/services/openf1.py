@@ -67,7 +67,12 @@ async def _get(path: str, params: dict | None = None) -> list[dict[str, Any]]:
             await _asyncio.sleep(retry_after)
             resp.raise_for_status()
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        if isinstance(data, list):
+            return data
+        # OpenF1 bazen dict döner (hata mesajı vb.) — boş liste olarak işle
+        logger.warning("OpenF1 %s beklenmeyen format: %s", path, str(data)[:200])
+        return []
 
 
 # ─── Meetings & Sessions ─────────────────────────────────────────────────────
