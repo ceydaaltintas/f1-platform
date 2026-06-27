@@ -441,17 +441,17 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
     lap_count_by_dn: dict[int, int] = {}
 
     if not has_segment_data and drivers:
-        import asyncio as _aio
-        async def _fetch_driver_laps(dn: int):
-            try:
-                return dn, await openf1.fetch_laps(session_key, dn)
-            except Exception:
-                return dn, []
-        tasks = [_fetch_driver_laps(d.get("driver_number")) for d in drivers if d.get("driver_number")]
-        laps_results = await _aio.gather(*tasks)
-        for dn, laps_data in laps_results:
-            if not laps_data:
-                continue
+        try:
+            all_laps = await openf1.fetch_all_session_laps(session_key)
+        except Exception:
+            all_laps = []
+        # Pilota göre grupla
+        laps_by_dn: dict[int, list] = {}
+        for l in all_laps:
+            dn = l.get("driver_number")
+            if dn is not None:
+                laps_by_dn.setdefault(dn, []).append(l)
+        for dn, laps_data in laps_by_dn.items():
             clean = [l for l in laps_data if l.get("lap_duration") and not l.get("is_pit_out_lap")]
             all_with_time = [l for l in laps_data if l.get("lap_duration")]
             lap_count_by_dn[dn] = len(all_with_time)
@@ -663,18 +663,17 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
     is_practice = session.type in ("practice1", "practice2", "practice3")
 
     if is_practice:
-        # Antrenman: tüm pilotların turlarını çek
-        import asyncio as _aio
-        async def _fetch_driver_laps(dn: int):
-            try:
-                return dn, await openf1.fetch_laps(session_key, dn)
-            except Exception:
-                return dn, []
-        tasks = [_fetch_driver_laps(d.get("driver_number")) for d in drivers if d.get("driver_number")]
-        results = await _aio.gather(*tasks)
-        for dn, laps_data in results:
-            if not laps_data:
-                continue
+        # Antrenman: tüm pilotların turlarını tek istekle çek
+        try:
+            all_laps = await openf1.fetch_all_session_laps(session_key)
+        except Exception:
+            all_laps = []
+        laps_by_dn: dict[int, list] = {}
+        for l in all_laps:
+            dn = l.get("driver_number")
+            if dn is not None:
+                laps_by_dn.setdefault(dn, []).append(l)
+        for dn, laps_data in laps_by_dn.items():
             clean = [l for l in laps_data if l.get("lap_duration") and not l.get("is_pit_out_lap")]
             all_with_time = [l for l in laps_data if l.get("lap_duration")]
             lap_count_by_dn[dn] = len(all_with_time)
