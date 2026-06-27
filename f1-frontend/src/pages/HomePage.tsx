@@ -426,7 +426,29 @@ export function HomePage() {
                 <div className="flex flex-col gap-2 justify-center shrink-0">
                   <p className="text-[9px] mono font-semibold tracking-widest mb-1"
                     style={{ color:'var(--t3)' }}>OTURUMLAR</p>
-                  {round.sessions.length > 0 ? round.sessions.map(s => (
+                  {round.sessions.length > 0 ? round.sessions.map(s => {
+                    const isClickable = s.status === 'active' || s.status === 'finished'
+                    const sessionTime = s.session_date
+                      ? new Date(s.session_date).toLocaleDateString('tr-TR', { weekday:'short', day:'numeric', month:'short' })
+                        + ' ' + new Date(s.session_date).toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' })
+                      : ''
+
+                    if (!isClickable) {
+                      return (
+                        <div key={s.id}
+                          className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border opacity-50"
+                          style={{ borderColor: 'var(--b1)', background: 'var(--s2)', minWidth: 160 }}>
+                          <span className="text-[11px] font-medium" style={{ color: 'var(--t3)' }}>
+                            {SESSION_LABELS[s.type as SessionType] ?? s.type}
+                          </span>
+                          <span className="text-[9px] mono" style={{ color: 'var(--t3)' }}>
+                            {sessionTime}
+                          </span>
+                        </div>
+                      )
+                    }
+
+                    return (
                     <Link key={s.id}
                       to={s.status === 'active' ? `/live/${s.id}` : `/session/${s.id}`}
                       className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border transition-all group"
@@ -447,7 +469,8 @@ export function HomePage() {
                       </div>
                       <span className="text-[10px] text-white/25 group-hover:text-white/60">→</span>
                     </Link>
-                  )) : (
+                    )
+                  }) : (
                     <p className="text-[12px]" style={{ color:'var(--t3)' }}>Yakında</p>
                   )}
                 </div>

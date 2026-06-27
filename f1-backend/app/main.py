@@ -22,8 +22,50 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("F1 Platform API başlıyor — %s", settings.app_env)
+    await _startup_sync()
     yield
     await engine.dispose()
+
+
+async def _startup_sync():
+    """Uygulama başlarken bu haftanın session'larını otomatik sync eder."""
+    from datetime import timedelta
+    from sqlalchemy import select
+    from app.core.database import AsyncSessionLocal
+    from app.models.f1 import Season, Round
+    from app.services.sync import sync_sessions_for_round, _determine_current_season
+
+    try:
+        async with AsyncSessionLocal() as db:
+            current_year = _determine_current_season()
+            result = await db.execute(select(Season).where(Season.year == current_year))
+            season = result.scalar_one_or_none()
+            if season is None:
+                logger.info("Startup sync: %d sezonu henüz yok, atlanıyor", current_year)
+                return
+
+            from datetime import date
+            today = date.today()
+            round_result = await db.execute(
+                select(Round).where(
+                    Round.season_id == season.id,
+                    Round.race_date >= today - timedelta(days=2),
+                    Round.race_date <= today + timedelta(days=7),
+                )
+            )
+            rnd = round_result.scalar_one_or_none()
+            if rnd is None:
+                logger.info("Startup sync: bu hafta yarış yok")
+                return
+
+            sessions = await sync_sessions_for_round(rnd, current_year, db)
+            await db.commit()
+            logger.info(
+                "Startup sync: Round %d (%s) — %d session güncellendi",
+                rnd.round_number, rnd.name, len(sessions),
+            )
+    except Exception as exc:
+        logger.warning("Startup sync hatası (kritik değil): %s", exc)
 
 
 app = FastAPI(

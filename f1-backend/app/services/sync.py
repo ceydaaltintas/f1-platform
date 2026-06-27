@@ -301,10 +301,16 @@ async def sync_full_season(year: int, db: AsyncSession) -> dict:
     driver_map = await sync_drivers(year, team_map, db)
     rounds = await sync_rounds(year, season, db)
 
-    # Tamamlanan round'lar için session'ları OpenF1'den çek
+    # Tamamlanan ve bu haftaki upcoming round'lar için session'ları OpenF1'den çek
+    from datetime import timedelta
+    today = date.today()
     total_sessions = 0
     for rnd in rounds:
-        if rnd.round_status == "completed":
+        is_race_week = (
+            rnd.race_date is not None
+            and today - timedelta(days=2) <= rnd.race_date <= today + timedelta(days=7)
+        )
+        if rnd.round_status == "completed" or is_race_week:
             try:
                 sessions = await sync_sessions_for_round(rnd, year, db)
                 total_sessions += len(sessions)
