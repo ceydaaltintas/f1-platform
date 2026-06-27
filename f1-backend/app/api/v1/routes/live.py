@@ -469,7 +469,7 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
     duration_by_dn = {r.get("driver_number"): r.get("duration") for r in results}
     position_by_dn = {r.get("driver_number"): r.get("position") for r in results}
 
-    # Aktif segment: herhangi bir pilotun en yüksek dolu duration index'i
+    # Aktif segment tespiti — önce session_result'tan
     active_idx = 0
     for durations in duration_by_dn.values():
         if not durations:
@@ -478,6 +478,20 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
             if len(durations) > idx and durations[idx] is not None:
                 active_idx = max(active_idx, idx)
                 break
+
+    # session_result boşsa → race_control mesajlarından segment tespiti
+    if active_idx == 0 and not duration_by_dn:
+        try:
+            rc_messages = await openf1.fetch_race_control(session_key)
+            started_count = sum(1 for m in rc_messages if (m.get("message") or "").strip() == "SESSION STARTED")
+            # 1 started = Q1, 2 = Q2, 3 = Q3
+            if started_count >= 3:
+                active_idx = 2
+            elif started_count >= 2:
+                active_idx = 1
+        except Exception:
+            pass
+
     active_segment = QUALI_SEGMENT_NAMES[active_idx]
     cutoff = QUALI_SEGMENT_CUTOFF[active_idx]
 
