@@ -529,28 +529,58 @@ async def _build_live_quali_timing(session_id: int, session, session_key: int, c
         except Exception:
             all_laps = []
 
-        # Segment başlangıç zamanından sonraki turları filtrele
+        # Tüm segment sınırlarını bul ve her segment için eleme yap
         if segment_start_time and active_idx > 0:
-            # Önce Q1 sonuçlarını hesapla (elenen pilotları bulmak için)
-            q1_best: dict[int, float] = {}
-            for l in all_laps:
-                dn = l.get("driver_number")
-                ts_str = l.get("date_start") or l.get("date") or ""
-                dur = l.get("lap_duration")
-                if dn is None or not dur or l.get("is_pit_out_lap"):
-                    continue
-                if ts_str:
+            # RC mesajlarından tüm segment başlangıç zamanlarını al
+            all_start_times: list[datetime] = []
+            for m in rc_messages:
+                if (m.get("message") or "").strip() == "SESSION STARTED":
+                    ts = m.get("date", "")
+                    if ts:
+                        try:
+                            all_start_times.append(datetime.fromisoformat(ts.replace("Z", "+00:00")))
+                        except ValueError:
+                            pass
+
+            def _best_laps_between(start_t: datetime | None, end_t: datetime | None) -> dict[int, float]:
+                """İki zaman arasındaki en iyi turları hesapla."""
+                best: dict[int, float] = {}
+                for l in all_laps:
+                    dn = l.get("driver_number")
+                    dur = l.get("lap_duration")
+                    if dn is None or not dur or l.get("is_pit_out_lap"):
+                        continue
+                    ts_str = l.get("date_start") or l.get("date") or ""
+                    if not ts_str:
+                        continue
                     try:
                         lap_ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                        if lap_ts < segment_start_time:
-                            if dn not in q1_best or dur < q1_best[dn]:
-                                q1_best[dn] = dur
                     except ValueError:
-                        pass
+                        continue
+                    if start_t and lap_ts < start_t:
+                        continue
+                    if end_t and lap_ts >= end_t:
+                        continue
+                    if dn not in best or dur < best[dn]:
+                        best[dn] = dur
+                return best
+
+            # Q1 elenmişler (ilk segment)
+            q1_end = all_start_times[1] if len(all_start_times) > 1 else segment_start_time
+            q1_best = _best_laps_between(all_start_times[0] if all_start_times else None, q1_end)
             if q1_best:
                 sorted_q1 = sorted(q1_best.items(), key=lambda x: x[1])
-                # 16. ve sonrası elenir (ilk 15 kalır)
                 q1_eliminated_dns = {dn for dn, _ in sorted_q1[16:]}
+
+            # Q2 elenmişler (Q3'teyse)
+            if active_idx >= 2 and len(all_start_times) >= 3:
+                q2_best = _best_laps_between(all_start_times[1], all_start_times[2])
+                if q2_best:
+                    # Q1 elenenleri çıkar
+                    q2_active = {dn: t for dn, t in q2_best.items() if dn not in q1_eliminated_dns}
+                    sorted_q2 = sorted(q2_active.items(), key=lambda x: x[1])
+                    q2_eliminated_dns = {dn for dn, _ in sorted_q2[10:]}
+                    q1_eliminated_dns = q1_eliminated_dns | q2_eliminated_dns
 
             # Aktif segment turlarını filtrele
             segment_laps = []
