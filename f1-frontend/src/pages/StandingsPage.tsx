@@ -54,6 +54,7 @@ export function StandingsPage() {
   const YEAR_OPTIONS = buildYearOptions(currentYear)
 
   const [tab, setTab] = useState<'drivers' | 'constructors' | 'results' | 'scenarios' | 'h2h' | 'fantasy'>('drivers')
+  const [expandedDriver, setExpandedDriver] = useState<string | null>(null)
 
   // Senaryolar, H2H ve Fantasy yalnızca güncel sezonda
   const isCurrentYear = currentSeasonQ.isSuccess && y === currentYear
@@ -243,10 +244,13 @@ export function StandingsPage() {
               const isLeader = i === 0
               return (
                 <div key={d.driver_id}
-                  className="rounded-xl border transition-all"
+                  className="rounded-xl border transition-all cursor-pointer"
+                  onClick={() => setExpandedDriver(expandedDriver === d.driver_id ? null : d.driver_id)}
                   style={{
                     background: isLeader ? 'rgba(255,215,0,0.04)' : 'var(--s1)',
-                    borderColor: isLeader ? 'rgba(255,215,0,0.2)' : 'var(--b1)',
+                    borderColor: expandedDriver === d.driver_id
+                      ? (TEAM_COLORS[d.team_id] ?? '#888') + '60'
+                      : isLeader ? 'rgba(255,215,0,0.2)' : 'var(--b1)',
                   }}>
                   <div className="flex items-center gap-3 px-4 py-3">
                     {/* Pozisyon */}
@@ -277,11 +281,6 @@ export function StandingsPage() {
                         </span>
                         {d.number && d.number !== '—' && (
                           <span className="text-[10px] mono" style={{ color:'var(--t3)' }}>#{d.number}</span>
-                        )}
-                        {d.wins > 0 && (
-                          <span className="text-[10px] mono" style={{ color:'#FFD700' }}>
-                            {d.wins} galibiyet
-                          </span>
                         )}
                       </div>
                       {/* Puan barı */}
@@ -326,6 +325,52 @@ export function StandingsPage() {
                       {isFavorite(d.code) ? '⭐' : '☆'}
                     </button>
                   </div>
+
+                  {/* Bilgi kartı */}
+                  {expandedDriver === d.driver_id && (
+                    <div className="px-4 pb-4 pt-1 border-t" style={{ borderColor:'rgba(255,255,255,0.06)' }}
+                      onClick={e => e.stopPropagation()}>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>MİLLİYET</p>
+                          <p className="text-[13px] font-bold text-white mt-0.5">
+                            {NATIONALITY_FLAG[d.nationality] ?? ''} {d.nationality}
+                          </p>
+                        </div>
+                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>NUMARA</p>
+                          <p className="text-[13px] font-bold text-white mt-0.5">#{d.number ?? '—'}</p>
+                        </div>
+                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>GALİBİYET</p>
+                          <p className="text-[13px] font-bold mt-0.5" style={{ color: d.wins > 0 ? '#FFD700' : 'white' }}>
+                            {d.wins}
+                          </p>
+                        </div>
+                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>TAKIM</p>
+                          <p className="text-[13px] font-bold mt-0.5" style={{ color: TEAM_COLORS[d.team_id] ?? 'white' }}>
+                            {d.team_name}
+                          </p>
+                        </div>
+                      </div>
+                      {!isLeader && (
+                        <div className="mt-2 rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
+                          <p className="text-[11px]" style={{ color:'var(--t2)' }}>
+                            Lider {(drivers.data?.[0] as any)?.code}'e <span className="font-bold text-white">{gapPts} puan</span> uzaklıkta
+                            {d.wins > 0 ? ` · Bu sezon ${d.wins} yarış kazandı` : ' · Henüz galibiyet yok'}
+                          </p>
+                        </div>
+                      )}
+                      {isLeader && (
+                        <div className="mt-2 rounded-lg px-3 py-2" style={{ background:'rgba(255,215,0,0.05)' }}>
+                          <p className="text-[11px]" style={{ color:'#FFD700' }}>
+                            Şampiyona lideri · {d.wins} galibiyet ile {d.points} puan topladı
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}
