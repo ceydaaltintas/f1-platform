@@ -945,7 +945,34 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
 
     entries: list[dict] = []
 
-    if is_practice:
+    # Formasyon turu: tur ≤ 1 ve interval verisi anlamsızsa grid sırasını göster
+    is_formation = is_race and (current_lap is None or current_lap <= 1)
+    if is_formation and start_position:
+        sorted_by_grid = sorted(start_position.items(), key=lambda x: x[1])
+        for dn, grid_pos in sorted_by_grid:
+            info  = num_to_info.get(dn, {"code": str(dn), "full_name": "", "team_name": "", "team_colour": "#888888"})
+            stint = latest_stint.get(dn, {})
+            entries.append({
+                "position":      grid_pos,
+                "driver_number": dn,
+                "code":          info["code"],
+                "full_name":     info["full_name"],
+                "team_name":     info["team_name"],
+                "team_colour":   info["team_colour"],
+                "gap_to_leader": "GRİD" if grid_pos == 1 else f"P{grid_pos}",
+                "gap_seconds":   0,
+                "interval":      None,
+                "lapped":        False,
+                "compound":      stint.get("compound"),
+                "tyre_age":      stint.get("tyre_age_at_end") or stint.get("lap_end"),
+                "pit_count":     0,
+                "last_lap_time": None,
+                "in_pit":          False,
+                "position_change": None,
+                "start_position":  grid_pos,
+            })
+
+    elif is_practice:
         # ── Antrenman sıralaması: en iyi tur süresine göre ──────────────────
         best_leader = min(best_lap_by_dn.values()) if best_lap_by_dn else None
 
