@@ -26,7 +26,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
       client.get(`/live/${sessionId}/simulate?driver_code=${selectedDriver}`)
         .then(r => r.data),
     enabled:  enabled && !!selectedDriver && !disabled,
-    staleTime: 10_000,
+    staleTime: 0,
     refetchInterval: enabled && !disabled ? 15_000 : false,
   })
 
