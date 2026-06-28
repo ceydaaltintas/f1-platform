@@ -68,7 +68,8 @@ CIRCUIT_TOTAL_LAPS: dict[str, int] = {
 RETIRED_THRESHOLD_SECONDS = 90
 
 
-def _inactive_driver_numbers(latest_iv: dict[int, dict], drivers: list[dict]) -> set:
+def _inactive_driver_numbers(latest_iv: dict[int, dict], drivers: list[dict],
+                             threshold: int = RETIRED_THRESHOLD_SECONDS) -> set:
     """DNF/emekli pilotların driver_number'larını döner.
 
     Yarış sonunda tüm pilotların interval akışı durur — bu yüzden eşik,
@@ -83,7 +84,7 @@ def _inactive_driver_numbers(latest_iv: dict[int, dict], drivers: list[dict]) ->
         try:
             d1 = datetime.fromisoformat(iv_date.replace("Z", "+00:00"))
             d2 = datetime.fromisoformat(live_ts.replace("Z", "+00:00"))
-            return (d2 - d1).total_seconds() > RETIRED_THRESHOLD_SECONDS
+            return (d2 - d1).total_seconds() > threshold
         except ValueError:
             return False
 
@@ -1118,11 +1119,10 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             if dn not in latest_iv or (iv.get("date","") > latest_iv[dn].get("date","")):
                 latest_iv[dn] = iv
 
-        # DNF/DNS pilotlar — yarış bittiyse herkes aktif say (lider de interval durur)
-        if race_finished:
-            inactive_dns: set[int] = set()
-        else:
-            inactive_dns = _inactive_driver_numbers(latest_iv, drivers)
+        # DNF/DNS pilotlar — yarış bittiyse eşiği yükselt (finiş sırası 1-2 dk sürer,
+        # gerçek DNF'ler çok daha eski interval verisine sahip)
+        threshold = 600 if race_finished else RETIRED_THRESHOLD_SECONDS
+        inactive_dns = _inactive_driver_numbers(latest_iv, drivers, threshold)
         await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
 
         active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
