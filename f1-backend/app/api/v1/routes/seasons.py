@@ -190,6 +190,21 @@ async def get_next_round(year: int, db: AsyncSession = Depends(get_db)):
     rnd = result.scalar_one_or_none()
     if rnd is None:
         raise HTTPException(404, "Bu sezon için önümüzdeki yarış bulunamadı")
+
+    # Session'lar boşsa otomatik sync (en fazla 5 dk'da bir)
+    if not rnd.sessions:
+        from app.core.redis_client import cache_get, cache_set
+        lock = await cache_get("next_round_sync_lock")
+        if not lock:
+            await cache_set("next_round_sync_lock", True, ttl_seconds=300)
+            try:
+                from app.services.sync import sync_sessions_for_round
+                await sync_sessions_for_round(rnd, year, db)
+                await db.commit()
+                await db.refresh(rnd, ["sessions"])
+            except Exception:
+                pass
+
     return rnd
 
 
