@@ -324,13 +324,14 @@ export function TrackMap({
 
         {/* Canlı GPS konumları */}
         {livePositions.map(lp => (
-          <g key={`live-${lp.code}`}>
-            <circle cx={lp.x} cy={lp.y} r={20} fill={lp.color + '12'} stroke={lp.color + '30'} strokeWidth={2}>
+          <g key={`live-${lp.code}`}
+            style={{ transform: `translate(${lp.x}px, ${lp.y}px)`, transition: 'transform 3s linear' }}>
+            <circle cx={0} cy={0} r={20} fill={lp.color + '12'} stroke={lp.color + '30'} strokeWidth={2}>
               <animate attributeName="r" values="16;24;16" dur="1.5s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="0.7;0;0.7" dur="1.5s" repeatCount="indefinite" />
             </circle>
-            <circle cx={lp.x} cy={lp.y} r={10} fill={lp.color} stroke="#05080f" strokeWidth={3} />
-            <text x={lp.x} y={lp.y - 17} textAnchor="middle" fontSize={13} fontWeight="bold"
+            <circle cx={0} cy={0} r={10} fill={lp.color} stroke="#05080f" strokeWidth={3} />
+            <text x={0} y={-17} textAnchor="middle" fontSize={13} fontWeight="bold"
               fontFamily="IBM Plex Mono,monospace" fill={lp.color}
               stroke="#05080f" strokeWidth={4} paintOrder="stroke">{lp.code}</text>
           </g>
