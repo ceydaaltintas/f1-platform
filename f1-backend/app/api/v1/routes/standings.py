@@ -50,62 +50,97 @@ async def constructor_standings(year: int):
 
 @router.get("/seasons/{year}/standings/pitstops")
 async def pitstop_standings(year: int, db: AsyncSession = Depends(get_db)):
-    """Takım bazında pit stop şampiyonası: en hızlı + ortalama."""
+    """Takım bazında pit stop şampiyonası: en hızlı + ortalama (OpenF1'den)."""
     ck = cache_key("pitstop_standings", year)
     cached = await cache_get(ck)
     if cached:
         return cached
 
-    from sqlalchemy import select, func
-    from app.models.f1 import PitStop, Session, Round, Season, Driver
+    from sqlalchemy import select
+    from app.models.f1 import Session as SessionModel, Round, Season
+    from app.services import openf1
+    from collections import defaultdict
+    import asyncio
 
     season_result = await db.execute(select(Season).where(Season.year == year))
     season = season_result.scalar_one_or_none()
     if season is None:
         raise HTTPException(404, f"{year} sezonu bulunamadı")
 
-    # Tamamlanmış yarış session'larındaki pit stopları çek
+    # Tamamlanmış yarış session'larını bul
     rows = await db.execute(
-        select(
-            PitStop.stop_duration,
-            Driver.current_team_id,
-        )
-        .join(Session, PitStop.session_id == Session.id)
-        .join(Round, Session.round_id == Round.id)
-        .join(Driver, PitStop.driver_id == Driver.id)
+        select(SessionModel.session_key, Round.name)
+        .join(Round, SessionModel.round_id == Round.id)
         .where(
             Round.season_id == season.id,
-            Session.type == "race",
-            PitStop.stop_duration.isnot(None),
-            PitStop.stop_duration > 0,
-            PitStop.stop_duration < 60,
+            SessionModel.type == "race",
+            SessionModel.status == "finished",
+            SessionModel.session_key.isnot(None),
         )
     )
-    pit_data = rows.all()
+    race_sessions = rows.all()
 
-    if not pit_data:
+    if not race_sessions:
         result = {"teams": [], "fastest_stops": []}
         await cache_set(ck, result, ttl_seconds=300)
         return result
 
-    # Takım isimlerini çek
-    from app.models.f1 import Team
-    teams_result = await db.execute(select(Team))
-    team_map = {t.id: t.name for t in teams_result.scalars().all()}
+    # Tüm yarışların pit + driver verisini paralel çek
+    async def _fetch(sk: int, race_name: str):
+        try:
+            pits, drivers = await asyncio.gather(
+                openf1.fetch_pit_data(sk),
+                openf1.fetch_session_drivers(sk),
+            )
+            return pits, drivers, race_name
+        except Exception:
+            return [], [], race_name
 
-    # Takım bazında grupla
-    from collections import defaultdict
-    team_stops: dict[int, list[float]] = defaultdict(list)
-    for duration, team_id in pit_data:
-        if team_id:
-            team_stops[team_id].append(duration)
+    results = await asyncio.gather(*[_fetch(sk, rn) for sk, rn in race_sessions])
+
+    # Driver → takım eşleşmesi
+    driver_team: dict[int, str] = {}
+    for _, drivers, _ in results:
+        for d in drivers:
+            dn = d.get("driver_number")
+            team = d.get("team_name")
+            if dn and team:
+                driver_team[dn] = team
+
+    driver_code: dict[int, str] = {}
+    for _, drivers, _ in results:
+        for d in drivers:
+            dn = d.get("driver_number")
+            code = d.get("name_acronym")
+            if dn and code:
+                driver_code[dn] = code
+
+    # Tüm pit verilerini topla
+    team_stops: dict[str, list[float]] = defaultdict(list)
+    all_fastest: list[dict] = []
+
+    for pits, _, race_name in results:
+        for p in pits:
+            dur = p.get("pit_duration")
+            dn = p.get("driver_number")
+            lap = p.get("lap_number")
+            if dur is None or dur <= 0 or dur > 60 or dn is None:
+                continue
+            team = driver_team.get(dn)
+            if team:
+                team_stops[team].append(dur)
+            all_fastest.append({
+                "duration": round(dur, 3),
+                "driver": driver_code.get(dn, str(dn)),
+                "race": race_name,
+                "lap": lap,
+            })
 
     # Takım sıralaması
     team_standings = []
-    for team_id, durations in team_stops.items():
+    for team, durations in team_stops.items():
         team_standings.append({
-            "team_id": team_id,
-            "team_name": team_map.get(team_id, "?"),
+            "team_name": team,
             "fastest": round(min(durations), 3),
             "average": round(sum(durations) / len(durations), 3),
             "total_stops": len(durations),
@@ -119,32 +154,8 @@ async def pitstop_standings(year: int, db: AsyncSession = Depends(get_db)):
     for i, t in enumerate(by_average):
         t["rank_average"] = i + 1
 
-    # Sezonun en hızlı 10 pit stopu
-    all_stops = await db.execute(
-        select(
-            PitStop.stop_duration,
-            PitStop.lap_number,
-            Driver.code,
-            Round.name.label("race_name"),
-        )
-        .join(Session, PitStop.session_id == Session.id)
-        .join(Round, Session.round_id == Round.id)
-        .join(Driver, PitStop.driver_id == Driver.id)
-        .where(
-            Round.season_id == season.id,
-            Session.type == "race",
-            PitStop.stop_duration.isnot(None),
-            PitStop.stop_duration > 0,
-            PitStop.stop_duration < 60,
-        )
-        .order_by(PitStop.stop_duration)
-        .limit(10)
-    )
-    fastest_stops = [
-        {"duration": round(r.stop_duration, 3), "driver": r.code,
-         "race": r.race_name, "lap": r.lap_number}
-        for r in all_stops.all()
-    ]
+    # En hızlı 10 pit stop
+    fastest_stops = sorted(all_fastest, key=lambda x: x["duration"])[:10]
 
     result = {"teams": by_fastest, "fastest_stops": fastest_stops}
     await cache_set(ck, result, ttl_seconds=3600)
