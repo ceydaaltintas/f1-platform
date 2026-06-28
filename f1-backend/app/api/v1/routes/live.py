@@ -1602,6 +1602,25 @@ async def live_simulate(
                               else f"Sadece {pace_diff:.3f}s/tur kazanıyor"),
                 })
 
+    # Sıralı tutarlılık: daha uzaktaki aracı, aradakinden önce yakalayamazsın
+    # catch_results en yakından en uzağa sıralı (pos büyükten küçüğe)
+    catch_results.sort(key=lambda x: x.get("gap_seconds", 0))
+    max_laps = 0.0
+    for c in catch_results:
+        lt = c.get("laps_to_catch")
+        if lt is not None:
+            if lt < max_laps:
+                c["laps_to_catch"] = round(max_laps + 1, 1)
+                if c.get("pace_gain_per_lap") and c["laps_to_catch"] > 0:
+                    c["pace_gain_per_lap"] = round(c["gap_seconds"] / c["laps_to_catch"], 3)
+            max_laps = c["laps_to_catch"]
+            if remaining_laps is not None and c["laps_to_catch"] > remaining_laps:
+                c["catchable"] = False
+                c["reason"] = (
+                    f"Yarış sonuna kadar yetişmiyor — ~{c['laps_to_catch']:.0f} tur gerekir, "
+                    f"{remaining_laps} tur kaldı"
+                )
+
     # ── 2: Pit senaryosu (şu an pit girerse) ─────────────────────────────
     # Sadece aynı turda olan araçlar (gap < 9000 = laplı değil)
     new_effective_gap = target_gap + PIT_LOSS
