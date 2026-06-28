@@ -224,7 +224,7 @@ async def live_status(db: AsyncSession = Depends(get_db)):
     # Worker her zaman çalışmayabilir — yarış bitmişse aktif oturumu burada da temizle
     # (anasayfadaki "CANLI YARIŞ" linki bitmiş yarışı göstermesin)
 
-    # 1) race_finished flag'i kontrol et (timing cache'inden veya ayrı cache'den)
+    # 1) race_finished flag'i kontrol et (timing cache veya ayrı flag)
     race_done = await cache_get(cache_key("race_finished", active["session_id"]))
     if not race_done:
         cached_timing = await cache_get(cache_key("live_timing", active["session_id"]))
@@ -245,6 +245,34 @@ async def live_status(db: AsyncSession = Depends(get_db)):
         await clear_active_session()
         await _mark_session_finished(active["session_id"], db)
         return {"live": False, "message": "Oturum bitti"}
+
+    # 3) OpenF1 unknown döndüyse ve yarış tipi oturumsa → tur kontrolü yap
+    if status == "unknown":
+        try:
+            result = await db.execute(
+                select(Session).where(Session.id == active["session_id"])
+            )
+            s = result.scalar_one_or_none()
+            if s and s.type in ("race", "sprint"):
+                from sqlalchemy.orm import selectinload
+                circuit_name = s.round.circuit_name if s.round else None
+                total = CIRCUIT_TOTAL_LAPS.get(circuit_name)
+                if total:
+                    all_laps = await cache_get(cache_key("session_all_laps", active["session_key"]))
+                    if all_laps is None:
+                        try:
+                            all_laps = await openf1.fetch_all_session_laps(active["session_key"])
+                        except Exception:
+                            all_laps = []
+                    if all_laps:
+                        max_lap = max((l.get("lap_number") or 0) for l in all_laps)
+                        if max_lap >= total:
+                            await cache_set(cache_key("race_finished", active["session_id"]), True, ttl_seconds=3600)
+                            await clear_active_session()
+                            await _mark_session_finished(active["session_id"], db)
+                            return {"live": False, "message": "Yarış bitti"}
+        except Exception as e:
+            logger.warning("live_status tur kontrolü hatası: %s", e)
 
     return {
         "live": True,
