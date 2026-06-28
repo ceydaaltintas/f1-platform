@@ -1118,9 +1118,11 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             if dn not in latest_iv or (iv.get("date","") > latest_iv[dn].get("date","")):
                 latest_iv[dn] = iv
 
-        # DNF/DNS pilotlar (emekli + hiç interval verisi olmayan) — positions_map'in
-        # ekstra OpenF1 isteği yapmadan filtreleyebilmesi için cache'lenir
-        inactive_dns = _inactive_driver_numbers(latest_iv, drivers)
+        # DNF/DNS pilotlar — yarış bittiyse herkes aktif say (lider de interval durur)
+        if race_finished:
+            inactive_dns: set[int] = set()
+        else:
+            inactive_dns = _inactive_driver_numbers(latest_iv, drivers)
         await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
 
         active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
