@@ -1512,10 +1512,11 @@ async def live_simulate(
             l["lap_duration"] for l in laps
             if l.get("lap_duration") and not l.get("is_pit_out_lap")
         ]
-        if not clean: return None
+        if len(clean) < 2: return None
         fastest = min(clean)
         valid = [t for t in clean if t <= fastest * 1.06]
-        return sum(sorted(valid)[-5:]) / len(sorted(valid)[-5:]) if valid else None
+        recent = sorted(valid)[-5:]
+        return sum(recent) / len(recent) if recent else None
 
     # Hedef sürücünün pace'i
     target_pace = _avg_pace(target_num)
@@ -1552,6 +1553,17 @@ async def live_simulate(
             continue
 
         their_pace = _avg_pace(dn)
+        if not target_pace or not their_pace:
+            in_battle = gap_to_catch <= 2.0
+            catch_results.append({
+                "ahead_code":  code,
+                "ahead_pos":   pos,
+                "gap_seconds": round(gap_to_catch, 2),
+                "catchable":   in_battle,
+                "in_battle":   in_battle,
+                "reason": "Mücadele mesafesinde" if in_battle else "Henüz yeterli tur verisi yok",
+            })
+            continue
         if target_pace and their_pace:
             pace_diff = their_pace - target_pace  # pozitif = hedef daha hızlı
             if pace_diff > 0.05:
@@ -1576,13 +1588,18 @@ async def live_simulate(
                     )
                 catch_results.append(entry)
             else:
+                # 2s'den az fark varsa "mücadele mesafesinde"
+                in_battle = gap_to_catch <= 2.0
                 catch_results.append({
                     "ahead_code":  code,
                     "ahead_pos":   pos,
                     "gap_seconds": round(gap_to_catch, 2),
-                    "catchable":   False,
-                    "reason": "Benzer veya daha yavaş pace" if pace_diff <= 0
-                              else f"Sadece {pace_diff:.3f}s/tur kazanıyor",
+                    "catchable":   in_battle,
+                    "in_battle":   in_battle,
+                    "pace_gain_per_lap": round(pace_diff, 3) if pace_diff > 0 else 0,
+                    "reason": "Mücadele mesafesinde — DRS etkili" if in_battle
+                              else ("Benzer veya daha yavaş pace" if pace_diff <= 0
+                              else f"Sadece {pace_diff:.3f}s/tur kazanıyor"),
                 })
 
     # ── 2: Pit senaryosu (şu an pit girerse) ─────────────────────────────
