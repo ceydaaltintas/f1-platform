@@ -53,7 +53,7 @@ async def pitstop_standings(year: int, db: AsyncSession = Depends(get_db)):
     """Takım bazında pit stop şampiyonası: en hızlı + ortalama (OpenF1'den)."""
     ck = cache_key("pitstop_standings", year)
     cached = await cache_get(ck)
-    if cached:
+    if cached and cached.get("teams"):
         return cached
 
     from sqlalchemy import select
