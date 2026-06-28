@@ -82,51 +82,6 @@ function speedColor(spd: number): string {
   }
 }
 
-function useInterpolatedPositions(targets: LivePos[]): LivePos[] {
-  const prevRef = useRef<Map<string, { x: number; y: number }>>(new Map())
-  const currentRef = useRef<Map<string, { x: number; y: number }>>(new Map())
-  const startTimeRef = useRef(0)
-  const [rendered, setRendered] = useState<LivePos[]>([])
-  const DURATION = 3500
-
-  useEffect(() => {
-    // Yeni hedef geldi — prev'i current'a, target'ı current'a kaydet
-    prevRef.current = new Map(currentRef.current)
-    const newCurrent = new Map<string, { x: number; y: number }>()
-    for (const t of targets) {
-      newCurrent.set(t.code, { x: t.x, y: t.y })
-      if (!prevRef.current.has(t.code)) {
-        prevRef.current.set(t.code, { x: t.x, y: t.y })
-      }
-    }
-    currentRef.current = newCurrent
-    startTimeRef.current = performance.now()
-  }, [targets])
-
-  useEffect(() => {
-    let raf: number
-    function tick() {
-      const elapsed = performance.now() - startTimeRef.current
-      const t = Math.min(1, elapsed / DURATION)
-      const result: LivePos[] = targets.map(lp => {
-        const prev = prevRef.current.get(lp.code) ?? lp
-        const curr = currentRef.current.get(lp.code) ?? lp
-        return {
-          ...lp,
-          x: prev.x + (curr.x - prev.x) * t,
-          y: prev.y + (curr.y - prev.y) * t,
-        }
-      })
-      setRendered(result)
-      if (t < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [targets])
-
-  return rendered.length ? rendered : targets
-}
-
 export function TrackMap({
   points, driverPositions = [], livePositions = [],
   speedTelemetry, compareTelemetry,
@@ -135,7 +90,6 @@ export function TrackMap({
   showCorners = true,
   height = 460,
 }: Props) {
-  const interpolated = useInterpolatedPositions(livePositions)
   const svgRef = useRef<SVGSVGElement>(null)
   const initRef = useRef<VB>({ x: 0, y: 0, w: 1000, h: 1000 })
   // drag: vb'yi sürükle başındaki değerden hesapla — drift olmaz
@@ -369,7 +323,7 @@ export function TrackMap({
         })}
 
         {/* Canlı GPS konumları */}
-        {interpolated.map(lp => (
+        {livePositions.map(lp => (
           <g key={`live-${lp.code}`} transform={`translate(${lp.x},${lp.y})`}>
             <circle cx={0} cy={0} r={20} fill={lp.color + '12'} stroke={lp.color + '30'} strokeWidth={2}>
               <animate attributeName="r" values="16;24;16" dur="1.5s" repeatCount="indefinite" />
