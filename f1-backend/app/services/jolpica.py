@@ -103,6 +103,21 @@ async def fetch_qualifying_results(year: int, round_number: int) -> list[dict]:
     return races[0].get("QualifyingResults", []) if races else []
 
 
+async def fetch_driver_results(driver_id: str) -> list[dict]:
+    """Bir pilotun tüm kariyer yarış sonuçlarını çeker."""
+    all_races: list[dict] = []
+    offset = 0
+    while True:
+        data = await _get(f"drivers/{driver_id}/results.json?limit=100&offset={offset}")
+        races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
+        all_races.extend(races)
+        total = int(data.get("MRData", {}).get("total", 0))
+        offset += 100
+        if offset >= total:
+            break
+    return all_races
+
+
 async def fetch_driver_standings(year: int, round_number: int | None = None) -> list[dict]:
     """Şampiyona pilotlar sıralamasını çeker."""
     path = f"{year}/driverStandings.json"

@@ -36,6 +36,50 @@ const NATIONALITY_FLAG: Record<string, string> = {
   Austrian: '🇦🇹', Swiss: '🇨🇭',
 }
 
+function DriverProfileCard({ driverId, teamColor }: { driverId: string; teamColor: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['driver-profile', driverId],
+    queryFn: () => client.get(`/drivers/${driverId}/profile`).then(r => r.data),
+    staleTime: 86_400_000,
+  })
+
+  if (isLoading) return (
+    <div className="px-4 pb-4 pt-2 border-t" style={{ borderColor:'rgba(255,255,255,0.06)' }}>
+      <div className="h-16 rounded-lg animate-pulse" style={{ background:'rgba(255,255,255,0.03)' }} />
+    </div>
+  )
+
+  if (!data) return null
+
+  const stats = [
+    { label: 'YARIŞ', value: data.total_races, color: 'white' },
+    { label: 'GALİBİYET', value: data.wins, color: data.wins > 0 ? '#FFD700' : 'white' },
+    { label: 'PODYUM', value: data.podiums, color: data.podiums > 0 ? '#00D2BE' : 'white' },
+    { label: 'POLE', value: data.poles, color: data.poles > 0 ? '#a855f7' : 'white' },
+    { label: 'İLK YARIŞ', value: data.debut_year ?? '—', color: 'var(--t2)' },
+  ]
+
+  return (
+    <div className="px-4 pb-4 pt-2 border-t" style={{ borderColor:'rgba(255,255,255,0.06)' }}
+      onClick={e => e.stopPropagation()}>
+      <div className="flex gap-2 flex-wrap">
+        {stats.map(s => (
+          <div key={s.label} className="rounded-lg px-3 py-2 flex-1 min-w-[70px]"
+            style={{ background:'rgba(255,255,255,0.03)' }}>
+            <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{s.label}</p>
+            <p className="text-[16px] font-black mono mt-0.5" style={{ color: s.color }}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+      {data.bio && (
+        <div className="mt-2 rounded-lg px-3 py-2.5" style={{ background: teamColor + '08', borderLeft: `3px solid ${teamColor}` }}>
+          <p className="text-[12px] leading-relaxed" style={{ color:'var(--t2)' }}>{data.bio}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function StandingsPage() {
   const { year } = useParams<{ year: string }>()
 
@@ -328,48 +372,7 @@ export function StandingsPage() {
 
                   {/* Bilgi kartı */}
                   {expandedDriver === d.driver_id && (
-                    <div className="px-4 pb-4 pt-1 border-t" style={{ borderColor:'rgba(255,255,255,0.06)' }}
-                      onClick={e => e.stopPropagation()}>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>MİLLİYET</p>
-                          <p className="text-[13px] font-bold text-white mt-0.5">
-                            {NATIONALITY_FLAG[d.nationality] ?? ''} {d.nationality}
-                          </p>
-                        </div>
-                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>NUMARA</p>
-                          <p className="text-[13px] font-bold text-white mt-0.5">#{d.number ?? '—'}</p>
-                        </div>
-                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>GALİBİYET</p>
-                          <p className="text-[13px] font-bold mt-0.5" style={{ color: d.wins > 0 ? '#FFD700' : 'white' }}>
-                            {d.wins}
-                          </p>
-                        </div>
-                        <div className="rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>TAKIM</p>
-                          <p className="text-[13px] font-bold mt-0.5" style={{ color: TEAM_COLORS[d.team_id] ?? 'white' }}>
-                            {d.team_name}
-                          </p>
-                        </div>
-                      </div>
-                      {!isLeader && (
-                        <div className="mt-2 rounded-lg px-3 py-2" style={{ background:'rgba(255,255,255,0.03)' }}>
-                          <p className="text-[11px]" style={{ color:'var(--t2)' }}>
-                            Lider {(drivers.data?.[0] as any)?.code}'e <span className="font-bold text-white">{gapPts} puan</span> uzaklıkta
-                            {d.wins > 0 ? ` · Bu sezon ${d.wins} yarış kazandı` : ' · Henüz galibiyet yok'}
-                          </p>
-                        </div>
-                      )}
-                      {isLeader && (
-                        <div className="mt-2 rounded-lg px-3 py-2" style={{ background:'rgba(255,215,0,0.05)' }}>
-                          <p className="text-[11px]" style={{ color:'#FFD700' }}>
-                            Şampiyona lideri · {d.wins} galibiyet ile {d.points} puan topladı
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <DriverProfileCard driverId={d.driver_id} teamColor={TEAM_COLORS[d.team_id] ?? '#888'} />
                   )}
                 </div>
               )

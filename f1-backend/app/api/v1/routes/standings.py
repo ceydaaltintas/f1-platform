@@ -48,6 +48,72 @@ async def constructor_standings(year: int):
         raise HTTPException(502, f"Jolpica verisi alınamadı: {e}")
 
 
+@router.get("/drivers/{driver_id}/profile")
+async def driver_profile(driver_id: str):
+    """Pilot kariyer istatistikleri + AI biyografi."""
+    ck = cache_key("driver_profile", driver_id)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    from app.services import jolpica
+
+    # Jolpica'dan kariyer verileri
+    try:
+        results = await jolpica.fetch_driver_results(driver_id)
+    except Exception:
+        results = []
+
+    total_races = len(results)
+    wins = 0
+    podiums = 0
+    poles = 0
+    first_race = None
+    for r in results:
+        res = r.get("Results", [{}])[0] if r.get("Results") else {}
+        pos = res.get("position")
+        grid = res.get("grid")
+        if pos == "1":
+            wins += 1
+        if pos and int(pos) <= 3:
+            podiums += 1
+        if grid == "1":
+            poles += 1
+        if first_race is None:
+            first_race = r.get("season")
+
+    # AI biyografi
+    bio = ""
+    try:
+        bio_ck = cache_key("driver_bio", driver_id)
+        bio = await cache_get(bio_ck)
+        if not bio:
+            from app.services import claude_ai
+            prompt = f"F1 pilotu {driver_id} hakkında 2 cümlelik kısa Türkçe biyografi yaz. Kariyer başarıları, tarzı ve öne çıkan özellikleri."
+            system = "Sen bir F1 uzmanısın. Çok kısa, bilgilendirici pilot tanıtımları yazarsın. Maksimum 2 cümle, sade Türkçe."
+            if claude_ai._groq_ok():
+                bio = await claude_ai._groq_interpret(prompt, system)
+            elif claude_ai._anthropic_ok():
+                bio = await claude_ai._anthropic_interpret(prompt, system)
+            if bio:
+                bio = claude_ai._clean_ai_text(bio)
+                await cache_set(bio_ck, bio, ttl_seconds=7 * 86_400)
+    except Exception:
+        pass
+
+    result = {
+        "driver_id": driver_id,
+        "total_races": total_races,
+        "wins": wins,
+        "podiums": podiums,
+        "poles": poles,
+        "debut_year": first_race,
+        "bio": bio or None,
+    }
+    await cache_set(ck, result, ttl_seconds=86_400)
+    return result
+
+
 @router.get("/seasons/{year}/results")
 async def season_results(year: int):
     """Sezon yarış sonuçları — her round için kazanan."""
