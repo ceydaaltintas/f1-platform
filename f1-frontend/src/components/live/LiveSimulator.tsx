@@ -268,10 +268,10 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                       {c.catchable ? (
                         <div className="text-right">
                           <span className="text-[13px] font-black mono" style={{ color: '#00D2BE' }}>
-                            ~{c.laps_to_catch.toFixed(0)} tur
+                            {c.laps_to_catch != null ? `~${c.laps_to_catch.toFixed(0)} tur` : 'Mücadelede'}
                           </span>
                           <p className="text-[9px] mono" style={{ color: 'var(--t3)' }}>
-                            +{c.pace_gain_per_lap.toFixed(3)}s/tur kazanıyor
+                            {c.pace_gain_per_lap ? `+${c.pace_gain_per_lap.toFixed(3)}s/tur kazanıyor` : (c.reason ?? 'DRS mesafesinde')}
                           </p>
                         </div>
                       ) : (
