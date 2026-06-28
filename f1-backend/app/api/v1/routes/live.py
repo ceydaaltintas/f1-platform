@@ -1048,9 +1048,6 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             })
 
     elif race_finished:
-        # Yarış bittiyse OpenF1'in resmi sonuç listesi (session_result) kullanılır —
-        # intervals akışı yarış sonunda donduğu için lider dahil herkesin "son güncelleme"
-        # zamanı birbirine yakın olur ve DNF tespiti (interval bazlı) yanlış sonuç verir.
         try:
             session_result = await openf1.fetch_session_result(session_key)
         except Exception:
@@ -1109,7 +1106,8 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         inactive_dns = {r.get("driver_number") for r in session_result if r.get("dnf") or r.get("dns") or r.get("dsq")}
         await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
 
-    else:
+    if not entries:
+        # race_finished dalı boş döndüyse veya normal yarış sıralaması
         # ── Her sürücünün EN SON interval kaydını al ──────────────────────────────
         # intervals binlerce satır içerebilir; sürücü başına sadece max(date) olan alınır
         latest_iv: dict[int, dict] = {}
