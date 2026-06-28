@@ -1636,7 +1636,7 @@ async def live_simulate(
     cars_behind = sorted(
         [(dn, gap_map[dn]) for dn, pos in pos_map.items()
          if pos > target_pos and dn != target_num and gap_map.get(dn, 9999) < 9000],
-        key=lambda x: x[1], reverse=True
+        key=lambda x: x[1]
     )
 
     optimal_pit_info = None
