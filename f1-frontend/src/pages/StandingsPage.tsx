@@ -16,10 +16,24 @@ function buildYearOptions(currentYear: number): number[] {
 
 // Pozisyon rengi
 function posColor(i: number) {
-  if (i === 0) return '#FFD700'   // Altın — lider
-  if (i === 1) return '#C0C0C0'   // Gümüş
-  if (i === 2) return '#CD7F32'   // Bronz
+  if (i === 0) return '#FFD700'
+  if (i === 1) return '#C0C0C0'
+  if (i === 2) return '#CD7F32'
   return 'var(--t3)'
+}
+
+const TEAM_COLORS: Record<string, string> = {
+  red_bull: '#3671C6', mclaren: '#FF8000', ferrari: '#E8002D', mercedes: '#27F4D2',
+  aston_martin: '#229971', alpine: '#FF87BC', williams: '#64C4FF', rb: '#6692FF',
+  audi: '#F50537', haas: '#B6BABD', cadillac: '#909090',
+}
+
+const NATIONALITY_FLAG: Record<string, string> = {
+  Italian: '🇮🇹', British: '🇬🇧', Dutch: '🇳🇱', Monegasque: '🇲🇨', Australian: '🇦🇺',
+  Spanish: '🇪🇸', German: '🇩🇪', French: '🇫🇷', Canadian: '🇨🇦', Mexican: '🇲🇽',
+  Finnish: '🇫🇮', Japanese: '🇯🇵', Chinese: '🇨🇳', Thai: '🇹🇭', American: '🇺🇸',
+  'New Zealander': '🇳🇿', Brazilian: '🇧🇷', Argentine: '🇦🇷', Danish: '🇩🇰',
+  Austrian: '🇦🇹', Swiss: '🇨🇭',
 }
 
 export function StandingsPage() {
@@ -234,23 +248,41 @@ export function StandingsPage() {
                     background: isLeader ? 'rgba(255,215,0,0.04)' : 'var(--s1)',
                     borderColor: isLeader ? 'rgba(255,215,0,0.2)' : 'var(--b1)',
                   }}>
-                  <div className="flex items-center gap-4 px-4 py-3">
+                  <div className="flex items-center gap-3 px-4 py-3">
                     {/* Pozisyon */}
                     <span className="text-[15px] font-black mono w-7 text-right shrink-0"
                       style={{ color: posColor(i) }}>
                       {d.position}
                     </span>
 
+                    {/* Takım renk çubuğu */}
+                    <div className="w-1 h-10 rounded-full shrink-0"
+                      style={{ background: TEAM_COLORS[d.team_id] ?? '#888' }} />
+
                     {/* Pilot */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[15px] font-black mono text-white">{d.code}</span>
                         <span className="text-[13px] font-semibold" style={{ color:'var(--t2)' }}>
                           {d.first_name} {d.last_name}
                         </span>
-                        <span className="text-[11px] mono" style={{ color:'var(--t3)' }}>
+                        <span className="text-[12px]">{NATIONALITY_FLAG[d.nationality] ?? ''}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] mono px-1.5 py-0.5 rounded"
+                          style={{ background: (TEAM_COLORS[d.team_id] ?? '#888') + '20',
+                                   color: TEAM_COLORS[d.team_id] ?? '#888',
+                                   border: `1px solid ${(TEAM_COLORS[d.team_id] ?? '#888')}30` }}>
                           {d.team_name}
                         </span>
+                        {d.number && d.number !== '—' && (
+                          <span className="text-[10px] mono" style={{ color:'var(--t3)' }}>#{d.number}</span>
+                        )}
+                        {d.wins > 0 && (
+                          <span className="text-[10px] mono" style={{ color:'#FFD700' }}>
+                            {d.wins} galibiyet
+                          </span>
+                        )}
                       </div>
                       {/* Puan barı */}
                       <div className="h-1 rounded-full mt-2 overflow-hidden"
@@ -312,27 +344,29 @@ export function StandingsPage() {
                     background: i===0 ? 'rgba(255,215,0,0.04)' : 'var(--s1)',
                     borderColor: i===0 ? 'rgba(255,215,0,0.2)' : 'var(--b1)',
                   }}>
-                  <div className="flex items-center gap-4 px-4 py-3">
+                  <div className="flex items-center gap-3 px-4 py-3">
                     <span className="text-[15px] font-black mono w-7 text-right shrink-0"
                       style={{ color: posColor(i) }}>
                       {c.position}
                     </span>
 
+                    {/* Takım renk çubuğu */}
+                    <div className="w-1 h-10 rounded-full shrink-0"
+                      style={{ background: TEAM_COLORS[c.team_id] ?? '#888' }} />
+
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
+                      <div className="flex items-center gap-2">
                         <span className="text-[15px] font-bold text-white">{c.team_name}</span>
-                        <span className="text-[11px] mono" style={{ color:'var(--t3)' }}>
-                          {c.nationality}
-                        </span>
+                        <span className="text-[12px]">{NATIONALITY_FLAG[c.nationality] ?? ''}</span>
                       </div>
-                      <div className="h-1 rounded-full mt-2 overflow-hidden"
+                      <div className="h-1.5 rounded-full mt-2 overflow-hidden"
                         style={{ background:'rgba(255,255,255,0.06)' }}>
-                        <div className="h-1 rounded-full transition-all duration-700"
+                        <div className="h-1.5 rounded-full transition-all duration-700"
                           style={{
                             width: `${pct}%`,
-                            background: i===0
+                            background: TEAM_COLORS[c.team_id] ?? (i===0
                               ? 'linear-gradient(90deg,#E10600,#ff4520)'
-                              : 'rgba(255,255,255,0.3)',
+                              : 'rgba(255,255,255,0.3)'),
                           }} />
                       </div>
                     </div>
