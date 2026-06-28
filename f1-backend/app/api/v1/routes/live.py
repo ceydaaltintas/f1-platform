@@ -1128,7 +1128,23 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
         retired_ivs = [iv for iv in latest_iv.values() if iv.get("driver_number") in inactive_dns]
 
-        sorted_intervals = sorted(active_ivs, key=lambda x: _gap_val(x.get("gap_to_leader")))
+        # Positions verisinden son pozisyon (lapped pilotları doğru sıralamak için)
+        latest_pos_by_dn: dict[int, int] = {}
+        for p in sorted(positions, key=lambda x: x.get("date") or ""):
+            dn = p.get("driver_number")
+            pos = p.get("position")
+            if dn is not None and pos is not None:
+                latest_pos_by_dn[dn] = pos
+
+        def _sort_key(iv: dict) -> tuple:
+            gap = _gap_val(iv.get("gap_to_leader"))
+            dn = iv.get("driver_number")
+            # Lapped pilotlar (gap >= 9000) için positions verisinden sırala
+            if gap >= 9000:
+                return (gap, latest_pos_by_dn.get(dn, 999))
+            return (gap, 0)
+
+        sorted_intervals = sorted(active_ivs, key=_sort_key)
 
         seen_dns: set = set()
 
