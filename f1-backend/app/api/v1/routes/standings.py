@@ -48,6 +48,109 @@ async def constructor_standings(year: int):
         raise HTTPException(502, f"Jolpica verisi alınamadı: {e}")
 
 
+@router.get("/seasons/{year}/standings/pitstops")
+async def pitstop_standings(year: int, db: AsyncSession = Depends(get_db)):
+    """Takım bazında pit stop şampiyonası: en hızlı + ortalama."""
+    ck = cache_key("pitstop_standings", year)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    from sqlalchemy import select, func
+    from app.models.f1 import PitStop, Session, Round, Season, Driver
+
+    season_result = await db.execute(select(Season).where(Season.year == year))
+    season = season_result.scalar_one_or_none()
+    if season is None:
+        raise HTTPException(404, f"{year} sezonu bulunamadı")
+
+    # Tamamlanmış yarış session'larındaki pit stopları çek
+    rows = await db.execute(
+        select(
+            PitStop.stop_duration,
+            Driver.current_team_id,
+        )
+        .join(Session, PitStop.session_id == Session.id)
+        .join(Round, Session.round_id == Round.id)
+        .join(Driver, PitStop.driver_id == Driver.id)
+        .where(
+            Round.season_id == season.id,
+            Session.type == "race",
+            PitStop.stop_duration.isnot(None),
+            PitStop.stop_duration > 0,
+            PitStop.stop_duration < 60,
+        )
+    )
+    pit_data = rows.all()
+
+    if not pit_data:
+        result = {"teams": [], "fastest_stops": []}
+        await cache_set(ck, result, ttl_seconds=300)
+        return result
+
+    # Takım isimlerini çek
+    from app.models.f1 import Team
+    teams_result = await db.execute(select(Team))
+    team_map = {t.id: t.name for t in teams_result.scalars().all()}
+
+    # Takım bazında grupla
+    from collections import defaultdict
+    team_stops: dict[int, list[float]] = defaultdict(list)
+    for duration, team_id in pit_data:
+        if team_id:
+            team_stops[team_id].append(duration)
+
+    # Takım sıralaması
+    team_standings = []
+    for team_id, durations in team_stops.items():
+        team_standings.append({
+            "team_id": team_id,
+            "team_name": team_map.get(team_id, "?"),
+            "fastest": round(min(durations), 3),
+            "average": round(sum(durations) / len(durations), 3),
+            "total_stops": len(durations),
+        })
+
+    by_fastest = sorted(team_standings, key=lambda x: x["fastest"])
+    for i, t in enumerate(by_fastest):
+        t["rank_fastest"] = i + 1
+
+    by_average = sorted(team_standings, key=lambda x: x["average"])
+    for i, t in enumerate(by_average):
+        t["rank_average"] = i + 1
+
+    # Sezonun en hızlı 10 pit stopu
+    all_stops = await db.execute(
+        select(
+            PitStop.stop_duration,
+            PitStop.lap_number,
+            Driver.code,
+            Round.name.label("race_name"),
+        )
+        .join(Session, PitStop.session_id == Session.id)
+        .join(Round, Session.round_id == Round.id)
+        .join(Driver, PitStop.driver_id == Driver.id)
+        .where(
+            Round.season_id == season.id,
+            Session.type == "race",
+            PitStop.stop_duration.isnot(None),
+            PitStop.stop_duration > 0,
+            PitStop.stop_duration < 60,
+        )
+        .order_by(PitStop.stop_duration)
+        .limit(10)
+    )
+    fastest_stops = [
+        {"duration": round(r.stop_duration, 3), "driver": r.code,
+         "race": r.race_name, "lap": r.lap_number}
+        for r in all_stops.all()
+    ]
+
+    result = {"teams": by_fastest, "fastest_stops": fastest_stops}
+    await cache_set(ck, result, ttl_seconds=3600)
+    return result
+
+
 @router.get("/seasons/{year}/results")
 async def season_results(year: int):
     """Sezon yarış sonuçları — her round için kazanan."""

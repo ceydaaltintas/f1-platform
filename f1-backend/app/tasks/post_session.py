@@ -110,10 +110,21 @@ async def _sync_session_laps_async(session_id: int) -> dict:
                 lap.is_pit_in_lap = lap_raw.get("is_pit_in_lap", False)
                 total_laps += 1
 
-        # Pit stop verilerini çek
-        pit_data = await openf1.fetch_stints(session_key)
+        # Pit stop verilerini çek: stints + pit süreleri
+        stint_data = await openf1.fetch_stints(session_key)
+        pit_times = await openf1.fetch_pit_data(session_key)
+
+        # Pit sürelerini driver_number + lap_number ile eşle
+        pit_duration_map: dict[tuple[int, int], float] = {}
+        for p in pit_times:
+            dn = p.get("driver_number")
+            lap = p.get("lap_number")
+            dur = p.get("pit_duration")
+            if dn is not None and lap is not None and dur is not None:
+                pit_duration_map[(dn, lap)] = dur
+
         total_pits = 0
-        for stint in pit_data:
+        for stint in stint_data:
             driver_number = stint.get("driver_number")
             driver_id = driver_map.get(driver_number)
             if driver_id is None:
@@ -127,15 +138,20 @@ async def _sync_session_laps_async(session_id: int) -> dict:
                     PitStop.lap_number == lap_number,
                 )
             )
-            if existing_pit.scalar_one_or_none() is None:
+            existing = existing_pit.scalar_one_or_none()
+            duration = pit_duration_map.get((driver_number, lap_number))
+            if existing is None:
                 pit = PitStop(
                     session_id=session_id,
                     driver_id=driver_id,
                     lap_number=lap_number,
+                    stop_duration=duration,
                     tyre_out=(stint.get("compound") or "").upper() or None,
                 )
                 db.add(pit)
                 total_pits += 1
+            elif duration and not existing.stop_duration:
+                existing.stop_duration = duration
 
         session.status = "finished"
         await db.commit()
