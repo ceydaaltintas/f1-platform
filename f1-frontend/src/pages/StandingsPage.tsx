@@ -39,7 +39,7 @@ export function StandingsPage() {
   const y = Number(year) || currentYear
   const YEAR_OPTIONS = buildYearOptions(currentYear)
 
-  const [tab, setTab] = useState<'drivers' | 'constructors' | 'results' | 'pitstops' | 'scenarios' | 'h2h' | 'fantasy'>('drivers')
+  const [tab, setTab] = useState<'drivers' | 'constructors' | 'results' | 'scenarios' | 'h2h' | 'fantasy'>('drivers')
 
   // Senaryolar, H2H ve Fantasy yalnızca güncel sezonda
   const isCurrentYear = currentSeasonQ.isSuccess && y === currentYear
@@ -122,13 +122,6 @@ export function StandingsPage() {
     retry: 0,
   })
 
-  const pitstops = useQuery({
-    queryKey: ['standings', 'pitstops', y],
-    queryFn:  () => client.get(`/seasons/${y}/standings/pitstops`).then(r => r.data),
-    enabled:  effectiveTab === 'pitstops',
-    staleTime: 300_000,
-  })
-
   const isFallback    = !!(drivers.data?.[0]?.fallback || constructors.data?.[0]?.fallback)
   const { toggleDriver, isFavorite } = useFavoritesStore()
   const maxDriverPts  = Math.max(1, ...(drivers.data?.map((d: any) => Number(d.points) || 0) ?? [0]))
@@ -137,8 +130,7 @@ export function StandingsPage() {
 
   const isLoading = (effectiveTab === 'drivers' && drivers.isLoading) ||
     (effectiveTab === 'constructors' && constructors.isLoading) ||
-    (effectiveTab === 'results' && results.isLoading) ||
-    (effectiveTab === 'pitstops' && pitstops.isLoading)
+    (effectiveTab === 'results' && results.isLoading)
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -176,7 +168,6 @@ export function StandingsPage() {
             ['drivers',      '🏎 Pilotlar'],
             ['constructors', '🔧 Takımlar'],
             ['results',      '🏁 Yarışlar'],
-            ['pitstops',     '🔩 Pit Stop'],
             ...(y === currentYear
               ? [['scenarios', '📊 Senaryolar'], ['h2h', '⚔️ H2H'], ['fantasy', '🎮 Fantasy']] as const
               : []),
@@ -423,89 +414,6 @@ export function StandingsPage() {
                 <p className="text-[14px] mb-2" style={{ color:'var(--t3)' }}>Henüz yarış sonucu yok</p>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── Pit Stop Şampiyonası ────────────────────────────── */}
-        {effectiveTab === 'pitstops' && !pitstops.isLoading && (
-          <div className="space-y-6">
-            {/* Takım Sıralaması */}
-            <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b flex justify-between items-center" style={{ borderColor:'var(--b1)' }}>
-                <p className="text-[13px] font-bold text-white">Takım Pit Stop Sıralaması</p>
-              </div>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontFamily:'IBM Plex Mono, monospace' }}>
-                <thead>
-                  <tr style={{ borderBottom:'1px solid rgba(255,255,255,0.07)', background:'rgba(255,255,255,0.02)' }}>
-                    {['#','TAKIM','EN HIZLI','ORT.','STOP'].map((h,i) => (
-                      <th key={i} style={{ padding:'8px 10px', fontSize:9, fontWeight:600, letterSpacing:'0.1em',
-                        color:'rgba(240,244,255,0.22)', textAlign: i < 2 ? 'left' : 'right' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(pitstops.data?.teams ?? []).map((t: any) => (
-                    <tr key={t.team_id} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding:'10px', fontSize:14, fontWeight:900,
-                        color: t.rank_fastest === 1 ? '#00D2BE' : 'rgba(240,244,255,0.3)' }}>
-                        {t.rank_fastest}
-                      </td>
-                      <td style={{ padding:'10px', fontSize:13, fontWeight:700, color:'white' }}>
-                        {t.team_name}
-                      </td>
-                      <td style={{ padding:'10px', fontSize:13, fontWeight:700, textAlign:'right',
-                        color: t.rank_fastest === 1 ? '#00D2BE' : t.rank_fastest <= 3 ? '#a855f7' : 'rgba(240,244,255,0.7)' }}>
-                        {t.fastest}s
-                      </td>
-                      <td style={{ padding:'10px', fontSize:12, textAlign:'right', color:'rgba(240,244,255,0.5)' }}>
-                        {t.average}s
-                      </td>
-                      <td style={{ padding:'10px', fontSize:12, textAlign:'right', color:'rgba(240,244,255,0.3)' }}>
-                        {t.total_stops}
-                      </td>
-                    </tr>
-                  ))}
-                  {!(pitstops.data?.teams?.length) && (
-                    <tr><td colSpan={5} style={{ padding:24, textAlign:'center', color:'rgba(240,244,255,0.2)', fontSize:12 }}>
-                      Pit stop verisi henüz yok
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Sezonun En Hızlı Pit Stopları */}
-            <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b" style={{ borderColor:'var(--b1)' }}>
-                <p className="text-[13px] font-bold text-white">Sezonun En Hızlı Pit Stopları</p>
-              </div>
-              <div className="space-y-0">
-                {(pitstops.data?.fastest_stops ?? []).map((s: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-3"
-                    style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                    <div className="flex items-center gap-3">
-                      <span style={{ fontSize:14, fontWeight:900, width:24,
-                        color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'rgba(240,244,255,0.3)' }}>
-                        {i + 1}
-                      </span>
-                      <span className="text-[13px] font-black text-white mono">{s.driver}</span>
-                      <span className="text-[11px]" style={{ color:'var(--t3)' }}>{s.race}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] mono" style={{ color:'var(--t3)' }}>Tur {s.lap}</span>
-                      <span className="text-[14px] font-black mono" style={{
-                        color: i === 0 ? '#FFD700' : i <= 2 ? '#00D2BE' : 'rgba(240,244,255,0.7)'
-                      }}>{s.duration}s</span>
-                    </div>
-                  </div>
-                ))}
-                {!(pitstops.data?.fastest_stops?.length) && (
-                  <div style={{ padding:24, textAlign:'center', color:'rgba(240,244,255,0.2)', fontSize:12 }}>
-                    Pit stop verisi henüz yok
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
