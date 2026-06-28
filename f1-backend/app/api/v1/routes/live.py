@@ -224,9 +224,12 @@ async def live_status(db: AsyncSession = Depends(get_db)):
     # Worker her zaman çalışmayabilir — yarış bitmişse aktif oturumu burada da temizle
     # (anasayfadaki "CANLI YARIŞ" linki bitmiş yarışı göstermesin)
 
-    # 1) /timing zaten hesaplamışsa onu kullan — ekstra istek yok
-    cached_timing = await cache_get(cache_key("live_timing", active["session_id"]))
-    if cached_timing and cached_timing.get("race_finished"):
+    # 1) race_finished flag'i kontrol et (timing cache'inden veya ayrı cache'den)
+    race_done = await cache_get(cache_key("race_finished", active["session_id"]))
+    if not race_done:
+        cached_timing = await cache_get(cache_key("live_timing", active["session_id"]))
+        race_done = cached_timing and cached_timing.get("race_finished")
+    if race_done:
         await clear_active_session()
         await _mark_session_finished(active["session_id"], db)
         return {"live": False, "message": "Yarış bitti"}
@@ -1289,6 +1292,8 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     await cache_set(ck, result, ttl_seconds=6)
+    if race_finished:
+        await cache_set(cache_key("race_finished", session_id), True, ttl_seconds=3600)
     return result
 
 
