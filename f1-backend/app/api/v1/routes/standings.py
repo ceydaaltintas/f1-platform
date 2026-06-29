@@ -229,9 +229,10 @@ async def race_recap(year: int, round_number: int):
             )
             system = (
                 "Sen deneyimli bir F1 gazetecisisin. Yarış sonrası kısa, akıcı ve bilgilendirici özet yazarsın. "
-                "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi."
+                "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi. "
+                "Önemli: F1'de 'retired' terimi 'yarıştan çekildi' demektir, 'emekliye ayrıldı' değil. DNF = yarışı tamamlayamadı."
             )
-            recap_ck = cache_key("race_recap_ai_v2", year, round_number)
+            recap_ck = cache_key("race_recap_ai_v3", year, round_number)
             recap_text = await cache_get(recap_ck)
             if not recap_text:
                 if claude_ai._groq_ok():
