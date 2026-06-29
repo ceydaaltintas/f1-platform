@@ -3,6 +3,13 @@ import { Helmet } from 'react-helmet-async'
 
 type Tab = 'general' | 'regulations'
 
+function posColor(i: number) {
+  if (i === 0) return '#FFD700'
+  if (i === 1) return '#C0C0C0'
+  if (i === 2) return '#CD7F32'
+  return 'var(--t3)'
+}
+
 const TYRE_COMPOUNDS = [
   { name: 'SOFT', color: '#E10600', letter: 'S', desc: 'Maksimum kavrama, düşük dayanıklılık. Sıralama ve kısa stintler için ideal.' },
   { name: 'MEDIUM', color: '#FFD700', letter: 'M', desc: 'Denge. Yarışın ana lastik stratejisinin temelini oluşturur.' },
@@ -145,13 +152,6 @@ export function RulesPage() {
         <meta name="description" content="Formula 1 kuralları: puan sistemi, bayraklar, lastik bileşikleri, yarış haftası formatı ve 2026 yeni regülasyonları. Aktif aerodinamik, yeni motor ve daha fazlası." />
       </Helmet>
 
-      <style>{`
-        @keyframes slideIn { from { width: 0; } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes tyreRotate { from { stroke-dasharray: 0 201; } }
-        @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 8px var(--glow); } 50% { box-shadow: 0 0 20px var(--glow); } }
-      `}</style>
-
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
         <div>
@@ -184,7 +184,7 @@ export function RulesPage() {
 
         {/* ── Genel Kurallar ──────────────────────────────────── */}
         {tab === 'general' && (
-          <div className="space-y-8" style={{ animation: 'fadeUp 0.4s ease-out' }}>
+          <div className="space-y-8">
 
             {/* Puan Sistemi */}
             <section className="card overflow-hidden">
@@ -256,7 +256,7 @@ export function RulesPage() {
               <div className="p-5 grid sm:grid-cols-2 gap-3">
                 {FLAGS.map((f, i) => (
                   <div key={f.name} className="flex items-start gap-3 rounded-lg px-3 py-2.5"
-                    style={{ background: 'rgba(255,255,255,0.03)', animation: `fadeUp 0.4s ease-out ${i * 0.05}s both` }}>
+                    style={{ background: 'rgba(255,255,255,0.03)'}s both` }}>
                     <span className="text-xl shrink-0">{f.icon}</span>
                     <div>
                       <p className="text-[12px] font-bold" style={{ color: f.color }}>{f.name}</p>
@@ -276,7 +276,7 @@ export function RulesPage() {
                 <div className="grid md:grid-cols-3 gap-4">
                   {WEEKEND_FORMAT.map((day, di) => (
                     <div key={day.day} className="rounded-xl border overflow-hidden"
-                      style={{ borderColor: 'var(--b1)', animation: `fadeUp 0.5s ease-out ${di * 0.15}s both` }}>
+                      style={{ borderColor: 'var(--b1)'}s both` }}>
                       <div className="px-4 py-2 text-center" style={{ background: di === 2 ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.03)' }}>
                         <p className="text-[11px] mono font-black tracking-widest"
                           style={{ color: di === 2 ? '#E10600' : 'var(--t3)' }}>
@@ -313,7 +313,7 @@ export function RulesPage() {
                     { seg: 'Q3', time: '12 dakika', drivers: '10 pilot', elim: 'Pole pozisyonu belirlenir', color: '#a855f7' },
                   ].map((q, i) => (
                     <div key={q.seg} className="flex-1 rounded-xl border overflow-hidden"
-                      style={{ borderColor: q.color + '40', animation: `fadeUp 0.5s ease-out ${i * 0.15}s both` }}>
+                      style={{ borderColor: q.color + '40'}s both` }}>
                       <div className="px-4 py-2 text-center" style={{ background: q.color + '15' }}>
                         <p className="text-[20px] font-black mono" style={{ color: q.color }}>{q.seg}</p>
                       </div>
@@ -399,7 +399,7 @@ export function RulesPage() {
                   { penalty: 'Diskalifiye', desc: 'Teknik kural ihlali, yakıt limitini aşma', severity: 5 },
                 ].map((p, i) => (
                   <div key={p.penalty} className="flex items-start gap-3 rounded-lg px-3 py-2.5"
-                    style={{ background: 'rgba(255,255,255,0.03)', animation: `fadeUp 0.4s ease-out ${i * 0.05}s both` }}>
+                    style={{ background: 'rgba(255,255,255,0.03)'}s both` }}>
                     <div className="flex gap-0.5 mt-1 shrink-0">
                       {Array(p.severity).fill(0).map((_, j) => (
                         <div key={j} className="w-1.5 h-1.5 rounded-full" style={{ background: '#E10600' }} />
@@ -418,7 +418,7 @@ export function RulesPage() {
 
         {/* ── 2026 Regülasyonları ─────────────────────────────── */}
         {tab === 'regulations' && (
-          <div className="space-y-6" style={{ animation: 'fadeUp 0.4s ease-out' }}>
+          <div className="space-y-6">
 
             <div className="card p-5">
               <p className="text-[14px] leading-relaxed" style={{ color: 'var(--t2)' }}>
