@@ -447,8 +447,8 @@ export function StandingsPage() {
         {effectiveTab === 'results' && !results.isLoading && (
           <div className="space-y-2">
             {(results.data ?? []).map((r: any) => (
-              <div key={r.round}
-                className="rounded-xl border transition-all hover:border-white/10 overflow-hidden"
+              <Link key={r.round} to={`/recap/${y}/${r.round}`}
+                className="block rounded-xl border transition-all hover:border-white/10 overflow-hidden"
                 style={{ background:'var(--s1)', borderColor:'var(--b1)' }}>
                 <div className="flex items-start gap-4 px-4 py-3.5">
                   <span className="text-[13px] font-black mono shrink-0 w-8 text-center
@@ -489,7 +489,7 @@ export function StandingsPage() {
                     )}
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
             {(!results.data || results.data.length === 0) && (
               <div className="text-center py-16">
