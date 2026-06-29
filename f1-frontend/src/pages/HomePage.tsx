@@ -479,7 +479,9 @@ export function HomePage() {
 
             {/* ── Son Yarış Podyumu ──────────────────────────── */}
             {lastRace && (
-              <div className="card p-5 h-full">
+              <Link to={`/recap/${current?.year ?? new Date().getFullYear()}/${lastRace.round}`}
+                className="card p-5 h-full block transition-all hover:border-white/10"
+                style={{ textDecoration: 'none' }}>
                 <p className="text-[9px] mono font-semibold tracking-[0.2em] mb-3"
                   style={{ color:'var(--t3)' }}>
                   SON YARIŞ
@@ -509,7 +511,10 @@ export function HomePage() {
                   })}
                 </div>
 
-              </div>
+                <p className="text-[10px] mono mt-3" style={{ color: '#E10600' }}>
+                  Yarış özeti →
+                </p>
+              </Link>
             )}
           </div>
         </section>
