@@ -146,7 +146,7 @@ async def season_results(year: int):
 @router.get("/seasons/{year}/rounds/{round_number}/recap")
 async def race_recap(year: int, round_number: int):
     """Yarış sonrası AI özeti: sonuçlar, öne çıkan anlar, strateji analizi."""
-    ck = cache_key("race_recap_v2", year, round_number)
+    ck = cache_key("race_recap_v3", year, round_number)
     cached = await cache_get(ck)
     if cached and cached.get("podium"):
         return cached
