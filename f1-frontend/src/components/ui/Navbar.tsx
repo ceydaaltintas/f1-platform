@@ -73,6 +73,7 @@ export function Navbar() {
         {[
           { to: `/season/${currentYear}`, label: `${currentYear} Sezonu` },
           { to: `/standings/${currentYear}`, label: 'Şampiyona' },
+          { to: '/rules', label: 'Kurallar' },
           { to: '/live/demo', label: '🎭 Demo' },
         ].map(({ to, label }) => (
           <Link
