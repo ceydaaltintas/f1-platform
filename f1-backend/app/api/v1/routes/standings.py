@@ -216,48 +216,40 @@ async def race_recap(year: int, round_number: int):
 
     # AI yarış özeti
     recap_text = ""
-    try:
-        from app.services import claude_ai
-        context = {
-            "race": race_name,
-            "circuit": circuit,
-            "podium": podium,
-            "total_drivers": len(all_drivers),
-            "dnfs": len(dnfs),
-            "top_gainer": gainers[0] if gainers else None,
-            "top_loser": losers[0] if losers else None,
-        }
-        prompt = (
-            f"{race_name} ({circuit}) yarış özeti yaz. "
-            f"Kazanan: {podium[0]['driver']} ({podium[0]['team']}), "
-            f"2.: {podium[1]['driver']}, 3.: {podium[2]['driver']}. "
-            f"{'DNF: ' + ', '.join(d['code'] for d in dnfs) + '. ' if dnfs else ''}"
-            f"{'En çok pozisyon kazanan: ' + gainers[0]['code'] + ' (+' + str(gainers[0]['change']) + '). ' if gainers else ''}"
-            f"4-5 cümlelik kısa Türkçe yarış özeti yaz. Yarışın hikayesini, kritik anları ve strateji kararlarını anlat."
-        )
-        system = (
-            "Sen deneyimli bir F1 gazetecisisin. Yarış sonrası kısa, akıcı ve bilgilendirici özet yazarsın. "
-            "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi."
-        )
-        recap_ck = cache_key("race_recap_ai", year, round_number)
-        recap_text = await cache_get(recap_ck)
-        if not recap_text:
-            if claude_ai._groq_ok():
-                recap_text = await claude_ai._groq_interpret(prompt, system)
-            elif claude_ai._anthropic_ok():
-                recap_text = await claude_ai._anthropic_interpret(prompt, system)
-            if recap_text:
-                recap_text = claude_ai._clean_ai_text(recap_text)
-                await cache_set(recap_ck, recap_text, ttl_seconds=7 * 86_400)
-    except Exception:
-        pass
+    if len(podium) >= 3:
+        try:
+            from app.services import claude_ai
+            prompt = (
+                f"{race_name} ({circuit}) yarış özeti yaz. "
+                f"Kazanan: {podium[0]['driver']} ({podium[0]['team']}), "
+                f"2.: {podium[1]['driver']}, 3.: {podium[2]['driver']}. "
+                f"{'DNF: ' + ', '.join(d['code'] for d in dnfs) + '. ' if dnfs else ''}"
+                f"{'En çok pozisyon kazanan: ' + gainers[0]['code'] + ' (+' + str(gainers[0]['change']) + '). ' if gainers else ''}"
+                f"4-5 cümlelik kısa Türkçe yarış özeti yaz. Yarışın hikayesini, kritik anları ve strateji kararlarını anlat."
+            )
+            system = (
+                "Sen deneyimli bir F1 gazetecisisin. Yarış sonrası kısa, akıcı ve bilgilendirici özet yazarsın. "
+                "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi."
+            )
+            recap_ck = cache_key("race_recap_ai_v2", year, round_number)
+            recap_text = await cache_get(recap_ck)
+            if not recap_text:
+                if claude_ai._groq_ok():
+                    recap_text = await claude_ai._groq_interpret(prompt, system)
+                elif claude_ai._anthropic_ok():
+                    recap_text = await claude_ai._anthropic_interpret(prompt, system)
+                if recap_text:
+                    recap_text = claude_ai._clean_ai_text(recap_text)
+                    await cache_set(recap_ck, recap_text, ttl_seconds=7 * 86_400)
+        except Exception:
+            pass
 
     result = {
         "year": year,
         "round": round_number,
         "race_name": race_name,
         "circuit": circuit,
-        "date": race.get("date"),
+        "date": race_meta.get("date"),
         "podium": podium,
         "results": all_drivers,
         "gainers": gainers,
@@ -265,7 +257,8 @@ async def race_recap(year: int, round_number: int):
         "dnfs": dnfs,
         "recap": recap_text or None,
     }
-    await cache_set(ck, result, ttl_seconds=86_400)
+    if podium:
+        await cache_set(ck, result, ttl_seconds=86_400)
     return result
 
 
