@@ -12,6 +12,7 @@ import { LivePage } from './pages/LivePage'
 import { LoginPage } from './pages/LoginPage'
 import { StandingsPage } from './pages/StandingsPage'
 import { RulesPage } from './pages/RulesPage'
+import { RecapPage } from './pages/RecapPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="/session/:sessionId"   element={<SessionPage />} />
             <Route path="/live/:sessionId"      element={<LivePage />} />
             <Route path="/rules"                element={<RulesPage />} />
+            <Route path="/recap/:year/:round"   element={<RecapPage />} />
             <Route path="/login"                element={<LoginPage />} />
             <Route path="*" element={
               <div className="min-h-screen flex flex-col items-center justify-center gap-5 px-6"

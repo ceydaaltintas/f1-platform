@@ -141,6 +141,125 @@ async def season_results(year: int):
         raise HTTPException(502, f"Sonuçlar alınamadı: {e}")
 
 
+# ─── Yarış Özeti ─────────────────────────────────────────────────────────────
+
+@router.get("/seasons/{year}/rounds/{round_number}/recap")
+async def race_recap(year: int, round_number: int):
+    """Yarış sonrası AI özeti: sonuçlar, öne çıkan anlar, strateji analizi."""
+    ck = cache_key("race_recap", year, round_number)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    from app.services import jolpica
+
+    # Yarış sonuçlarını çek
+    try:
+        all_results = await standings_svc.get_season_results(year)
+    except Exception:
+        all_results = []
+
+    race = None
+    for r in all_results:
+        if r.get("round") == round_number:
+            race = r
+            break
+
+    if race is None:
+        raise HTTPException(404, f"{year} Round {round_number} sonucu bulunamadı")
+
+    race_name = race.get("raceName", f"Round {round_number}")
+    circuit = race.get("Circuit", {}).get("circuitName", "")
+    results = race.get("Results", [])
+
+    # Podyum ve öne çıkan veriler
+    podium = []
+    for r in results[:3]:
+        podium.append({
+            "position": int(r.get("position", 0)),
+            "driver": f"{r.get('Driver', {}).get('givenName', '')} {r.get('Driver', {}).get('familyName', '')}",
+            "code": r.get("Driver", {}).get("code", "???"),
+            "team": r.get("Constructor", {}).get("name", ""),
+            "time": r.get("Time", {}).get("time") if r.get("Time") else r.get("status", ""),
+            "grid": int(r.get("grid", 0)),
+        })
+
+    # Tüm sürücü sonuçları
+    all_drivers = []
+    for r in results:
+        grid = int(r.get("grid", 0))
+        pos = int(r.get("position", 0))
+        all_drivers.append({
+            "position": pos,
+            "code": r.get("Driver", {}).get("code", "???"),
+            "driver": f"{r.get('Driver', {}).get('givenName', '')} {r.get('Driver', {}).get('familyName', '')}",
+            "team": r.get("Constructor", {}).get("name", ""),
+            "grid": grid,
+            "status": r.get("status", "Finished"),
+            "points": float(r.get("points", 0)),
+            "change": grid - pos if grid > 0 and pos > 0 else 0,
+        })
+
+    # En çok pozisyon kazanan/kaybeden
+    gainers = sorted([d for d in all_drivers if d["change"] > 0], key=lambda x: -x["change"])[:3]
+    losers = sorted([d for d in all_drivers if d["change"] < 0], key=lambda x: x["change"])[:3]
+    dnfs = [d for d in all_drivers if d["status"] != "Finished" and "Lap" not in d["status"]]
+
+    # AI yarış özeti
+    recap_text = ""
+    try:
+        from app.services import claude_ai
+        context = {
+            "race": race_name,
+            "circuit": circuit,
+            "podium": podium,
+            "total_drivers": len(results),
+            "dnfs": len(dnfs),
+            "top_gainer": gainers[0] if gainers else None,
+            "top_loser": losers[0] if losers else None,
+        }
+        prompt = (
+            f"{race_name} ({circuit}) yarış özeti yaz. "
+            f"Kazanan: {podium[0]['driver']} ({podium[0]['team']}), "
+            f"2.: {podium[1]['driver']}, 3.: {podium[2]['driver']}. "
+            f"{'DNF: ' + ', '.join(d['code'] for d in dnfs) + '. ' if dnfs else ''}"
+            f"{'En çok pozisyon kazanan: ' + gainers[0]['code'] + ' (+' + str(gainers[0]['change']) + '). ' if gainers else ''}"
+            f"4-5 cümlelik kısa Türkçe yarış özeti yaz. Yarışın hikayesini, kritik anları ve strateji kararlarını anlat."
+        )
+        system = (
+            "Sen deneyimli bir F1 gazetecisisin. Yarış sonrası kısa, akıcı ve bilgilendirici özet yazarsın. "
+            "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi."
+        )
+        recap_ck = cache_key("race_recap_ai", year, round_number)
+        recap_text = await cache_get(recap_ck)
+        if not recap_text:
+            if claude_ai._groq_ok():
+                recap_text = await claude_ai._groq_interpret(prompt, system)
+            elif claude_ai._anthropic_ok():
+                recap_text = await claude_ai._anthropic_interpret(prompt, system)
+            if recap_text:
+                recap_text = claude_ai._clean_ai_text(recap_text)
+                await cache_set(recap_ck, recap_text, ttl_seconds=7 * 86_400)
+    except Exception:
+        pass
+
+    result = {
+        "year": year,
+        "round": round_number,
+        "race_name": race_name,
+        "circuit": circuit,
+        "date": race.get("date"),
+        "podium": podium,
+        "results": all_drivers,
+        "gainers": gainers,
+        "losers": losers,
+        "dnfs": dnfs,
+        "recap": recap_text or None,
+    }
+    await cache_set(ck, result, ttl_seconds=86_400)
+    return result
+
+
 # ─── Strateji Simülatörü ─────────────────────────────────────────────────────
 
 @router.get("/sessions/{session_id}/strategy/simulate")
