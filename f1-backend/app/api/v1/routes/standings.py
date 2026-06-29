@@ -146,59 +146,68 @@ async def season_results(year: int):
 @router.get("/seasons/{year}/rounds/{round_number}/recap")
 async def race_recap(year: int, round_number: int):
     """Yarış sonrası AI özeti: sonuçlar, öne çıkan anlar, strateji analizi."""
-    ck = cache_key("race_recap", year, round_number)
+    ck = cache_key("race_recap_v2", year, round_number)
     cached = await cache_get(ck)
-    if cached:
+    if cached and cached.get("podium"):
         return cached
 
     from app.services import jolpica
 
-    # Yarış sonuçlarını çek
+    # Önce season results'tan yarış meta bilgisini al
     try:
-        all_results = await standings_svc.get_season_results(year)
+        season_results = await standings_svc.get_season_results(year)
     except Exception:
-        all_results = []
+        season_results = []
 
-    race = None
-    for r in all_results:
+    race_meta = None
+    for r in season_results:
         if r.get("round") == round_number:
-            race = r
+            race_meta = r
             break
 
-    if race is None:
+    if race_meta is None:
         raise HTTPException(404, f"{year} Round {round_number} sonucu bulunamadı")
 
-    race_name = race.get("raceName", f"Round {round_number}")
-    circuit = race.get("Circuit", {}).get("circuitName", "")
-    results = race.get("Results", [])
+    race_name = race_meta.get("race_name", f"Round {round_number}")
+    circuit = race_meta.get("circuit", "")
 
-    # Podyum ve öne çıkan veriler
+    # Jolpica'dan detaylı yarış sonuçlarını çek
+    try:
+        raw = await jolpica.fetch_race_results(year, round_number)
+    except Exception:
+        raw = []
+
+    # Podyum ve tüm sonuçlar
     podium = []
-    for r in results[:3]:
-        podium.append({
-            "position": int(r.get("position", 0)),
-            "driver": f"{r.get('Driver', {}).get('givenName', '')} {r.get('Driver', {}).get('familyName', '')}",
-            "code": r.get("Driver", {}).get("code", "???"),
-            "team": r.get("Constructor", {}).get("name", ""),
-            "time": r.get("Time", {}).get("time") if r.get("Time") else r.get("status", ""),
-            "grid": int(r.get("grid", 0)),
-        })
-
-    # Tüm sürücü sonuçları
     all_drivers = []
-    for r in results:
-        grid = int(r.get("grid", 0))
+    for r in raw:
         pos = int(r.get("position", 0))
-        all_drivers.append({
-            "position": pos,
-            "code": r.get("Driver", {}).get("code", "???"),
-            "driver": f"{r.get('Driver', {}).get('givenName', '')} {r.get('Driver', {}).get('familyName', '')}",
-            "team": r.get("Constructor", {}).get("name", ""),
-            "grid": grid,
-            "status": r.get("status", "Finished"),
-            "points": float(r.get("points", 0)),
-            "change": grid - pos if grid > 0 and pos > 0 else 0,
-        })
+        grid = int(r.get("grid", 0))
+        code = r.get("Driver", {}).get("code", "???")
+        driver_name = f"{r.get('Driver', {}).get('givenName', '')} {r.get('Driver', {}).get('familyName', '')}"
+        team = r.get("Constructor", {}).get("name", "")
+        status = r.get("status", "Finished")
+        points = float(r.get("points", 0))
+        time_str = r.get("Time", {}).get("time") if r.get("Time") else status
+
+        entry = {
+            "position": pos, "code": code, "driver": driver_name,
+            "team": team, "grid": grid, "status": status,
+            "points": points, "change": grid - pos if grid > 0 and pos > 0 else 0,
+        }
+        all_drivers.append(entry)
+        if pos <= 3:
+            podium.append({**entry, "time": time_str})
+
+    # Jolpica boşsa season_results podiumunu kullan
+    if not podium and race_meta.get("podium"):
+        for i, p in enumerate(race_meta["podium"][:3]):
+            podium.append({
+                "position": i + 1, "code": p.get("code", "???"),
+                "driver": p.get("name", ""), "team": p.get("team", ""),
+                "grid": 0, "status": p.get("status", ""), "time": "",
+                "points": p.get("points", 0), "change": 0,
+            })
 
     # En çok pozisyon kazanan/kaybeden
     gainers = sorted([d for d in all_drivers if d["change"] > 0], key=lambda x: -x["change"])[:3]
@@ -213,7 +222,7 @@ async def race_recap(year: int, round_number: int):
             "race": race_name,
             "circuit": circuit,
             "podium": podium,
-            "total_drivers": len(results),
+            "total_drivers": len(all_drivers),
             "dnfs": len(dnfs),
             "top_gainer": gainers[0] if gainers else None,
             "top_loser": losers[0] if losers else None,

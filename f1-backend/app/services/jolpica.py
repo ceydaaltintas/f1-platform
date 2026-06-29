@@ -103,6 +103,13 @@ async def fetch_qualifying_results(year: int, round_number: int) -> list[dict]:
     return races[0].get("QualifyingResults", []) if races else []
 
 
+async def fetch_race_results(year: int, round_number: int) -> list[dict]:
+    """Bir yarışın detaylı sonuçlarını çeker (grid, status, time dahil)."""
+    data = await _get(f"{year}/{round_number}/results.json")
+    races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
+    return races[0].get("Results", []) if races else []
+
+
 async def fetch_driver_info(driver_id: str) -> dict:
     """Pilot temel bilgilerini çeker (isim, doğum tarihi, milliyet)."""
     data = await _get(f"drivers/{driver_id}.json")
