@@ -458,46 +458,45 @@ export function RulesPage() {
               </section>
             ))}
 
-            {/* Karşılaştırma */}
+            {/* Karşılaştırma Tablosu */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
                 <h2 className="text-[15px] font-bold text-white">📊 2025 vs 2026 Karşılaştırma</h2>
               </div>
-              <div className="p-5">
-                <div className="space-y-3">
-                  {[
-                    { label: 'Elektrik Gücü (MGU-K)', old: '120 kW', new: '350 kW', pctOld: 34, pctNew: 100 },
-                    { label: 'Minimum Ağırlık', old: '798 kg', new: '722 kg', pctOld: 100, pctNew: 90 },
-                    { label: 'Yakıt', old: 'Fosil bazlı', new: '%100 sürdürülebilir', pctOld: 40, pctNew: 100 },
-                    { label: 'Aerodinamik', old: 'Sabit kanat', new: 'Aktif kanat', pctOld: 60, pctNew: 100 },
-                  ].map((c, i) => (
-                    <div key={c.label} style={{ animation: `fadeUp 0.4s ease-out ${i * 0.1}s both` }}>
-                      <p className="text-[11px] mono font-semibold mb-1" style={{ color: 'var(--t3)' }}>{c.label}</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="h-5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                            <div className="h-5 rounded-full flex items-center px-2"
-                              style={{ width: `${c.pctOld}%`, background: 'rgba(255,255,255,0.15)',
-                                       animation: `slideIn 0.6s ease-out ${i * 0.1}s both` }}>
-                              <span className="text-[9px] mono text-white/60">{c.old}</span>
-                            </div>
-                          </div>
-                          <p className="text-[8px] mono mt-0.5" style={{ color: 'var(--t3)' }}>2025</p>
-                        </div>
-                        <div>
-                          <div className="h-5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                            <div className="h-5 rounded-full flex items-center px-2"
-                              style={{ width: `${c.pctNew}%`, background: 'linear-gradient(90deg, #E1060040, #E10600)',
-                                       animation: `slideIn 0.8s ease-out ${i * 0.1 + 0.2}s both` }}>
-                              <span className="text-[9px] mono text-white font-bold">{c.new}</span>
-                            </div>
-                          </div>
-                          <p className="text-[8px] mono mt-0.5" style={{ color: '#E10600' }}>2026</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="overflow-x-auto">
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'IBM Plex Mono, monospace' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
+                      {['ÖZELLİK', '2025', '2026', 'FARK'].map((h, i) => (
+                        <th key={h} style={{
+                          padding: '10px 14px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+                          color: h === '2026' ? '#00D2BE' : h === 'FARK' ? '#E10600' : 'rgba(240,244,255,0.3)',
+                          textAlign: i === 0 ? 'left' : 'right',
+                        }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: 'Uzunluk', old: '5640 mm', val: '5440 mm', diff: '-200 mm', diffColor: '#00D2BE' },
+                      { label: 'Genişlik', old: '2000 mm', val: '2000 mm', diff: 'Aynı', diffColor: 'var(--t3)' },
+                      { label: 'Min. ağırlık', old: '798 kg', val: '722 kg', diff: '-76 kg', diffColor: '#00D2BE' },
+                      { label: 'Dingil mesafesi', old: '3600 mm', val: '3400 mm', diff: '-200 mm', diffColor: '#00D2BE' },
+                      { label: 'Elektrik (MGU-K)', old: '120 kW', val: '350 kW', diff: '+192%', diffColor: '#E10600' },
+                      { label: 'MGU-H', old: 'Var', val: 'Kaldırıldı', diff: '—', diffColor: '#E10600' },
+                      { label: 'Yakıt', old: 'Fosil bazlı', val: '%100 sürdürülebilir', diff: 'Yeni', diffColor: '#00D2BE' },
+                      { label: 'Aerodinamik', old: 'Sabit kanat', val: 'Aktif kanat', diff: 'Yeni', diffColor: '#a855f7' },
+                      { label: 'DRS', old: 'Var', val: 'Kaldırıldı (Overtake)', diff: 'Yeni', diffColor: '#a855f7' },
+                    ].map(r => (
+                      <tr key={r.label} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--t2)' }}>{r.label}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, textAlign: 'right', color: 'rgba(240,244,255,0.5)' }}>{r.old}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, textAlign: 'right', color: '#00D2BE' }}>{r.val}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, textAlign: 'right', color: r.diffColor }}>{r.diff}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           </div>
