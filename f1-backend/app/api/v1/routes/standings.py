@@ -209,10 +209,12 @@ async def race_recap(year: int, round_number: int):
                 "points": p.get("points", 0), "change": 0,
             })
 
-    # En çok pozisyon kazanan/kaybeden
-    gainers = sorted([d for d in all_drivers if d["change"] > 0], key=lambda x: -x["change"])[:3]
-    losers = sorted([d for d in all_drivers if d["change"] < 0], key=lambda x: x["change"])[:3]
+    # En çok pozisyon kazanan/kaybeden (DNF/DNS hariç)
     dnfs = [d for d in all_drivers if d["status"] != "Finished" and "Lap" not in d["status"]]
+    dnf_codes = {d["code"] for d in dnfs}
+    finished = [d for d in all_drivers if d["code"] not in dnf_codes]
+    gainers = sorted([d for d in finished if d["change"] > 0], key=lambda x: -x["change"])[:3]
+    losers = sorted([d for d in finished if d["change"] < 0], key=lambda x: x["change"])[:3]
 
     # AI yarış özeti
     recap_text = ""
