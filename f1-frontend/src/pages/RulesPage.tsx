@@ -256,7 +256,7 @@ export function RulesPage() {
               <div className="p-5 grid sm:grid-cols-2 gap-3">
                 {FLAGS.map((f, i) => (
                   <div key={f.name} className="flex items-start gap-3 rounded-lg px-3 py-2.5"
-                    style={{ background: 'rgba(255,255,255,0.03)'}s both` }}>
+                    style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <span className="text-xl shrink-0">{f.icon}</span>
                     <div>
                       <p className="text-[12px] font-bold" style={{ color: f.color }}>{f.name}</p>
@@ -276,7 +276,7 @@ export function RulesPage() {
                 <div className="grid md:grid-cols-3 gap-4">
                   {WEEKEND_FORMAT.map((day, di) => (
                     <div key={day.day} className="rounded-xl border overflow-hidden"
-                      style={{ borderColor: 'var(--b1)'}s both` }}>
+                      style={{ borderColor: 'var(--b1)' }}>
                       <div className="px-4 py-2 text-center" style={{ background: di === 2 ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.03)' }}>
                         <p className="text-[11px] mono font-black tracking-widest"
                           style={{ color: di === 2 ? '#E10600' : 'var(--t3)' }}>
@@ -313,7 +313,7 @@ export function RulesPage() {
                     { seg: 'Q3', time: '12 dakika', drivers: '10 pilot', elim: 'Pole pozisyonu belirlenir', color: '#a855f7' },
                   ].map((q, i) => (
                     <div key={q.seg} className="flex-1 rounded-xl border overflow-hidden"
-                      style={{ borderColor: q.color + '40'}s both` }}>
+                      style={{ borderColor: q.color + '40' }}>
                       <div className="px-4 py-2 text-center" style={{ background: q.color + '15' }}>
                         <p className="text-[20px] font-black mono" style={{ color: q.color }}>{q.seg}</p>
                       </div>
@@ -399,7 +399,7 @@ export function RulesPage() {
                   { penalty: 'Diskalifiye', desc: 'Teknik kural ihlali, yakıt limitini aşma', severity: 5 },
                 ].map((p, i) => (
                   <div key={p.penalty} className="flex items-start gap-3 rounded-lg px-3 py-2.5"
-                    style={{ background: 'rgba(255,255,255,0.03)'}s both` }}>
+                    style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <div className="flex gap-0.5 mt-1 shrink-0">
                       {Array(p.severity).fill(0).map((_, j) => (
                         <div key={j} className="w-1.5 h-1.5 rounded-full" style={{ background: '#E10600' }} />
