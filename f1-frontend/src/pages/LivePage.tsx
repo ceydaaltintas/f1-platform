@@ -378,7 +378,7 @@ export function LivePage() {
                   <th key={i} style={{
                     padding: '7px 6px', textAlign: align as any,
                     fontSize: 9, fontWeight: 600, letterSpacing: '0.1em',
-                    color: 'rgba(240,244,255,0.22)',
+                    color: 'rgba(240,244,255,0.4)',
                     overflow: 'hidden', whiteSpace: 'nowrap',
                   }}>{label}</th>
                 ))}
@@ -387,7 +387,7 @@ export function LivePage() {
             <tbody>
               {entries.length === 0 ? (
                 <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center',
-                  color: 'rgba(240,244,255,0.2)', fontSize: 12 }}>
+                  color: 'rgba(240,244,255,0.4)', fontSize: 12 }}>
                   Veri yükleniyor...
                 </td></tr>
               ) : entries.map((e: any) => {
@@ -402,7 +402,7 @@ export function LivePage() {
 
                     {/* P */}
                     <td style={{ padding: '7px 6px', fontSize: 12, fontWeight: 900,
-                      color: e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.25)' }}>
+                      color: e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.45)' }}>
                       {e.position}
                     </td>
 
@@ -413,7 +413,7 @@ export function LivePage() {
                       ) : e.position_change < 0 ? (
                         <span style={{ color: '#f87171' }}>▼{Math.abs(e.position_change)}</span>
                       ) : (
-                        <span style={{ color: 'rgba(240,244,255,0.18)' }}>—</span>
+                        <span style={{ color: 'rgba(240,244,255,0.35)' }}>—</span>
                       )}
                     </td>
 
@@ -435,7 +435,7 @@ export function LivePage() {
                           }}>PİT</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 8, color: 'rgba(240,244,255,0.22)', marginTop: 1,
+                      <div style={{ fontSize: 8, color: 'rgba(240,244,255,0.4)', marginTop: 1,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {e.team_name}
                       </div>
@@ -446,9 +446,9 @@ export function LivePage() {
                       whiteSpace: 'nowrap', overflow: 'hidden',
                       color: isPractice
                         ? (e.position === 1 ? '#a855f7' : 'rgba(240,244,255,0.75)')
-                        : e.status === 'DNS/DNF' ? 'rgba(240,244,255,0.25)'
+                        : e.status === 'DNS/DNF' ? 'rgba(240,244,255,0.45)'
                         : e.lapped ? '#f87171'
-                        : e.position === 1 ? 'rgba(240,244,255,0.28)'
+                        : e.position === 1 ? 'rgba(240,244,255,0.5)'
                         : 'rgba(240,244,255,0.75)' }}>
                       {isPractice
                         ? (e.best_lap_time ?? '—')
@@ -475,14 +475,14 @@ export function LivePage() {
                           fontSize: 8, fontWeight: 900,
                           background: tyreC + '20', color: tyreC, border: `1.5px solid ${tyreC}50`,
                         }}>{tyre[0]}</span>
-                      ) : <span style={{ color: 'rgba(240,244,255,0.2)', fontSize: 10 }}>—</span>}
+                      ) : <span style={{ color: 'rgba(240,244,255,0.4)', fontSize: 10 }}>—</span>}
                     </td>
 
                     {/* Sütun 8: Antrenman→Tur sayısı, Yarış→Pit */}
                     <td style={{ padding: '7px 6px', textAlign: 'right', fontSize: 11, fontWeight: 700,
                       color: isPractice
-                        ? (e.lap_count > 0 ? 'rgba(240,244,255,0.5)' : 'rgba(240,244,255,0.2)')
-                        : e.pit_count > 0 ? '#FF8700' : 'rgba(240,244,255,0.2)' }}>
+                        ? (e.lap_count > 0 ? 'rgba(240,244,255,0.5)' : 'rgba(240,244,255,0.4)')
+                        : e.pit_count > 0 ? '#FF8700' : 'rgba(240,244,255,0.4)' }}>
                       {isPractice ? (e.lap_count ?? 0) : (e.pit_count ?? 0)}
                     </td>
                   </tr>
@@ -519,7 +519,7 @@ export function LivePage() {
                   <th key={i} style={{
                     padding: '7px 6px', textAlign: align as any,
                     fontSize: 9, fontWeight: 600, letterSpacing: '0.1em',
-                    color: 'rgba(240,244,255,0.22)',
+                    color: 'rgba(240,244,255,0.4)',
                     overflow: 'hidden', whiteSpace: 'nowrap',
                   }}>{label}</th>
                 ))}
@@ -528,7 +528,7 @@ export function LivePage() {
             <tbody>
               {entries.length === 0 ? (
                 <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center',
-                  color: 'rgba(240,244,255,0.2)', fontSize: 12 }}>
+                  color: 'rgba(240,244,255,0.4)', fontSize: 12 }}>
                   Veri yükleniyor...
                 </td></tr>
               ) : entries.map((e: any) => {
@@ -541,7 +541,7 @@ export function LivePage() {
                     onMouseLeave={ev => (ev.currentTarget.style.background='transparent')}>
 
                     <td style={{ padding: '7px 6px', fontSize: 12, fontWeight: 900,
-                      color: e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.25)' }}>
+                      color: e.position === 1 ? '#00D2BE' : 'rgba(240,244,255,0.45)' }}>
                       {e.position}
                     </td>
 
@@ -552,7 +552,7 @@ export function LivePage() {
                     <td style={{ padding: '6px 8px 6px 4px', overflow: 'hidden' }}>
                       <div style={{ fontSize: 12, fontWeight: 900, color: 'white',
                         lineHeight: 1, whiteSpace: 'nowrap' }}>{e.code}</div>
-                      <div style={{ fontSize: 8, color: 'rgba(240,244,255,0.22)', marginTop: 1,
+                      <div style={{ fontSize: 8, color: 'rgba(240,244,255,0.4)', marginTop: 1,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {e.team_name}
                       </div>
@@ -564,7 +564,7 @@ export function LivePage() {
                     </td>
 
                     <td style={{ padding: '7px 6px', textAlign: 'right', fontSize: 10, fontWeight: 600,
-                      color: e.position === 1 ? 'rgba(240,244,255,0.28)' : 'rgba(240,244,255,0.75)' }}>
+                      color: e.position === 1 ? 'rgba(240,244,255,0.5)' : 'rgba(240,244,255,0.75)' }}>
                       {!hasTime ? '—' : e.position === 1 ? 'LDR' : (e.gap < 60 ? `+${e.gap.toFixed(3)}` : `+${formatLapTime(e.gap)}`)}
                     </td>
                   </tr>
@@ -655,7 +655,7 @@ export function LivePage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[12px] leading-snug" style={{ color: c }}>{m.message}</p>
                         {m.date && (
-                          <p className="text-[9px] mono mt-0.5" style={{ color: 'rgba(240,244,255,0.2)' }}>
+                          <p className="text-[9px] mono mt-0.5" style={{ color: 'rgba(240,244,255,0.4)' }}>
                             {new Date(m.date).toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
                           </p>
                         )}
@@ -721,7 +721,7 @@ export function LivePage() {
                   <div style={{ minWidth: 46, flexShrink: 0 }}>
                     <p className="text-[12px] font-black mono text-white leading-none">{c.code}</p>
                     {c.date && (
-                      <p className="text-[9px] mono mt-0.5" style={{ color: 'rgba(240,244,255,0.25)' }}>
+                      <p className="text-[9px] mono mt-0.5" style={{ color: 'rgba(240,244,255,0.45)' }}>
                         {new Date(c.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </p>
                     )}

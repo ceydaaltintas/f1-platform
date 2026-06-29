@@ -102,7 +102,7 @@ function TimeUnit({ value, label, color }: { value: string|number; label: string
   return (
     <div className="text-center px-1">
       <p className="text-[38px] font-black mono leading-none" style={{ color }}>{value}</p>
-      <p className="text-[8px] mono mt-1 tracking-widest" style={{ color:'rgba(240,244,255,0.25)' }}>
+      <p className="text-[8px] mono mt-1 tracking-widest" style={{ color:'rgba(240,244,255,0.45)' }}>
         {label}
       </p>
     </div>
