@@ -73,7 +73,7 @@ const REGS_2026 = [
     points: [
       'Ön ve arka kanat pozisyonları otomatik ayarlanabilir',
       'Düz yolda düşük sürükleme (Z-modu) — virajda yüksek yere basma',
-      'DRS yerini "manual override" alıyor',
+      'DRS kaldırıldı — yerini manual override (overtake modu) aldı',
       'Araçlar arası takip mesafesi azalacak',
     ],
   },
@@ -206,7 +206,7 @@ export function RulesPage() {
                       </div>
                     ))}
                     <p className="text-[10px] mt-2" style={{ color: 'var(--t3)' }}>
-                      + En hızlı tur yapan pilota ilk 10'da bitirmesi halinde <span className="text-[#a855f7] font-bold">+1 puan</span>
+                      2026'dan itibaren en hızlı tur bonusu kaldırılmıştır
                     </p>
                   </div>
                 </div>
@@ -338,45 +338,56 @@ export function RulesPage() {
               </div>
             </section>
 
-            {/* DRS */}
+            {/* Aktif Aerodinamik — Overtake Modu */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">💨 DRS (Sürükleme Azaltma Sistemi)</h2>
+                <h2 className="text-[15px] font-bold text-white">💨 Aktif Aerodinamik & Overtake Modu</h2>
               </div>
               <div className="p-5">
+                <div className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(225,6,0,0.06)', border: '1px solid rgba(225,6,0,0.15)' }}>
+                  <p className="text-[11px]" style={{ color: '#E10600' }}>
+                    2026'da DRS kaldırıldı. Yerine aktif aerodinamik sistemi geldi.
+                  </p>
+                </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                      <p className="text-[12px] font-bold text-white">Nasıl çalışır?</p>
+                      <p className="text-[12px] font-bold text-white">Z-Modu (Düzlük Modu)</p>
                       <p className="text-[11px] mt-1" style={{ color: 'var(--t2)' }}>
-                        Arka kanat açılarak hava direnci %10-15 azalır. Düz yolda ~15 km/s hız avantajı sağlar.
+                        Düz yollarda ön ve arka kanatlar otomatik olarak düzleşir, hava direnci azalır.
+                        Tüm araçlarda otomatik aktif olur — özel koşul gerekmez.
                       </p>
                     </div>
                     <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                      <p className="text-[12px] font-bold text-white">Ne zaman kullanılır?</p>
+                      <p className="text-[12px] font-bold text-white">Manual Override (Overtake)</p>
                       <p className="text-[11px] mt-1" style={{ color: 'var(--t2)' }}>
-                        Önündeki araca DRS algılama noktasında 1 saniyeden az farkla yaklaşan pilot, belirlenen
-                        DRS bölgelerinde arka kanadı açabilir. İlk 2 turda ve sarı bayrak altında kullanılamaz.
+                        Pilot direksiyondaki butona basarak kanatları düzlük moduna zorlar.
+                        Tur başına sınırlı kullanım hakkı — savunma ve atak için stratejik kullanılır.
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center justify-center">
-                    <svg viewBox="0 0 200 120" width="200" height="120">
-                      {/* DRS kapalı */}
-                      <g transform="translate(20,20)">
-                        <rect x="0" y="30" width="60" height="4" rx="2" fill="#888" />
-                        <rect x="10" y="20" width="40" height="8" rx="2" fill="#888" />
-                        <text x="30" y="60" textAnchor="middle" fontSize="8" fill="var(--t3)" fontFamily="IBM Plex Mono">KAPALI</text>
+                    <svg viewBox="0 0 220 130" width="220" height="130">
+                      {/* Viraj modu */}
+                      <g transform="translate(10,15)">
+                        <rect x="5" y="25" width="70" height="4" rx="2" fill="#888" />
+                        <rect x="15" y="8" width="50" height="6" rx="2" fill="#888" transform="rotate(-15 40 11)" />
+                        <rect x="15" y="40" width="50" height="6" rx="2" fill="#888" transform="rotate(15 40 43)" />
+                        <text x="40" y="70" textAnchor="middle" fontSize="8" fill="var(--t3)" fontFamily="IBM Plex Mono">VİRAJ</text>
+                        <text x="40" y="80" textAnchor="middle" fontSize="7" fill="var(--t3)" fontFamily="IBM Plex Mono">Yüksek basma</text>
                       </g>
-                      {/* Ok */}
-                      <text x="100" y="45" textAnchor="middle" fontSize="16" fill="#E10600">→</text>
-                      {/* DRS açık */}
-                      <g transform="translate(120,20)">
-                        <rect x="0" y="30" width="60" height="4" rx="2" fill="#00D2BE" />
-                        <rect x="10" y="10" width="40" height="4" rx="2" fill="#00D2BE">
-                          <animate attributeName="y" values="20;10;10" dur="1s" fill="freeze" />
+                      <text x="110" y="40" textAnchor="middle" fontSize="16" fill="#00D2BE">→</text>
+                      {/* Düzlük modu */}
+                      <g transform="translate(130,15)">
+                        <rect x="5" y="25" width="70" height="4" rx="2" fill="#00D2BE" />
+                        <rect x="15" y="20" width="50" height="4" rx="2" fill="#00D2BE">
+                          <animate attributeName="y" values="12;20;20" dur="0.8s" fill="freeze" />
                         </rect>
-                        <text x="30" y="60" textAnchor="middle" fontSize="8" fill="#00D2BE" fontWeight="bold" fontFamily="IBM Plex Mono">AÇIK</text>
+                        <rect x="15" y="32" width="50" height="4" rx="2" fill="#00D2BE">
+                          <animate attributeName="y" values="40;32;32" dur="0.8s" fill="freeze" />
+                        </rect>
+                        <text x="40" y="70" textAnchor="middle" fontSize="8" fill="#00D2BE" fontWeight="bold" fontFamily="IBM Plex Mono">DÜZLÜK</text>
+                        <text x="40" y="80" textAnchor="middle" fontSize="7" fill="#00D2BE" fontFamily="IBM Plex Mono">Düşük direnç</text>
                       </g>
                     </svg>
                   </div>
