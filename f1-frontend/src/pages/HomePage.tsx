@@ -102,7 +102,7 @@ function TimeUnit({ value, label, color }: { value: string|number; label: string
   return (
     <div className="text-center px-1">
       <p className="text-[38px] font-black mono leading-none" style={{ color }}>{value}</p>
-      <p className="text-[8px] mono mt-1 tracking-widest" style={{ color:'rgba(240,244,255,0.45)' }}>
+      <p className="text-[8px] mono mt-1 tracking-widest" style={{ color:'rgba(240,244,255,0.65)' }}>
         {label}
       </p>
     </div>
@@ -413,7 +413,7 @@ export function HomePage() {
                       {/* Saniye */}
                       <TimeUnit value={String(countdown.s).padStart(2,'0')}
                         label="SAN"
-                        color={countdown.d===0 && countdown.h===0 ? '#E10600' : 'rgba(240,244,255,0.5)'} />
+                        color={countdown.d===0 && countdown.h===0 ? '#E10600' : 'rgba(240,244,255,0.7)'} />
                     </div>
                   ) : (
                     <p className="text-[18px] font-black" style={{ color:'#E10600' }}>
