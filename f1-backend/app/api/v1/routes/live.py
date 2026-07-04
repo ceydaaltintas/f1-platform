@@ -153,9 +153,11 @@ QUALI_SEGMENT_CUTOFF: dict[int, int | None] = {0: None, 1: 16, 2: 10}
 
 SESSION_DURATION_MINUTES: dict[str, int] = {
     "practice1": 60, "practice2": 60, "practice3": 60,
-    "sprint_qualifying": 44,
+    "sprint_qualifying": 35,
 }
 QUALI_SEGMENT_DURATION: dict[str, int] = {"Q1": 18, "Q2": 15, "Q3": 12}
+# Sprint Shootout süreleri (SQ1/SQ2/SQ3 olarak adlandırılsa da OpenF1 Q1/Q2/Q3 döner)
+SPRINT_QUALI_SEGMENT_DURATION: dict[str, int] = {"Q1": 12, "Q2": 10, "Q3": 8}
 
 
 def _build_session_clock(session, active_segment: str | None = None,
@@ -172,7 +174,8 @@ def _build_session_clock(session, active_segment: str | None = None,
     elapsed_s = max(0, (now - start).total_seconds())
 
     if session.type in ("qualifying", "sprint_qualifying") and active_segment:
-        total_min = QUALI_SEGMENT_DURATION.get(active_segment)
+        seg_dur_map = SPRINT_QUALI_SEGMENT_DURATION if session.type == "sprint_qualifying" else QUALI_SEGMENT_DURATION
+        total_min = seg_dur_map.get(active_segment)
     else:
         total_min = SESSION_DURATION_MINUTES.get(session.type)
 
