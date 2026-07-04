@@ -63,6 +63,19 @@ CIRCUIT_TOTAL_LAPS: dict[str, int] = {
     "Yas Marina Circuit": 58,
 }
 
+# Sprint yarışı tur sayıları (~100 km mesafe)
+CIRCUIT_SPRINT_LAPS: dict[str, int] = {
+    "Shanghai International Circuit": 19,
+    "Miami International Autodrome": 19,
+    "Circuit de Spa-Francorchamps": 15,
+    "Silverstone Circuit": 17,
+    "Circuit of the Americas": 17,
+    "Autódromo José Carlos Pace": 24,
+    "Losail International Circuit": 19,
+    "Red Bull Ring": 23,
+    "Albert Park Grand Prix Circuit": 19,
+}
+
 
 # Bir pilotun aralık verisi, en güncel veriden 90s'den fazla eskiyse DNF/emekli kabul edilir
 RETIRED_THRESHOLD_SECONDS = 90
@@ -256,7 +269,8 @@ async def live_status(db: AsyncSession = Depends(get_db)):
             if s and s.type in ("race", "sprint"):
                 from sqlalchemy.orm import selectinload
                 circuit_name = s.round.circuit_name if s.round else None
-                total = CIRCUIT_TOTAL_LAPS.get(circuit_name)
+                _laps_map = CIRCUIT_SPRINT_LAPS if s.type == "sprint" else CIRCUIT_TOTAL_LAPS
+                total = _laps_map.get(circuit_name) or CIRCUIT_TOTAL_LAPS.get(circuit_name)
                 if total:
                     all_laps = await cache_get(cache_key("session_all_laps", active["session_key"]))
                     if all_laps is None:
@@ -891,7 +905,8 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
                 pass
     if is_race:
         circuit_name = session.round.circuit_name if session.round else None
-        total_laps = CIRCUIT_TOTAL_LAPS.get(circuit_name)
+        _laps_map = CIRCUIT_SPRINT_LAPS if session.type == "sprint" else CIRCUIT_TOTAL_LAPS
+        total_laps = _laps_map.get(circuit_name) or CIRCUIT_TOTAL_LAPS.get(circuit_name)
         if total_laps is None and stints:
             max_lap_end = max((s.get("lap_end") or 0) for s in stints)
             if max_lap_end > 0:
@@ -1539,7 +1554,8 @@ async def live_simulate(
     # Mevcut tur (lider üzerinden) + kalan tur sayısı — yakalama tahminleri
     # bu kalan tur sayısıyla sınırlandırılır (örn. 28 tur kaldıysa 94 tur
     # gerektiren bir yakalama "yakalanamaz" sayılır).
-    total_laps = CIRCUIT_TOTAL_LAPS.get(circuit_name)
+    _laps_map = CIRCUIT_SPRINT_LAPS if session.type == "sprint" else CIRCUIT_TOTAL_LAPS
+    total_laps = _laps_map.get(circuit_name) or CIRCUIT_TOTAL_LAPS.get(circuit_name)
     if total_laps is None and stints:
         max_lap_end = max((s.get("lap_end") or 0) for s in stints)
         if max_lap_end > 0:
