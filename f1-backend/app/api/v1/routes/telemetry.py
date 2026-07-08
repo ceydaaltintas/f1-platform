@@ -382,7 +382,7 @@ async def get_stints(
     """
     Lastik stint verilerini döner: hangi lastik, kaç tur kullanıldı.
     """
-    cache_k = cache_key("stints", session_id, driver_code or "all")
+    cache_k = cache_key("stints_v2", session_id, driver_code or "all")
     cached = await cache_get(cache_k)
     if cached:
         return cached
@@ -400,8 +400,15 @@ async def get_stints(
         if driver_number else all_stints
     )
 
-    # Pilot kodlarını ekle
-    num_to_code = await db_cache.get_driver_code_map(db)
+    # Pilot kodlarını o session'ın OpenF1 datasından eşle (sezon filtreli)
+    session_drivers = await db_cache.get_session_drivers(session)
+    num_to_code: dict[int, str] = {
+        d["driver_number"]: (d.get("name_acronym") or "?").upper()
+        for d in session_drivers
+        if d.get("driver_number")
+    }
+    if not num_to_code:
+        num_to_code = await db_cache.get_driver_code_map(db)
     for s in stints:
         s["driver_code"] = num_to_code.get(s.get("driver_number"), "?")
 
