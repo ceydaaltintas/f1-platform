@@ -57,12 +57,15 @@ export function LoginPage() {
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-[#E10600] flex items-center justify-center"
-              style={{ boxShadow:'0 0 20px rgba(225,6,0,0.4)' }}>
-              <span className="text-white font-black mono">F1</span>
-            </div>
-            <span className="text-xl font-black text-white">F1 Platform</span>
+          <Link to="/" className="inline-flex items-center gap-2.5 mb-2">
+            <img src="/favicon.svg" alt="Hotlap" style={{ width: 32, height: 32 }} />
+            <span style={{
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontSize: 22, fontWeight: 600, letterSpacing: '-0.3px', lineHeight: 1,
+            }}>
+              <span style={{ color: '#ffffff' }}>Hot</span>
+              <span style={{ color: '#E10600' }}>lap</span>
+            </span>
           </Link>
           <p className="text-[13px]" style={{ color:'var(--t2)' }}>
             {tab==='login' ? 'Hesabına giriş yap' : 'Yeni hesap oluştur'}
