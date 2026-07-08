@@ -321,7 +321,47 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
     return () => cancelAnimationFrame(animRef.current)
   }, [worldData, draw])
 
-  // Mouse/touch sürükleme
+  // ── Ortak: koordinattan marker hit testi ─────────────────────────────────
+  const hitTest = useCallback((clientX: number, clientY: number) => {
+    const svg  = svgRef.current
+    const rect = svg?.getBoundingClientRect()
+    if (!rect) return null
+    const scaleX = size.w / rect.width
+    const scaleY = size.h / rect.height
+    const cx = (clientX - rect.left) * scaleX
+    const cy = (clientY - rect.top)  * scaleY
+    const HIT = 26
+    let hit: (typeof markerPtsRef.current)[0] | null = null
+    let best = HIT
+    for (const mp of markerPtsRef.current) {
+      const d = Math.hypot(mp.sx - cx, mp.sy - cy)
+      if (d < best) { best = d; hit = mp }
+    }
+    return hit
+  }, [size.w, size.h])
+
+  const handleTap = useCallback((clientX: number, clientY: number) => {
+    const hit = hitTest(clientX, clientY)
+    if (hit) {
+      const alreadyPaused = svgRef.current?.dataset.paused === '1' &&
+        tooltip?.marker.name === hit.marker.name
+      if (alreadyPaused) {
+        if (svgRef.current) svgRef.current.dataset.paused = '0'
+        setPaused(false)
+        setTooltip(null)
+      } else {
+        if (svgRef.current) svgRef.current.dataset.paused = '1'
+        setPaused(true)
+        setTooltip({ marker: hit.marker, x: clientX, y: clientY })
+      }
+    } else {
+      if (svgRef.current) svgRef.current.dataset.paused = '0'
+      setPaused(false)
+      setTooltip(null)
+    }
+  }, [hitTest, tooltip])
+
+  // ── Mouse etkileşimi ──────────────────────────────────────────────────────
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging.current = true
     dragMoved.current  = false
@@ -347,42 +387,42 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
 
   const onSvgClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (dragMoved.current) return
+    handleTap(e.clientX, e.clientY)
+  }, [handleTap])
 
-    const svg  = svgRef.current
-    const rect = svg?.getBoundingClientRect()
-    if (!rect) return
-
-    const scaleX = size.w / rect.width
-    const scaleY = size.h / rect.height
-    const cx = (e.clientX - rect.left) * scaleX
-    const cy = (e.clientY - rect.top)  * scaleY
-    const HIT = 22
-
-    let hit: (typeof markerPtsRef.current)[0] | null = null
-    let best = HIT
-    for (const mp of markerPtsRef.current) {
-      const d = Math.hypot(mp.sx - cx, mp.sy - cy)
-      if (d < best) { best = d; hit = mp }
+  // ── Touch etkileşimi ──────────────────────────────────────────────────────
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    // Çok parmak (pinch) → sürüklemeyi durdur, otomatik dönüş devam etsin
+    if (e.touches.length !== 1) {
+      isDragging.current = false
+      return
     }
+    isDragging.current = true
+    dragMoved.current  = false
+    lastMouse.current  = [e.touches[0].clientX, e.touches[0].clientY]
+  }, [])
 
-    if (hit) {
-      const alreadyPaused = svgRef.current?.dataset.paused === '1' &&
-        tooltip?.marker.name === hit.marker.name
-      if (alreadyPaused) {
-        if (svgRef.current) svgRef.current.dataset.paused = '0'
-        setPaused(false)
-        setTooltip(null)
-      } else {
-        if (svgRef.current) svgRef.current.dataset.paused = '1'
-        setPaused(true)
-        setTooltip({ marker: hit.marker, x: e.clientX, y: e.clientY })
-      }
-    } else {
-      if (svgRef.current) svgRef.current.dataset.paused = '0'
-      setPaused(false)
-      setTooltip(null)
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current || e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - lastMouse.current[0]
+    const dy = e.touches[0].clientY - lastMouse.current[1]
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragMoved.current = true
+    rotationRef.current = [
+      rotationRef.current[0] + dx * 0.4,
+      rotationRef.current[1] - dy * 0.4,
+      0,
+    ]
+    lastMouse.current = [e.touches[0].clientX, e.touches[0].clientY]
+  }, [])
+
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    isDragging.current = false
+    // Kısa dokunuş (drag değil) → marker tıklama
+    if (!dragMoved.current && e.changedTouches.length === 1) {
+      const t = e.changedTouches[0]
+      handleTap(t.clientX, t.clientY)
     }
-  }, [size.w, size.h, tooltip])
+  }, [handleTap])
 
   if (!worldData) return (
     <div ref={containerRef}
@@ -425,11 +465,14 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
       </div>
 
       {/* Globe */}
-      <div style={{ cursor: isDragging.current ? 'grabbing' : 'grab' }}
+      <div style={{ cursor: isDragging.current ? 'grabbing' : 'grab', touchAction: 'none' }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}>
+        onMouseLeave={onMouseUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}>
         <svg ref={svgRef}
           style={{ display:'block', width:'100%', userSelect:'none', cursor: paused ? 'default' : 'grab' }}
           onClick={onSvgClick}
