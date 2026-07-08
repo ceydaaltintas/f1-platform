@@ -148,8 +148,19 @@ export function RulesPage() {
   return (
     <>
       <Helmet>
-        <title>F1 Kuralları & 2026 Regülasyonları — Hotlap</title>
+        <title>F1 Kuralları & 2026 Regülasyonları · Hotlap</title>
         <meta name="description" content="Formula 1 kuralları: puan sistemi, bayraklar, lastik bileşikleri, yarış haftası formatı ve 2026 yeni regülasyonları. Aktif aerodinamik, yeni motor ve daha fazlası." />
+        <link rel="canonical" href="https://hotlap.live/rules" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Hotlap" />
+        <meta property="og:title" content="F1 Kuralları & 2026 Regülasyonları · Hotlap" />
+        <meta property="og:description" content="Formula 1 kuralları: puan sistemi, bayraklar, lastik bileşikleri, yarış haftası formatı ve 2026 yeni regülasyonları." />
+        <meta property="og:url" content="https://hotlap.live/rules" />
+        <meta property="og:image" content="https://hotlap.live/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@hotlapapp" />
+        <meta name="twitter:title" content="F1 Kuralları & 2026 Regülasyonları · Hotlap" />
+        <meta name="twitter:description" content="Formula 1 kuralları: puan sistemi, bayraklar, lastik bileşikleri, yarış haftası formatı ve 2026 yeni regülasyonları." />
       </Helmet>
 
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">

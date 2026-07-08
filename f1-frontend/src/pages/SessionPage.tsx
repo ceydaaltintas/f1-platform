@@ -307,6 +307,14 @@ export function SessionPage() {
     <div className="min-h-screen" style={{ background: 'var(--bg)', overflowX: 'clip' }}>
       <Helmet>
         <title>{`${telA.data ? primaryDriver + ' Telemetri — ' : ''}Oturum #${sid} · Hotlap`}</title>
+        <meta name="description" content={`Formula 1 oturum telemetri analizi — sektör süreleri, lastik stratejisi ve hız karşılaştırması. Hotlap.live`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Hotlap" />
+        <meta property="og:title" content={`${telA.data ? primaryDriver + ' Telemetri — ' : ''}Oturum #${sid} · Hotlap`} />
+        <meta property="og:description" content="Formula 1 oturum telemetri analizi — sektör süreleri, lastik stratejisi ve hız karşılaştırması." />
+        <meta property="og:image" content="https://hotlap.live/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@hotlapapp" />
       </Helmet>
 
       {/* ── Sticky Header ─────────────────────────────────── */}

@@ -172,6 +172,17 @@ export function SeasonPage() {
       <Helmet>
         <title>{`${y} F1 Sezonu — Yarış Takvimi ve Telemetri · Hotlap`}</title>
         <meta name="description" content={`Formula 1 ${y} sezonu yarış takvimi, telemetri analizleri ve canlı yarış takibi. Hotlap.live`} />
+        <link rel="canonical" href={`https://hotlap.live/seasons/${y}`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Hotlap" />
+        <meta property="og:title" content={`${y} F1 Sezonu — Yarış Takvimi ve Telemetri · Hotlap`} />
+        <meta property="og:description" content={`Formula 1 ${y} sezonu yarış takvimi, telemetri analizleri ve canlı yarış takibi.`} />
+        <meta property="og:url" content={`https://hotlap.live/seasons/${y}`} />
+        <meta property="og:image" content="https://hotlap.live/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@hotlapapp" />
+        <meta name="twitter:title" content={`${y} F1 Sezonu — Yarış Takvimi ve Telemetri · Hotlap`} />
+        <meta name="twitter:description" content={`Formula 1 ${y} sezonu yarış takvimi, telemetri analizleri ve canlı yarış takibi.`} />
       </Helmet>
 
       {/* ── Season Header ──────────────────────────── */}

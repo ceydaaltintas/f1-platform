@@ -196,6 +196,17 @@ export function StandingsPage() {
       <Helmet>
         <title>{`${y} F1 Şampiyona Tablosu · Hotlap`}</title>
         <meta name="description" content={`${y} Formula 1 pilot ve takım şampiyona sıralaması. Güncel puan tablosu ve yarış sonuçları.`} />
+        <link rel="canonical" href={`https://hotlap.live/standings/${y}`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Hotlap" />
+        <meta property="og:title" content={`${y} F1 Şampiyona Tablosu · Hotlap`} />
+        <meta property="og:description" content={`${y} Formula 1 pilot ve takım şampiyona sıralaması. Güncel puan tablosu ve yarış sonuçları.`} />
+        <meta property="og:url" content={`https://hotlap.live/standings/${y}`} />
+        <meta property="og:image" content="https://hotlap.live/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@hotlapapp" />
+        <meta name="twitter:title" content={`${y} F1 Şampiyona Tablosu · Hotlap`} />
+        <meta name="twitter:description" content={`${y} Formula 1 pilot ve takım şampiyona sıralaması. Güncel puan tablosu ve yarış sonuçları.`} />
       </Helmet>
       <div className="max-w-4xl mx-auto px-6 py-8">
 

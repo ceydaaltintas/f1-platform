@@ -238,10 +238,18 @@ export function HomePage() {
       <Helmet>
         <title>{title}</title>
         <meta name="description" content={description} />
+        <link rel="canonical" href="https://hotlap.live/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Hotlap" />
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
-        <meta property="og:url" content="https://hotlap.live" />
+        <meta property="og:url" content="https://hotlap.live/" />
+        <meta property="og:image" content="https://hotlap.live/og-image.png" />
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@hotlapapp" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content="https://hotlap.live/og-image.png" />
       </Helmet>
 
       {/* ── Hero: Sol = Küre, Sağ = Metin ──────────────────── */}

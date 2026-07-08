@@ -62,8 +62,19 @@ export function RecapPage() {
   return (
     <>
       <Helmet>
-        <title>{data.race_name} Yarış Özeti — Hotlap</title>
+        <title>{`${data.race_name} ${y} Yarış Özeti · Hotlap`}</title>
         <meta name="description" content={`${data.race_name} ${y} yarış özeti, sonuçlar ve analiz. ${podium[0]?.driver ?? ''} kazandı.`} />
+        <link rel="canonical" href={`https://hotlap.live/recap/${y}/${r}`} />
+        <meta property="og:type" content="article" />
+        <meta property="og:site_name" content="Hotlap" />
+        <meta property="og:title" content={`${data.race_name} ${y} Yarış Özeti · Hotlap`} />
+        <meta property="og:description" content={`${data.race_name} ${y} yarış özeti, sonuçlar ve analiz. ${podium[0]?.driver ?? ''} kazandı.`} />
+        <meta property="og:url" content={`https://hotlap.live/recap/${y}/${r}`} />
+        <meta property="og:image" content="https://hotlap.live/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@hotlapapp" />
+        <meta name="twitter:title" content={`${data.race_name} ${y} Yarış Özeti · Hotlap`} />
+        <meta name="twitter:description" content={`${data.race_name} ${y} yarış özeti, sonuçlar ve analiz. ${podium[0]?.driver ?? ''} kazandı.`} />
       </Helmet>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
