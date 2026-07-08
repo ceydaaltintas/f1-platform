@@ -38,7 +38,13 @@ class Settings(BaseSettings):
     jolpica_base_url: str = "https://api.jolpi.ca/ergast/f1"
 
     # CORS
-    allowed_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    allowed_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://hotlap.live",
+        "https://www.hotlap.live",
+        "https://supportive-encouragement-production-afa2.up.railway.app",
+    ]
 
     @property
     def is_production(self) -> bool:
