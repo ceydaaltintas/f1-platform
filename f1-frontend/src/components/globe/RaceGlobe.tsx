@@ -442,76 +442,75 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
     }
   }, [])
 
-  if (!worldData) return (
-    <div ref={containerRef}
-      className="card flex items-center justify-center"
-      style={{ height: 600 }}>
-      <div className="text-center space-y-3">
-        <div className="flex gap-1.5 justify-center">
-          {[0,1,2].map(i => (
-            <div key={i} className="w-2 h-2 rounded-full bg-[#E10600]"
-              style={{ animation:`bounce-dot 0.8s ${i*0.15}s infinite` }} />
-          ))}
-        </div>
-        <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>Küre yükleniyor...</p>
-      </div>
-      <style>{`@keyframes bounce-dot{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}`}</style>
-    </div>
-  )
-
   return (
     <div ref={containerRef} className="card overflow-hidden" style={{ position:'relative' }}>
-      {/* Başlık + legend */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b"
-        style={{ borderColor:'var(--b1)' }}>
-        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color:'var(--t3)' }}>
-          2026 YARIŞ TAKVİMİ
-        </p>
-        <div className="flex items-center gap-3 text-[10px] mono">
-          {[
-            { color: COLOR.next,      label: 'Sıradaki', size: 10 },
-            { color: COLOR.completed, label: 'Bitti',    size: 8  },
-            { color: COLOR.upcoming,  label: 'Yaklaşıyor', size: 6 },
-          ].map(({ color, label, size }) => (
-            <span key={label} className="flex items-center gap-1">
-              <span className="rounded-full inline-block shrink-0"
-                style={{ width: size, height: size, background: color }} />
-              <span style={{ color: 'var(--t2)' }}>{label}</span>
-            </span>
-          ))}
+
+      {/* Yükleniyor */}
+      {!worldData && (
+        <div className="flex items-center justify-center" style={{ height: 600 }}>
+          <div className="text-center space-y-3">
+            <div className="flex gap-1.5 justify-center">
+              {[0,1,2].map(i => (
+                <div key={i} className="w-2 h-2 rounded-full bg-[#E10600]"
+                  style={{ animation:`bounce-dot 0.8s ${i*0.15}s infinite` }} />
+              ))}
+            </div>
+            <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>Küre yükleniyor...</p>
+          </div>
         </div>
-      </div>
+      )}
+      {worldData && <>
+        {/* Başlık + legend */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b"
+          style={{ borderColor:'var(--b1)' }}>
+          <p className="text-[11px] mono font-semibold tracking-widest" style={{ color:'var(--t3)' }}>
+            2026 YARIŞ TAKVİMİ
+          </p>
+          <div className="flex items-center gap-3 text-[10px] mono">
+            {[
+              { color: COLOR.next,      label: 'Sıradaki', size: 10 },
+              { color: COLOR.completed, label: 'Bitti',    size: 8  },
+              { color: COLOR.upcoming,  label: 'Yaklaşıyor', size: 6 },
+            ].map(({ color, label, size }) => (
+              <span key={label} className="flex items-center gap-1">
+                <span className="rounded-full inline-block shrink-0"
+                  style={{ width: size, height: size, background: color }} />
+                <span style={{ color: 'var(--t2)' }}>{label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
 
-      {/* Globe */}
-      <div style={{ cursor: isDragging.current ? 'grabbing' : 'grab', touchAction: 'none' }}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}>
-        <svg ref={svgRef}
-          style={{ display:'block', width:'100%', userSelect:'none', cursor: paused ? 'default' : 'grab' }}
-          onClick={onSvgClick}
-          onContextMenu={e => e.preventDefault()}
-        />
-      </div>
+        {/* Globe */}
+        <div style={{ cursor: isDragging.current ? 'grabbing' : 'grab', touchAction: 'none' }}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseUp}>
+          <svg ref={svgRef}
+            style={{ display:'block', width:'100%', userSelect:'none', cursor: paused ? 'default' : 'grab' }}
+            onClick={onSvgClick}
+            onContextMenu={e => e.preventDefault()}
+          />
+        </div>
 
-      <div className="flex items-center justify-between px-4 py-2 border-t"
-        style={{ borderColor:'var(--b1)' }}>
-        <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-          {paused
-            ? '⏸ Durduruldu — tekrar tıkla veya sürükle'
-            : '✦ Tıkla = durdur · Sürükle = döndür · İşarete gel = detay'}
-        </p>
-        {paused && (
-          <span className="text-[10px] mono px-2 py-0.5 rounded"
-            style={{ background:'rgba(255,215,0,0.1)', color:'#FFD700', border:'1px solid rgba(255,215,0,0.2)' }}>
-            ⏸ Duraklatıldı
-          </span>
-        )}
-      </div>
+        <div className="flex items-center justify-between px-4 py-2 border-t"
+          style={{ borderColor:'var(--b1)' }}>
+          <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
+            {paused
+              ? '⏸ Durduruldu — tekrar tıkla veya sürükle'
+              : '✦ Tıkla = durdur · Sürükle = döndür · İşarete gel = detay'}
+          </p>
+          {paused && (
+            <span className="text-[10px] mono px-2 py-0.5 rounded"
+              style={{ background:'rgba(255,215,0,0.1)', color:'#FFD700', border:'1px solid rgba(255,215,0,0.2)' }}>
+              ⏸ Duraklatıldı
+            </span>
+          )}
+        </div>
 
-      {/* Tooltip — document.body'e portal ile render: overflow/backdrop-filter kesmiyor */}
-      {tooltip && createPortal(<GlobeTooltip {...tooltip} />, document.body)}
+        {tooltip && createPortal(<GlobeTooltip {...tooltip} />, document.body)}
+      </>}
 
       <style>{`
         @keyframes bounce-dot {
