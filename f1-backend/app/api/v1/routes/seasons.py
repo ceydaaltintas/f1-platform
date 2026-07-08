@@ -175,10 +175,30 @@ async def list_rounds(
 @router.get("/seasons/{year}/next", response_model=RoundOut)
 async def get_next_round(year: int, db: AsyncSession = Depends(get_db)):
     """Bir sonraki upcoming round'u döner."""
+    from app.services.sync import _round_status
+
     season_result = await db.execute(select(Season).where(Season.year == year))
     season = season_result.scalar_one_or_none()
     if season is None:
         raise HTTPException(404, f"{year} sezonu bulunamadı")
+
+    today = date.today()
+
+    # Önce "upcoming" işaretli ama tarihi geçmiş round'ları düzelt (Celery beat
+    # geciktiyse veya çalışmadıysa DB stale kalabilir)
+    stale_result = await db.execute(
+        select(Round).where(
+            Round.season_id == season.id,
+            Round.round_status == "upcoming",
+            Round.race_date < today,
+        )
+    )
+    stale_rounds = stale_result.scalars().all()
+    if stale_rounds:
+        for rnd in stale_rounds:
+            rnd.round_status = "completed"
+        await db.commit()
+        logger.info("%d stale upcoming round 'completed' olarak güncellendi", len(stale_rounds))
 
     result = await db.execute(
         select(Round)
@@ -193,12 +213,10 @@ async def get_next_round(year: int, db: AsyncSession = Depends(get_db)):
 
     # Session'lar boşsa otomatik sync (en fazla 5 dk'da bir)
     if not rnd.sessions:
-        from app.core.redis_client import cache_get, cache_set
         lock = await cache_get("next_round_sync_lock")
         if not lock:
             await cache_set("next_round_sync_lock", True, ttl_seconds=300)
             try:
-                from app.services.sync import sync_sessions_for_round
                 await sync_sessions_for_round(rnd, year, db)
                 await db.commit()
                 await db.refresh(rnd, ["sessions"])
