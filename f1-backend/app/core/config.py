@@ -37,14 +37,16 @@ class Settings(BaseSettings):
     openf1_password: str = ""
     jolpica_base_url: str = "https://api.jolpi.ca/ergast/f1"
 
-    # CORS
-    allowed_origins: list[str] = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://hotlap.live",
-        "https://www.hotlap.live",
-        "https://supportive-encouragement-production-afa2.up.railway.app",
-    ]
+    # CORS — Railway'de ALLOWED_ORIGINS=url1,url2 şeklinde virgülle ayır
+    allowed_origins_raw: str = (
+        "http://localhost:5173,http://localhost:3000,"
+        "https://hotlap.live,https://www.hotlap.live,"
+        "https://supportive-encouragement-production-afa2.up.railway.app"
+    )
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins_raw.split(",") if o.strip()]
 
     @property
     def is_production(self) -> bool:
