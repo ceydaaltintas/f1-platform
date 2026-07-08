@@ -221,20 +221,31 @@ async def race_recap(year: int, round_number: int):
     if len(podium) >= 3:
         try:
             from app.services import claude_ai
+            def _driver_label(d: dict) -> str:
+                name = d.get("driver", "").strip()
+                code = d.get("code", "")
+                return name if name else code
+
+            dnf_names = ", ".join(_driver_label(d) for d in dnfs)
+            gainer_str = (
+                f"{_driver_label(gainers[0])} (+{gainers[0]['change']} pozisyon)"
+                if gainers else ""
+            )
             prompt = (
                 f"{race_name} ({circuit}) yarış özeti yaz. "
                 f"Kazanan: {podium[0]['driver']} ({podium[0]['team']}), "
                 f"2.: {podium[1]['driver']}, 3.: {podium[2]['driver']}. "
-                f"{'DNF: ' + ', '.join(d['code'] for d in dnfs) + '. ' if dnfs else ''}"
-                f"{'En çok pozisyon kazanan: ' + gainers[0]['code'] + ' (+' + str(gainers[0]['change']) + '). ' if gainers else ''}"
+                f"{'DNF: ' + dnf_names + '. ' if dnfs else ''}"
+                f"{'En çok pozisyon kazanan: ' + gainer_str + '. ' if gainer_str else ''}"
                 f"4-5 cümlelik kısa Türkçe yarış özeti yaz. Yarışın hikayesini, kritik anları ve strateji kararlarını anlat."
             )
             system = (
                 "Sen deneyimli bir F1 gazetecisisin. Yarış sonrası kısa, akıcı ve bilgilendirici özet yazarsın. "
                 "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi. "
-                "Önemli: F1'de 'retired' terimi 'yarıştan çekildi' demektir, 'emekliye ayrıldı' değil. DNF = yarışı tamamlayamadı."
+                "Önemli: F1'de 'retired' terimi 'yarıştan çekildi' demektir, 'emekliye ayrıldı' değil. DNF = yarışı tamamlayamadı. "
+                "Pilot kodlarını (COL, VER, NOR gibi) asla doğrudan kullanma — her zaman tam ismi yaz."
             )
-            recap_ck = cache_key("race_recap_ai_v3", year, round_number)
+            recap_ck = cache_key("race_recap_ai_v4", year, round_number)
             recap_text = await cache_get(recap_ck)
             if not recap_text:
                 if claude_ai._groq_ok():
