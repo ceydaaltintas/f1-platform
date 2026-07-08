@@ -340,11 +340,14 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
     return hit
   }, [size.w, size.h])
 
+  const tooltipRef = useRef<TooltipState | null>(null)
+  tooltipRef.current = tooltip
+
   const handleTap = useCallback((clientX: number, clientY: number) => {
     const hit = hitTest(clientX, clientY)
     if (hit) {
       const alreadyPaused = svgRef.current?.dataset.paused === '1' &&
-        tooltip?.marker.name === hit.marker.name
+        tooltipRef.current?.marker.name === hit.marker.name
       if (alreadyPaused) {
         if (svgRef.current) svgRef.current.dataset.paused = '0'
         setPaused(false)
@@ -359,7 +362,7 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
       setPaused(false)
       setTooltip(null)
     }
-  }, [hitTest, tooltip])
+  }, [hitTest])
 
   // ── Mouse etkileşimi ──────────────────────────────────────────────────────
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -385,44 +388,59 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
     isDragging.current = false
   }, [])
 
+  const handleTapRef = useRef(handleTap)
+  handleTapRef.current = handleTap
+
   const onSvgClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (dragMoved.current) return
-    handleTap(e.clientX, e.clientY)
-  }, [handleTap])
+    handleTapRef.current(e.clientX, e.clientY)
+  }, [])
 
-  // ── Touch etkileşimi ──────────────────────────────────────────────────────
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    // Çok parmak (pinch) → sürüklemeyi durdur, otomatik dönüş devam etsin
-    if (e.touches.length !== 1) {
+  // ── Touch etkileşimi — containerRef üzerinde (her zaman var), passive:false
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        isDragging.current = false
+        return
+      }
+      e.preventDefault()
+      isDragging.current = true
+      dragMoved.current  = false
+      lastMouse.current  = [e.touches[0].clientX, e.touches[0].clientY]
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDragging.current || e.touches.length !== 1) return
+      e.preventDefault()
+      const dx = e.touches[0].clientX - lastMouse.current[0]
+      const dy = e.touches[0].clientY - lastMouse.current[1]
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragMoved.current = true
+      rotationRef.current[0] += dx * 0.4
+      rotationRef.current[1] -= dy * 0.4
+      lastMouse.current = [e.touches[0].clientX, e.touches[0].clientY]
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
       isDragging.current = false
-      return
+      if (!dragMoved.current && e.changedTouches.length === 1) {
+        const t = e.changedTouches[0]
+        handleTapRef.current(t.clientX, t.clientY)
+      }
     }
-    isDragging.current = true
-    dragMoved.current  = false
-    lastMouse.current  = [e.touches[0].clientX, e.touches[0].clientY]
-  }, [])
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current || e.touches.length !== 1) return
-    const dx = e.touches[0].clientX - lastMouse.current[0]
-    const dy = e.touches[0].clientY - lastMouse.current[1]
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragMoved.current = true
-    rotationRef.current = [
-      rotationRef.current[0] + dx * 0.4,
-      rotationRef.current[1] - dy * 0.4,
-      0,
-    ]
-    lastMouse.current = [e.touches[0].clientX, e.touches[0].clientY]
-  }, [])
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    el.addEventListener('touchend',   onTouchEnd,   { passive: false })
 
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    isDragging.current = false
-    // Kısa dokunuş (drag değil) → marker tıklama
-    if (!dragMoved.current && e.changedTouches.length === 1) {
-      const t = e.changedTouches[0]
-      handleTap(t.clientX, t.clientY)
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove',  onTouchMove)
+      el.removeEventListener('touchend',   onTouchEnd)
     }
-  }, [handleTap])
+  }, [])
 
   if (!worldData) return (
     <div ref={containerRef}
@@ -469,10 +487,7 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}>
+        onMouseLeave={onMouseUp}>
         <svg ref={svgRef}
           style={{ display:'block', width:'100%', userSelect:'none', cursor: paused ? 'default' : 'grab' }}
           onClick={onSvgClick}
