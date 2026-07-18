@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.redis_client import cache_delete_pattern, cache_get, cache_key, cache_set
-from app.models.f1 import Driver, Round, Season, Team
+from app.models.f1 import Driver, F1Session, Round, Season, Team
 from app.schemas.f1 import DriverOut, RoundOut, SeasonOut, TeamOut
 from app.services.sync import _determine_current_season, sync_full_season, sync_sessions_for_round
 
@@ -167,6 +167,26 @@ async def list_rounds(
 
     result = await db.execute(query)
     rounds = result.scalars().all()
+
+    # Geçmiş tarihli "upcoming" session'ları otomatik "finished" yap
+    now = datetime.now(timezone.utc)
+    stale_sessions_result = await db.execute(
+        select(F1Session).where(
+            F1Session.status == "upcoming",
+            F1Session.session_date < now,
+            F1Session.round_id.in_([r.id for r in rounds]),
+        )
+    )
+    stale_sessions = stale_sessions_result.scalars().all()
+    if stale_sessions:
+        for s in stale_sessions:
+            s.status = "finished"
+        await db.commit()
+        for r in rounds:
+            await db.refresh(r, ["sessions"])
+        logger.info("%d stale session 'finished' olarak güncellendi", len(stale_sessions))
+        await cache_delete_pattern(f"rounds:{year}:*")
+
     data = [RoundOut.model_validate(r).model_dump(mode="json") for r in rounds]
     await cache_set(cache_k, data, ttl_seconds=_season_cache_ttl(year))
     return data
