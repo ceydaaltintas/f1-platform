@@ -713,7 +713,8 @@
   "fantasy": {
     "label": "FANTASY PICK",
     "this_weekend": "FANTASY PICK FOR THIS WEEKEND",
-    "pts_per_race": "pts/race"
+    "pts_per_race": "pts/race",
+    "avg_abbr": "avg."
   },
   "live_sim": {
     "title": "Live Simulation",

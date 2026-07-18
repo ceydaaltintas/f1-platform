@@ -357,9 +357,10 @@ async def fantasy_picks(
     year: int,
     round: int = Query(..., description="Bu haftanın round numarası"),
     mode: str = Query("beginner", pattern="^(beginner|expert)$"),
+    language: str = Query("tr", pattern="^(tr|en)$"),
 ):
     """Fantasy F1 haftasonu tahminleri — son 3 yarışın formuna göre."""
-    cache_k = cache_key("fantasy_picks_full_v3", year, round, mode)
+    cache_k = cache_key("fantasy_picks_full_v3", year, round, mode, language)
     cached = await cache_get(cache_k)
     if cached:
         return cached
@@ -372,27 +373,48 @@ async def fantasy_picks(
         # Top 3 için AI gerekçesi
         top3 = picks[:3]
         top3_codes = [p["code"] for p in top3]
-        system = (
-            "F1 Fantasy koçusun. Son yarışların formuna göre kısa, net öneriler ver. "
-            + ("Sade Türkçe, teknik terim yok." if mode == "beginner"
-               else "Teknik analiz, pace/degradation/qualifying performance dahil et.")
-            + " Düz metin yaz, tek paragraf — markdown kullanma (yıldız, başlık, "
-              "madde işareti veya numaralı liste kullanma). "
-            + f"Bu paragrafta SADECE şu üç pilot kodundan bahsedebilirsin: "
-              f"{top3_codes[0]}, {top3_codes[1]}, {top3_codes[2]}. "
-              f"Bunlar dışında BAŞKA HİÇBİR pilot ismi veya kodu YAZMA — "
-              f"sadece bu üçü hakkında yorum yap. Pilotlardan SADECE 3 harfli "
-              f"kodlarıyla bahset (örn. {top3_codes[0]}), pilotların gerçek "
-              f"adını ASLA yazma — kod-isim eşleşmesini hatalı bilebilirsin ve "
-              f"yanlış isim yazman kullanıcıyı yanıltır."
-        )
-        prompt = "Bu hafta için top 3 öneri (SADECE bu pilot kodlarından bahset, isim yazma):\n" + "\n".join(
-            f"{i+1}. {p['code']}: form={p['form_score']}, ort puan={p['avg_points']}, ort pozisyon={p['avg_position']}"
-            for i, p in enumerate(top3)
-        ) + (
-            f"\nBu {len(top3)} pilot için tek cümle gerekçe yaz, hepsini akıcı bir paragrafta birleştir. "
-            f"Pilot kodları olarak SADECE {', '.join(top3_codes)} kullan, başka isim/kod yazma."
-        )
+        en = language == "en"
+        if en:
+            system = (
+                "You are an F1 Fantasy coach. Give short, clear recommendations based on recent race form. "
+                + ("Plain English, no technical jargon." if mode == "beginner"
+                   else "Technical analysis including pace, tyre degradation, and qualifying performance.")
+                + " Write plain text, single paragraph — no markdown (no asterisks, headings, bullet points or numbered lists). "
+                + f"In this paragraph you may ONLY mention these three driver codes: "
+                  f"{top3_codes[0]}, {top3_codes[1]}, {top3_codes[2]}. "
+                  f"Do NOT write any other driver name or code — comment only on these three. "
+                  f"Refer to drivers ONLY by their 3-letter code (e.g. {top3_codes[0]}), "
+                  f"NEVER write their real name — you may get the code-name mapping wrong and mislead the user."
+            )
+            prompt = f"Top 3 picks for this weekend (mention ONLY these driver codes, no names):\n" + "\n".join(
+                f"{i+1}. {p['code']}: form={p['form_score']}, avg_points={p['avg_points']}, avg_position={p['avg_position']}"
+                for i, p in enumerate(top3)
+            ) + (
+                f"\nWrite a single-sentence reason for each of these {len(top3)} drivers, combined into one flowing paragraph. "
+                f"Use ONLY {', '.join(top3_codes)} as driver codes, no other names or codes."
+            )
+        else:
+            system = (
+                "F1 Fantasy koçusun. Son yarışların formuna göre kısa, net öneriler ver. "
+                + ("Sade Türkçe, teknik terim yok." if mode == "beginner"
+                   else "Teknik analiz, pace/degradation/qualifying performance dahil et.")
+                + " Düz metin yaz, tek paragraf — markdown kullanma (yıldız, başlık, "
+                  "madde işareti veya numaralı liste kullanma). "
+                + f"Bu paragrafta SADECE şu üç pilot kodundan bahsedebilirsin: "
+                  f"{top3_codes[0]}, {top3_codes[1]}, {top3_codes[2]}. "
+                  f"Bunlar dışında BAŞKA HİÇBİR pilot ismi veya kodu YAZMA — "
+                  f"sadece bu üçü hakkında yorum yap. Pilotlardan SADECE 3 harfli "
+                  f"kodlarıyla bahset (örn. {top3_codes[0]}), pilotların gerçek "
+                  f"adını ASLA yazma — kod-isim eşleşmesini hatalı bilebilirsin ve "
+                  f"yanlış isim yazman kullanıcıyı yanıltır."
+            )
+            prompt = "Bu hafta için top 3 öneri (SADECE bu pilot kodlarından bahset, isim yazma):\n" + "\n".join(
+                f"{i+1}. {p['code']}: form={p['form_score']}, ort puan={p['avg_points']}, ort pozisyon={p['avg_position']}"
+                for i, p in enumerate(top3)
+            ) + (
+                f"\nBu {len(top3)} pilot için tek cümle gerekçe yaz, hepsini akıcı bir paragrafta birleştir. "
+                f"Pilot kodları olarak SADECE {', '.join(top3_codes)} kullan, başka isim/kod yazma."
+            )
 
         ai_note = ""
         if claude_ai._groq_ok():

@@ -713,7 +713,8 @@
   "fantasy": {
     "label": "FANTASY TAHMİN",
     "this_weekend": "BU HAFTASONU İÇİN FANTASY ÖNERİSİ",
-    "pts_per_race": "pt/yarış"
+    "pts_per_race": "pt/yarış",
+    "avg_abbr": "ort."
   },
   "live_sim": {
     "title": "Canlı Simülasyon",

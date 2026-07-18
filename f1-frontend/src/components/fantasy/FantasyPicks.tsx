@@ -11,14 +11,15 @@ interface Props {
 const MEDALS = ['🥇', '🥈', '🥉']
 
 export function FantasyPicks({ year, roundNumber }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
   const { insightMode } = useUIStore()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['fantasy', year, roundNumber, insightMode],
+    queryKey: ['fantasy', year, roundNumber, insightMode, lang],
     queryFn: () =>
       client.get(`/seasons/${year}/fantasy/picks`, {
-        params: { round: roundNumber, mode: insightMode }
+        params: { round: roundNumber, mode: insightMode, language: lang }
       }).then(r => r.data),
     staleTime: 60 * 60 * 1000,
   })
@@ -59,7 +60,7 @@ export function FantasyPicks({ year, roundNumber }: Props) {
             </div>
             <div className="text-right">
               <p className="text-[11px] mono" style={{ color: 'var(--t2)' }}>{p.avg_points} {t('fantasy.pts_per_race')}</p>
-              <p className="text-[9px] mono" style={{ color: 'var(--t3)' }}>P{p.avg_position.toFixed(1)} ort.</p>
+              <p className="text-[9px] mono" style={{ color: 'var(--t3)' }}>P{p.avg_position.toFixed(1)} {t('fantasy.avg_abbr')}</p>
             </div>
           </div>
         ))}
