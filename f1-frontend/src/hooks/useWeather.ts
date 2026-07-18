@@ -51,18 +51,19 @@ export function weatherEmoji(code: number): string {
   return '🌡'
 }
 
-export function weatherDesc(code: number): string {
-  if (code === 0)            return 'Açık'
-  if (code <= 2)             return 'Az bulutlu'
-  if (code <= 3)             return 'Bulutlu'
-  if (code <= 49)            return 'Sisli'
-  if (code <= 55)            return 'Çisenti'
-  if (code <= 65)            return 'Yağmurlu'
-  if (code <= 67)            return 'Dondurucu yağmur'
-  if (code <= 77)            return 'Karlı'
-  if (code <= 82)            return 'Sağanak'
-  if (code <= 99)            return 'Fırtınalı'
-  return 'Bilinmeyen'
+export function weatherDesc(code: number, lang = 'tr'): string {
+  const en = lang === 'en'
+  if (code === 0)   return en ? 'Clear'           : 'Açık'
+  if (code <= 2)    return en ? 'Partly cloudy'   : 'Az bulutlu'
+  if (code <= 3)    return en ? 'Cloudy'           : 'Bulutlu'
+  if (code <= 49)   return en ? 'Foggy'            : 'Sisli'
+  if (code <= 55)   return en ? 'Drizzle'          : 'Çisenti'
+  if (code <= 65)   return en ? 'Rainy'            : 'Yağmurlu'
+  if (code <= 67)   return en ? 'Freezing rain'    : 'Dondurucu yağmur'
+  if (code <= 77)   return en ? 'Snowy'            : 'Karlı'
+  if (code <= 82)   return en ? 'Showers'          : 'Sağanak'
+  if (code <= 99)   return en ? 'Stormy'           : 'Fırtınalı'
+  return en ? 'Unknown' : 'Bilinmeyen'
 }
 
 async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {

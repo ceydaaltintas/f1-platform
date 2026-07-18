@@ -305,7 +305,7 @@ export function SessionPage() {
 
   const roundName    = sessionInfo.data?.round?.name ?? '...'
   const sessionLabel = sessionInfo.data?.type
-    ? (SESSION_LABELS[sessionInfo.data.type as SessionType] ?? sessionInfo.data.type)
+    ? t(`session.${sessionInfo.data.type}`, SESSION_LABELS[sessionInfo.data.type as SessionType] ?? sessionInfo.data.type)
     : '...'
 
   return (

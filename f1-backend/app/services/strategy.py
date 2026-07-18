@@ -66,6 +66,7 @@ class Stint:
 @dataclass
 class StrategyScenario:
     label: str
+    label_key: str             # i18n key: "base" | "early_pit" | "late_pit"
     stints: list[Stint]
     total_time: float          # saniye
     pit_count: int
@@ -140,10 +141,11 @@ def generate_scenarios(
     remaining = total_laps - current_lap
     scenarios: list[StrategyScenario] = []
 
-    def _make(label: str, stints: list[Stint]) -> StrategyScenario:
+    def _make(label: str, stints: list[Stint], label_key: str = "base") -> StrategyScenario:
         total, laps = simulate_scenario(stints, base_lap_time, total_laps)
         return StrategyScenario(
             label=label,
+            label_key=label_key,
             stints=stints,
             total_time=total,
             pit_count=len(stints) - 1,
@@ -162,6 +164,7 @@ def generate_scenarios(
             Stint(current_compound, current_lap, mid, current_tyre_age),
             Stint(mid_next, mid + 1, total_laps),
         ],
+        label_key="base",
     )
     scenarios.append(base)
 
@@ -176,6 +179,7 @@ def generate_scenarios(
                 Stint(current_compound, current_lap, early, current_tyre_age),
                 Stint(early_next, early + 1, total_laps),
             ],
+            label_key="early_pit",
         )
         scenarios.append(s)
 
@@ -190,6 +194,7 @@ def generate_scenarios(
                 Stint(current_compound, current_lap, late, current_tyre_age),
                 Stint(late_next, late + 1, total_laps),
             ],
+            label_key="late_pit",
         )
         scenarios.append(s)
 
@@ -212,6 +217,7 @@ def generate_scenarios(
         s = _make(
             f"Undercut · {current_compound[0]}→{mid_aggressive[0]}→{current_compound[0]} (Tur {p1}+{p2})",
             undercut_stints,
+            label_key="undercut",
         )
         scenarios.append(s)
 
@@ -234,6 +240,7 @@ def generate_scenarios(
         s = _make(
             f"Klasik 2-stop · {current_compound[0]}→{stint2[0]}→{stint3[0]} (Tur {p1}+{p2})",
             classic_stints,
+            label_key="classic_2stop",
         )
         scenarios.append(s)
 
@@ -247,6 +254,7 @@ def generate_scenarios(
                 Stint(current_compound, current_lap, alternate_pit_lap, current_tyre_age),
                 Stint(alt_next, alternate_pit_lap + 1, total_laps),
             ],
+            label_key="custom_pit",
         )
         scenarios.append(s)
 

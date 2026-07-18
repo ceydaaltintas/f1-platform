@@ -329,6 +329,7 @@ async def simulate_strategy(
         "scenarios": [
             {
                 "label": s.label,
+                "label_key": s.label_key,
                 "stints": [
                     {
                         "compound": st.compound,

@@ -171,7 +171,30 @@
   },
   "track_map": {
     "click_hint": "Click the chart to show position",
-    "corner": "Corner:"
+    "corner": "Corner:",
+    "slow": "Slow",
+    "fast": "Fast",
+    "faster": "faster",
+    "equal": "Equal"
+  },
+  "circuit": {
+    "first_gp": "First GP",
+    "length": "Length",
+    "corners": "Corners",
+    "drs_zones": "DRS Zones",
+    "lap_record": "Lap Record",
+    "weather_loading": "Loading weather data...",
+    "weather_error": "Could not load weather data",
+    "forecast_title": "7-DAY FORECAST",
+    "rain_warning": "High chance of rain on race day — {{pct}}%"
+  },
+  "strategy_sim": {
+    "early_pit": "Early pit",
+    "late_pit": "Late pit",
+    "undercut": "Undercut",
+    "classic_2stop": "Classic 2-stop",
+    "custom_pit": "Custom pit",
+    "lap_abbr": "Lap"
   },
   "community": {
     "comments": "LIVE COMMENTS",

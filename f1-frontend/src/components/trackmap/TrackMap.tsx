@@ -199,23 +199,23 @@ export function TrackMap({
             <>
               <span className="flex items-center gap-1.5">
                 <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: primaryColor }} />
-                <b style={{ color: primaryColor }}>{primaryLabel}</b> daha hızlı
+                <b style={{ color: primaryColor }}>{primaryLabel}</b> {t('track_map.faster')}
               </span>
               <span className="flex items-center gap-1.5">
                 <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: compareColor }} />
-                <b style={{ color: compareColor }}>{compareLabel}</b> daha hızlı
+                <b style={{ color: compareColor }}>{compareLabel}</b> {t('track_map.faster')}
               </span>
               <span className="flex items-center gap-1.5" style={{ color: 'var(--t3)' }}>
                 <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: 'rgba(130,145,165,0.55)' }} />
-                Eşit
+                {t('track_map.equal')}
               </span>
             </>
           ) : hasSegments ? (
             <span className="flex items-center gap-2" style={{ color: 'var(--t2)' }}>
-              <span>Yavaş</span>
+              <span>{t('track_map.slow')}</span>
               <span style={{ display: 'inline-block', width: 72, height: 8, borderRadius: 4,
                 background: 'linear-gradient(to right,#0064ff,#00c832,#ffee00,#ff2000)' }} />
-              <span>Hızlı</span>
+              <span>{t('track_map.fast')}</span>
               {primaryLabel && <b style={{ color: primaryColor, marginLeft: 4 }}>· {primaryLabel}</b>}
             </span>
           ) : (

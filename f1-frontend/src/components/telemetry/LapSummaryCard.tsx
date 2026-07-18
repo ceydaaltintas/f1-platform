@@ -24,7 +24,8 @@ export function LapSummaryCard({
   compareLap, compareDriver,
   tyreCompound, tyreAge,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
   const [state, setState] = useState<State>({ kind: 'idle' })
 
   // Tur, mod veya pilot değişince analizi yeniden üret
@@ -40,7 +41,7 @@ export function LapSummaryCard({
       compound: tyreCompound ?? lap.compound ?? t('compounds.UNKNOWN'),
     }
 
-    aiApi.lapSummary(lapWithCompound as any, keyMoments, mode)
+    aiApi.lapSummary(lapWithCompound as any, keyMoments, mode, lang)
       .then(r => { if (!cancelled) setState({ kind: 'ok', text: r.summary }) })
       .catch(() => { if (!cancelled) setState({ kind: 'error' }) })
 

@@ -627,27 +627,44 @@ async def interpret_live_race(context: dict, mode: str = "beginner", language: s
     return text
 
 
-async def summarize_lap(lap_info: dict, key_moments: list[dict], mode: str = "beginner") -> str:
-    cache_k = _cache_key({"fn": "lap_summary", "mode": mode, "lap": lap_info})
+async def summarize_lap(lap_info: dict, key_moments: list[dict], mode: str = "beginner", language: str = "tr") -> str:
+    cache_k = _cache_key({"fn": "lap_summary", "mode": mode, "lang": language, "lap": lap_info})
     cached = await cache_get(cache_k)
     if cached:
         return cached["text"]
 
-    system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
-    moments_text = "\n".join(
-        f"- {m.get('point','?')}: Giriş {m.get('speed_entry')} km/sa → Min {m.get('speed_min')} km/sa"
-        for m in key_moments[:5]
-    )
-    dur = lap_info.get("duration")
-    compound = lap_info.get('compound') or 'Bilinmiyor'
-    content = (
-        f"Tur: #{lap_info.get('number')} | "
-        f"Süre: {formatLapTime(dur) if dur else '?'} | "
-        f"Lastik: {compound}\n"
-        f"S1={lap_info.get('sector1','?')}s  S2={lap_info.get('sector2','?')}s  S3={lap_info.get('sector3','?')}s\n"
-        f"Önemli anlar:\n{moments_text}\n"
-        "Bu tur hakkında genel analiz yap — pilotun güçlü ve zayıf noktalarını belirt."
-    )
+    if language == "en":
+        system = BEGINNER_SYS_EN if mode == "beginner" else EXPERT_SYS_EN
+        moments_text = "\n".join(
+            f"- {m.get('point','?')}: Entry {m.get('speed_entry')} km/h → Min {m.get('speed_min')} km/h"
+            for m in key_moments[:5]
+        )
+        dur = lap_info.get("duration")
+        compound = lap_info.get('compound') or 'Unknown'
+        content = (
+            f"Lap: #{lap_info.get('number')} | "
+            f"Time: {formatLapTime(dur) if dur else '?'} | "
+            f"Tyre: {compound}\n"
+            f"S1={lap_info.get('sector1','?')}s  S2={lap_info.get('sector2','?')}s  S3={lap_info.get('sector3','?')}s\n"
+            f"Key moments:\n{moments_text}\n"
+            "Provide a general analysis of this lap — highlight the driver's strengths and weaknesses."
+        )
+    else:
+        system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
+        moments_text = "\n".join(
+            f"- {m.get('point','?')}: Giriş {m.get('speed_entry')} km/sa → Min {m.get('speed_min')} km/sa"
+            for m in key_moments[:5]
+        )
+        dur = lap_info.get("duration")
+        compound = lap_info.get('compound') or 'Bilinmiyor'
+        content = (
+            f"Tur: #{lap_info.get('number')} | "
+            f"Süre: {formatLapTime(dur) if dur else '?'} | "
+            f"Lastik: {compound}\n"
+            f"S1={lap_info.get('sector1','?')}s  S2={lap_info.get('sector2','?')}s  S3={lap_info.get('sector3','?')}s\n"
+            f"Önemli anlar:\n{moments_text}\n"
+            "Bu tur hakkında genel analiz yap — pilotun güçlü ve zayıf noktalarını belirt."
+        )
 
     text = ""
     if _groq_ok():

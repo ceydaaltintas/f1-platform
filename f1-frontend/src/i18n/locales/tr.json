@@ -171,7 +171,30 @@
   },
   "track_map": {
     "click_hint": "Grafiğe tıklayınca konum gösterilir",
-    "corner": "Köşe:"
+    "corner": "Köşe:",
+    "slow": "Yavaş",
+    "fast": "Hızlı",
+    "faster": "daha hızlı",
+    "equal": "Eşit"
+  },
+  "circuit": {
+    "first_gp": "İlk GP",
+    "length": "Uzunluk",
+    "corners": "Viraj",
+    "drs_zones": "DRS Bölgesi",
+    "lap_record": "Tur Rekoru",
+    "weather_loading": "Hava verisi yükleniyor...",
+    "weather_error": "Hava verisi alınamadı",
+    "forecast_title": "7 GÜNLÜK TAHMİN",
+    "rain_warning": "Yarış günü yağış ihtimali yüksek — {{pct}}%"
+  },
+  "strategy_sim": {
+    "early_pit": "Erken pit",
+    "late_pit": "Geç pit",
+    "undercut": "Undercut",
+    "classic_2stop": "Klasik 2-stop",
+    "custom_pit": "Özel pit",
+    "lap_abbr": "Tur"
   },
   "community": {
     "comments": "CANLI YORUMLAR",

@@ -158,6 +158,21 @@ export function StrategySimulator({
     staleTime: 60_000,
   })
 
+  const { t: tFn } = useTranslation()
+  const scenarioLabel = (s: any): string => {
+    const compounds = (s.stints ?? []).map((st: any) => st.compound[0]).join('→')
+    const laps = (s.stints ?? []).filter((_: any, i: number) => i > 0).map((st: any) => st.start_lap - 1).join('+')
+    const lapSuffix = laps ? ` (${tFn('strategy_sim.lap_abbr')} ${laps})` : ''
+    const key = s.label_key
+    if (key === 'base')         return `1-Stop · ${compounds}${lapSuffix}`
+    if (key === 'early_pit')    return `${tFn('strategy_sim.early_pit')} · ${compounds}${lapSuffix}`
+    if (key === 'late_pit')     return `${tFn('strategy_sim.late_pit')} · ${compounds}${lapSuffix}`
+    if (key === 'undercut')     return `Undercut · ${compounds}${lapSuffix}`
+    if (key === 'classic_2stop') return `${tFn('strategy_sim.classic_2stop')} · ${compounds}${lapSuffix}`
+    if (key === 'custom_pit')   return `${tFn('strategy_sim.custom_pit')} · ${compounds}${lapSuffix}`
+    return s.label
+  }
+
   const scenarios: any[] = sim.data?.scenarios ?? []
   const best = scenarios.reduce(
     (a: any, b: any) => (b.time_vs_base < a.time_vs_base ? b : a),
@@ -386,7 +401,7 @@ export function StrategySimulator({
                           {t('strategy_sim.base_badge')}
                         </span>
                       )}
-                      <span className="text-[13px] font-bold text-white">{s.label}</span>
+                      <span className="text-[13px] font-bold text-white">{scenarioLabel(s)}</span>
                     </div>
                     <span className="text-[18px] font-black mono"
                       style={{ color: isBase ? 'var(--t3)' : barColor }}>

@@ -42,6 +42,7 @@ class LapSummaryRequest(BaseModel):
     lap_info: dict
     key_moments: list[dict] = Field(default_factory=list)
     mode: str = Field("beginner", pattern="^(beginner|expert)$")
+    language: str = Field("tr", pattern="^(tr|en)$")
 
 
 class CompareRequest(BaseModel):
@@ -82,7 +83,7 @@ async def interpret_snapshot(body: TelemetrySnapshot):
 @router.post("/lap_summary")
 async def lap_summary(body: LapSummaryRequest):
     """Bir turun tüm verilerini analiz ederek özet üretir."""
-    text = await claude_ai.summarize_lap(body.lap_info, body.key_moments, body.mode)
+    text = await claude_ai.summarize_lap(body.lap_info, body.key_moments, body.mode, language=body.language)
     return {"summary": text, "mode": body.mode}
 
 

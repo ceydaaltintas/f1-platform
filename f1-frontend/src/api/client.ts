@@ -157,9 +157,9 @@ export const aiApi = {
       .post<InterpretResponse & { source?: string }>('/ai/interpret', { ...snapshot, mode, language })
       .then((r) => r.data),
 
-  lapSummary: (lapInfo: object, keyMoments: object[], mode: string) =>
+  lapSummary: (lapInfo: object, keyMoments: object[], mode: string, language = 'tr') =>
     client
-      .post<{ summary: string; mode: string }>('/ai/lap_summary', { lap_info: lapInfo, key_moments: keyMoments, mode })
+      .post<{ summary: string; mode: string }>('/ai/lap_summary', { lap_info: lapInfo, key_moments: keyMoments, mode, language })
       .then((r) => r.data),
 
   compare: (body: object) =>

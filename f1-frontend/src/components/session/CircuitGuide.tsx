@@ -3,6 +3,7 @@
  * Session sayfası "Analiz" tabında gösterilir
  */
 
+import { useTranslation } from 'react-i18next'
 import { useWeather, weatherEmoji, weatherDesc, type DailyForecast } from '../../hooks/useWeather'
 import { getCircuitByRaceName } from '../../data/circuits'
 
@@ -12,8 +13,10 @@ interface Props {
 }
 
 function WeatherDay({ day, isRaceDay }: { day: DailyForecast; isRaceDay: boolean }) {
+  const { i18n } = useTranslation()
+  const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-GB'
   const date   = new Date(day.date)
-  const label  = date.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' })
+  const label  = date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
   const emoji  = weatherEmoji(day.weatherCode)
   const hasRain = day.rainProb >= 30
 
@@ -24,7 +27,7 @@ function WeatherDay({ day, isRaceDay }: { day: DailyForecast; isRaceDay: boolean
         border: `1px solid ${isRaceDay ? 'rgba(225,6,0,0.3)' : 'var(--b1)'}`,
       }}>
       <p className="text-[9px] mono font-semibold text-center" style={{ color: isRaceDay ? '#E10600' : 'var(--t3)' }}>
-        {isRaceDay ? 'YARIŞ' : label.toUpperCase()}
+        {label.toUpperCase()}
       </p>
       <span className="text-xl">{emoji}</span>
       <p className="text-[12px] font-bold text-white">{day.tempMax.toFixed(0)}°</p>
@@ -39,6 +42,8 @@ function WeatherDay({ day, isRaceDay }: { day: DailyForecast; isRaceDay: boolean
 }
 
 export function CircuitGuide({ raceName, raceDate }: Props) {
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
   const circuit = raceName ? getCircuitByRaceName(raceName) : null
   const weather = useWeather(circuit?.lat ?? null, circuit?.lng ?? null)
 
@@ -56,7 +61,7 @@ export function CircuitGuide({ raceName, raceDate }: Props) {
           <div>
             <p className="text-[13px] font-bold text-white">{circuit.name}</p>
             <p className="text-[11px]" style={{ color: 'var(--t2)' }}>
-              {circuit.locality}, {circuit.country} · İlk GP: {circuit.firstGP}
+              {circuit.locality}, {circuit.country} · {t('circuit.first_gp')}: {circuit.firstGP}
             </p>
           </div>
         </div>
@@ -66,17 +71,13 @@ export function CircuitGuide({ raceName, raceDate }: Props) {
         {/* Devre istatistikleri */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Uzunluk', value: `${circuit.lengthKm} km`, icon: '📏' },
-            { label: 'Viraj', value: `${circuit.corners}`, icon: '↩️' },
-            { label: 'DRS Bölgesi', value: `${circuit.drsZones}`, icon: '🚀' },
+            { label: t('circuit.length'), value: `${circuit.lengthKm} km`, icon: '📏' },
+            { label: t('circuit.corners'), value: `${circuit.corners}`, icon: '↩️' },
+            { label: t('circuit.drs_zones'), value: `${circuit.drsZones}`, icon: '🚀' },
             {
-              label: 'Tur Rekoru',
-              value: circuit.lapRecord
-                ? `${circuit.lapRecord.time}`
-                : '—',
-              sub: circuit.lapRecord
-                ? `${circuit.lapRecord.driver} (${circuit.lapRecord.year})`
-                : undefined,
+              label: t('circuit.lap_record'),
+              value: circuit.lapRecord ? `${circuit.lapRecord.time}` : '—',
+              sub: circuit.lapRecord ? `${circuit.lapRecord.driver} (${circuit.lapRecord.year})` : undefined,
               icon: '⏱',
             },
           ].map(s => (
@@ -99,17 +100,17 @@ export function CircuitGuide({ raceName, raceDate }: Props) {
         {weather.isLoading ? (
           <div className="flex items-center gap-2" style={{ color: 'var(--t3)' }}>
             <span className="text-sm animate-pulse">🌤</span>
-            <p className="text-[12px] mono">Hava verisi yükleniyor...</p>
+            <p className="text-[12px] mono">{t('circuit.weather_loading')}</p>
           </div>
         ) : weather.isError ? (
           <p className="text-[12px] mono" style={{ color: 'var(--t3)' }}>
-            Hava verisi alınamadı
+            {t('circuit.weather_error')}
           </p>
         ) : weather.data ? (
           <div>
             <div className="flex items-center gap-2 mb-3">
               <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>
-                7 GÜNLÜK TAHMİN
+                {t('circuit.forecast_title')}
               </p>
               {/* Güncel hava */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg ml-auto"
@@ -119,7 +120,7 @@ export function CircuitGuide({ raceName, raceDate }: Props) {
                   {weather.data.current.temp.toFixed(0)}°C
                 </span>
                 <span className="text-[11px]" style={{ color: 'var(--t3)' }}>
-                  {weatherDesc(weather.data.current.weatherCode)}
+                  {weatherDesc(weather.data.current.weatherCode, lang)}
                 </span>
                 <span className="text-[11px] mono ml-1" style={{ color: 'var(--t3)' }}>
                   💨 {weather.data.current.windSpeed.toFixed(0)} km/h
@@ -143,10 +144,7 @@ export function CircuitGuide({ raceName, raceDate }: Props) {
                 style={{ background: 'rgba(0,207,255,0.08)', border: '1px solid rgba(0,207,255,0.2)' }}>
                 <span className="text-lg">🌧</span>
                 <p className="text-[12px]" style={{ color: '#00cfff' }}>
-                  Yarış günü yağış ihtimali yüksek —{' '}
-                  <strong>
-                    {weather.data.daily.find(d => d.date === raceDay)?.rainProb}%
-                  </strong>
+                  {t('circuit.rain_warning', { pct: weather.data.daily.find(d => d.date === raceDay)?.rainProb })}
                 </p>
               </div>
             )}
