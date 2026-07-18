@@ -315,19 +315,22 @@ export function HomePage() {
 
               <p className="text-[11px] mono font-semibold tracking-[0.3em] mb-4"
                 style={{ color: 'rgba(225,6,0,0.8)' }}>
-                FORMULA 1 TELEMETRİ PLATFORMU
+                {t('home.platform_label')}
               </p>
 
               <h1 className="text-4xl sm:text-5xl font-black leading-tight mb-5">
-                <span className="text-white">Yarışı </span>
-                <span className="grad-red">veriyle</span>
-                <br />
-                <span className="text-white">takip et.</span>
+                {(() => {
+                  const words = t('home.hero_title').split(' ')
+                  const last = words.pop()
+                  return <>
+                    <span className="text-white">{words.join(' ')} </span>
+                    <span className="grad-red">{last}</span>
+                  </>
+                })()}
               </h1>
 
               <p className="text-[16px] leading-relaxed mb-8" style={{ color: 'var(--t2)', maxWidth: 420 }}>
-                Gerçek zamanlı telemetri, AI destekli analiz,
-                canlı pist haritası — F1 mühendislerinin gözünden.
+                {t('home.hero_desc')}
               </p>
 
               <div className="flex flex-wrap gap-3">
@@ -335,22 +338,22 @@ export function HomePage() {
                   className="px-6 py-3 rounded-xl font-semibold text-[14px] transition-all
                              bg-[#E10600] text-white hover:bg-[#cc0000]
                              hover:shadow-[0_0_32px_rgba(225,6,0,0.5)]">
-                  {current?.year ?? new Date().getFullYear()} Sezonu →
+                  {current?.year ?? new Date().getFullYear()} {t('nav.season')} →
                 </Link>
                 <Link to="/session/5"
                   className="px-6 py-3 rounded-xl font-semibold text-[14px] transition-all
                              border border-white/10 text-white/60 hover:border-white/20 hover:text-white
                              bg-white/[0.04]">
-                  Telemetri Dene
+                  {t('home.try_telemetry')}
                 </Link>
               </div>
 
               {/* Hızlı istatistik */}
               <div className="flex gap-6 mt-10 pt-8 border-t" style={{ borderColor:'rgba(255,255,255,0.07)' }}>
                 {[
-                  { val: '24', label: 'Yarış' },
-                  { val: '22', label: 'Pilot' },
-                  { val: '10', label: 'Takım' },
+                  { val: '24', label: t('standings.results') },
+                  { val: '22', label: t('standings.drivers') },
+                  { val: '10', label: t('standings.constructors') },
                 ].map(s => (
                   <div key={s.label}>
                     <p className="text-2xl font-black text-white">{s.val}</p>
@@ -406,28 +409,28 @@ export function HomePage() {
                     <div className="flex items-end gap-0">
                       {/* Gün */}
                       {countdown.d > 0 && <>
-                        <TimeUnit value={countdown.d} label="GÜN" color="white" />
+                        <TimeUnit value={countdown.d} label={t('home.cd_day')} color="white" />
                         <Colon />
                       </>}
                       {/* Saat */}
                       {(countdown.d > 0 || countdown.h > 0) && <>
                         <TimeUnit value={String(countdown.h).padStart(2,'0')}
-                          label="SAAT" color={countdown.d === 0 ? '#E10600' : 'white'} />
+                          label={t('home.cd_hour')} color={countdown.d === 0 ? '#E10600' : 'white'} />
                         <Colon active={countdown.d === 0} />
                       </>}
                       {/* Dakika */}
                       <TimeUnit value={String(countdown.m).padStart(2,'0')}
-                        label="DAK"
+                        label={t('home.cd_min')}
                         color={countdown.d===0 && countdown.h===0 ? '#E10600' : 'white'} />
                       <Colon active={countdown.d===0 && countdown.h===0} blink />
                       {/* Saniye */}
                       <TimeUnit value={String(countdown.s).padStart(2,'0')}
-                        label="SAN"
+                        label={t('home.cd_sec')}
                         color={countdown.d===0 && countdown.h===0 ? '#E10600' : 'rgba(240,244,255,0.7)'} />
                     </div>
                   ) : (
                     <p className="text-[18px] font-black" style={{ color:'#E10600' }}>
-                      {t('home.today')} / GEÇTİ
+                      {t('home.today')} / {t('home.past')}
                     </p>
                   )}
                 </div>

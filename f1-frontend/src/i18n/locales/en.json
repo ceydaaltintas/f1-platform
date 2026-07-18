@@ -18,7 +18,14 @@
     "seasons": "SEASONS",
     "no_data": "No season data yet.",
     "live_race": "LIVE RACE",
-    "live_go": "Go to live tracking →"
+    "live_go": "Go to live tracking →",
+    "past": "PASSED",
+    "cd_day": "DAY",
+    "cd_hour": "HR",
+    "cd_min": "MIN",
+    "cd_sec": "SEC",
+    "try_telemetry": "Try Telemetry",
+    "platform_label": "FORMULA 1 TELEMETRY PLATFORM"
   },
   "season": {
     "title": "{{year}} Season",

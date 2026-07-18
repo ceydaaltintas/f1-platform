@@ -18,7 +18,14 @@
     "seasons": "SEZONLAR",
     "no_data": "Henüz sezon verisi yok.",
     "live_race": "CANLI YARIŞ",
-    "live_go": "Canlı takip sayfasına git →"
+    "live_go": "Canlı takip sayfasına git →",
+    "past": "GEÇTİ",
+    "cd_day": "GÜN",
+    "cd_hour": "SAAT",
+    "cd_min": "DAK",
+    "cd_sec": "SAN",
+    "try_telemetry": "Telemetri Dene",
+    "platform_label": "FORMULA 1 TELEMETRİ PLATFORMU"
   },
   "season": {
     "title": "{{year}} Sezonu",
