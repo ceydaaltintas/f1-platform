@@ -3,8 +3,11 @@ import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
 import clsx from 'clsx'
+import { useTranslation } from 'react-i18next'
+import { LanguageToggle } from './LanguageToggle'
 
 export function Navbar() {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const [isLive, setIsLive] = useState(false)
   const [liveSessionId, setLiveSessionId] = useState<number | null>(null)
@@ -57,8 +60,8 @@ export function Navbar() {
     to === '/' ? pathname === '/' : pathname.startsWith(to)
 
   const navLinks = [
-    { to: `/season/${currentYear}`, label: `${currentYear} Sezonu` },
-    { to: `/standings/${currentYear}`, label: 'Şampiyona' },
+    { to: `/season/${currentYear}`, label: `${t('nav.season')} ${currentYear}` },
+    { to: `/standings/${currentYear}`, label: t('nav.standings') },
     { to: '/rules', label: 'Kurallar' },
     { to: '/live/demo', label: '🎭 Demo' },
   ]
@@ -112,9 +115,10 @@ export function Navbar() {
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#E10600]"
               style={{ animation: 'pulse-dot 1s infinite' }} />
-            CANLI
+            {t('nav.live')}
           </Link>
         )}
+        <LanguageToggle />
         {isLoggedIn ? (
           <button
             onClick={() => {
@@ -124,7 +128,7 @@ export function Navbar() {
             }}
             className="px-3 py-1.5 rounded-lg text-[12px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
           >
-            Çıkış
+            {t('nav.logout')}
           </button>
         ) : (
           <Link
@@ -133,7 +137,7 @@ export function Navbar() {
                        bg-white/[0.06] border border-white/10 text-white/70
                        hover:bg-white/10 hover:text-white transition-all"
           >
-            Giriş Yap
+            {t('nav.login')}
           </Link>
         )}
       </div>
@@ -149,7 +153,7 @@ export function Navbar() {
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#E10600]"
               style={{ animation: 'pulse-dot 1s infinite' }} />
-            CANLI
+            {t('nav.live')}
           </Link>
         )}
 
@@ -194,16 +198,19 @@ export function Navbar() {
                   }}
                   className="px-5 py-3.5 text-left text-[15px] text-white/40 hover:text-white/70 transition-colors"
                 >
-                  Çıkış
+                  {t('nav.logout')}
                 </button>
               ) : (
                 <Link
                   to="/login"
                   className="px-5 py-3.5 text-[15px] font-medium text-white/50 hover:text-white transition-colors"
                 >
-                  Giriş Yap
+                  {t('nav.login')}
                 </Link>
               )}
+              <div className="px-5 py-3">
+                <LanguageToggle />
+              </div>
             </div>
           </div>
         )}

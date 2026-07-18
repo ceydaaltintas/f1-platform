@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi } from '../api/client'
+import { useTranslation } from 'react-i18next'
 
 export function LoginPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'login' | 'register'>('login')
   const [form, setForm] = useState({ username:'', email:'', password:'' })
@@ -76,13 +78,13 @@ export function LoginPage() {
         <div className="card p-6 space-y-4">
           {/* Tab */}
           <div className="flex p-1 rounded-xl" style={{ background:'var(--s2)' }}>
-            {(['login','register'] as const).map(t => (
-              <button key={t} onClick={() => { setTab(t); setError(null) }}
+            {(['login','register'] as const).map(tabKey => (
+              <button key={tabKey} onClick={() => { setTab(tabKey); setError(null) }}
                 className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-all"
-                style={tab===t
+                style={tab===tabKey
                   ? { background:'#E10600', color:'white', boxShadow:'0 0 12px rgba(225,6,0,0.3)' }
                   : { background:'transparent', color:'var(--t2)' }}>
-                {t==='login' ? 'Giriş Yap' : 'Kayıt Ol'}
+                {tabKey==='login' ? t('auth.login_btn') : t('auth.register_btn')}
               </button>
             ))}
           </div>
@@ -90,7 +92,7 @@ export function LoginPage() {
           {tab==='register' && (
             <div className="space-y-1.5">
               <label className="text-[11px] mono font-semibold" style={{ color:'var(--t3)' }}>
-                KULLANICI ADI
+                {t('auth.username').toUpperCase()}
               </label>
               <input value={form.username} onChange={set('username')}
                 name="username" id="username"
@@ -101,7 +103,7 @@ export function LoginPage() {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[11px] mono font-semibold" style={{ color:'var(--t3)' }}>E-POSTA</label>
+            <label className="text-[11px] mono font-semibold" style={{ color:'var(--t3)' }}>{t('auth.email').toUpperCase()}</label>
             <input value={form.email} onChange={set('email')}
               name="email" id="email"
               placeholder="ornek@mail.com" type="email" autoComplete="email"
@@ -110,7 +112,7 @@ export function LoginPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] mono font-semibold" style={{ color:'var(--t3)' }}>ŞİFRE</label>
+            <label className="text-[11px] mono font-semibold" style={{ color:'var(--t3)' }}>{t('auth.password').toUpperCase()}</label>
             <input value={form.password} onChange={set('password')}
               name="password" id="password"
               placeholder="••••••••" type="password"
@@ -132,7 +134,7 @@ export function LoginPage() {
                        disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: loading ? 'rgba(225,6,0,0.5)' : '#E10600', color:'white',
                      boxShadow: loading ? 'none' : '0 0 20px rgba(225,6,0,0.35)' }}>
-            {loading ? '⏳ Lütfen bekleyin...' : tab==='login' ? 'Giriş Yap →' : 'Hesap Oluştur →'}
+            {loading ? `⏳ ${t('auth.loading')}` : tab==='login' ? `${t('auth.login_btn')} →` : `${t('auth.register_btn')} →`}
           </button>
 
           <p className="text-center text-[11px]" style={{ color:'var(--t3)' }}>

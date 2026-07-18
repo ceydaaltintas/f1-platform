@@ -31,6 +31,7 @@ class PointSnapshot(BaseModel):
 
 class TelemetrySnapshot(PointSnapshot):
     mode: str = Field("beginner", pattern="^(beginner|expert)$")
+    language: str = Field("tr", pattern="^(tr|en)$")
     # Karşılaştırma modu — opsiyonel
     driver_a: str | None = None
     driver_b: str | None = None
@@ -59,7 +60,7 @@ async def interpret_snapshot(body: TelemetrySnapshot):
     snapshot_b + driver_a + driver_b gönderilirse iki pilotu aynı noktada karşılaştırır.
     Öncelik: Groq → Anthropic → Kural tabanlı (her zaman çalışır).
     """
-    exclude = {"mode", "driver_a", "driver_b", "snapshot_b"}
+    exclude = {"mode", "language", "driver_a", "driver_b", "snapshot_b"}
     snap_a = body.model_dump(exclude=exclude)
 
     if body.snapshot_b and body.driver_a and body.driver_b:
@@ -72,7 +73,7 @@ async def interpret_snapshot(body: TelemetrySnapshot):
             mode=body.mode,
         )
     else:
-        explanation = await claude_ai.interpret_telemetry(snap_a, body.mode, driver_code=body.driver_a)
+        explanation = await claude_ai.interpret_telemetry(snap_a, body.mode, driver_code=body.driver_a, language=body.language)
 
     source = "groq" if claude_ai._groq_ok() else ("anthropic" if claude_ai._anthropic_ok() else "rule")
     return {"explanation": explanation, "mode": body.mode, "source": source}

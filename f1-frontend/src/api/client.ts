@@ -152,9 +152,9 @@ export const telemetryApi = {
 // ─── AI ──────────────────────────────────────────────────────────────────────
 
 export const aiApi = {
-  interpret: (snapshot: Record<string, unknown>, mode: string) =>
+  interpret: (snapshot: Record<string, unknown>, mode: string, language = 'tr') =>
     client
-      .post<InterpretResponse & { source?: string }>('/ai/interpret', { ...snapshot, mode })
+      .post<InterpretResponse & { source?: string }>('/ai/interpret', { ...snapshot, mode, language })
       .then((r) => r.data),
 
   lapSummary: (lapInfo: object, keyMoments: object[], mode: string) =>

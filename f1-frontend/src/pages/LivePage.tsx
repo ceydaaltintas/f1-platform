@@ -14,6 +14,7 @@ import { CommentFeed } from '../components/community/CommentFeed'
 import { PollWidget } from '../components/community/PollWidget'
 import { COMPOUND_COLORS, SESSION_LABELS, type SessionType } from '../types/f1'
 import { formatLapTime, formatGap } from '../utils/format'
+import { useTranslation } from 'react-i18next'
 
 // Canlı yarışta yorum/anket akışı için yenileme süresi
 const LIVE_COMMUNITY_REFRESH = 12_000
@@ -75,6 +76,7 @@ function windDir(deg?: number): string {
 const DEMO_SESSION_ID = 25
 
 export function LivePage() {
+  const { t } = useTranslation()
   const { sessionId } = useParams<{ sessionId: string }>()
   const isDemo = sessionId === 'demo'
   // Demo için gerçek Kanada GP verisi kullan
@@ -216,13 +218,13 @@ export function LivePage() {
               <span className="w-2 h-2 rounded-full bg-[#E10600]"
                 style={{ animation: 'pulse-dot 1s infinite' }} />
               <span className="text-[12px] font-bold mono text-[#E10600]">
-                {isDemo ? 'DEMO' : 'CANLI'}
+                {isDemo ? 'DEMO' : t('live.live')}
               </span>
             </div>
           )}
           <div>
             <p className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
-              {isDemo ? 'KANADA GP — DEMO GÖRÜNTÜLEMESİ' : 'CANLI YARIŞ TAKİBİ'}
+              {isDemo ? 'KANADA GP — DEMO GÖRÜNTÜLEMESİ' : t('live.title').toUpperCase()}
             </p>
             <p className="text-[14px] font-bold text-white">
               {sessionTitle}
@@ -638,7 +640,7 @@ export function LivePage() {
           <div className="grid md:grid-cols-2 gap-4">
             <div className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <p className="text-[13px] font-bold text-white">Yarış Kontrolü</p>
+                <p className="text-[13px] font-bold text-white">{t('live.race_control')}</p>
               </div>
               <div className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 200 }}>
                 {messages.length === 0 ? (
@@ -673,7 +675,7 @@ export function LivePage() {
                   style={{ background:'linear-gradient(135deg,#E10600,#cc0000)', color:'white' }}>
                   AI
                 </div>
-                <p className="text-[13px] font-bold text-white">Canlı Yorum</p>
+                <p className="text-[13px] font-bold text-white">{t('live.commentary')}</p>
                 {isDemo && (
                   <span className="text-[10px] mono ml-auto" style={{ color:'var(--t3)' }}>
                     Sadece canlı yarışta
@@ -690,7 +692,7 @@ export function LivePage() {
                   <p className="text-[12px] italic w-full text-center" style={{ color:'var(--t3)' }}>
                     {isDemo
                       ? 'AI yorumu canlı oturum sırasında aktif olur'
-                      : 'Yorum bekleniyor...'}
+                      : t('live.commentary_placeholder')}
                   </p>
                 )}
               </div>
@@ -701,7 +703,7 @@ export function LivePage() {
           <div className="card overflow-hidden">
             <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--b1)' }}>
               <span className="text-base">📻</span>
-              <p className="text-[13px] font-bold text-white">Takım Radyoları</p>
+              <p className="text-[13px] font-bold text-white">{t('live.radio')}</p>
               {radioClips.length > 0 && (
                 <span className="text-[10px] mono ml-auto" style={{ color: 'var(--t3)' }}>
                   {radioClips.length} kayıt

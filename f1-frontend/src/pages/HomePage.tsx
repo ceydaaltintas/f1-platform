@@ -6,6 +6,7 @@ import { seasonApi, client } from '../api/client'
 import { buildPageSEO } from '../utils/seo'
 import { SESSION_LABELS, type SessionType } from '../types/f1'
 import { RaceGlobe } from '../components/globe/RaceGlobe'
+import { useTranslation } from 'react-i18next'
 
 function LiveTicker() {
   // Aktif sezonu dinamik çek — 2027 gelince otomatik güncellenir
@@ -167,6 +168,7 @@ const FLAG: Record<string, string> = {
 }
 
 export function HomePage() {
+  const { t } = useTranslation()
   const seasons = useQuery({ queryKey:['seasons'], queryFn:()=>seasonApi.list(), staleTime:300_000 })
   const current = seasons.data?.find(s => s.is_current)
 
@@ -307,7 +309,7 @@ export function HomePage() {
                 >
                   <span className="w-2 h-2 rounded-full bg-[#E10600]"
                     style={{ animation: 'pulse-dot 1s infinite' }} />
-                  CANLI YARIŞ — Takip Et
+                  {t('home.live_race')} — {t('home.live_go')}
                 </Link>
               )}
 
@@ -378,7 +380,7 @@ export function HomePage() {
                 <div className="flex items-center gap-3">
                   <span className="text-[11px] mono font-semibold tracking-[0.2em]"
                     style={{ color:'rgba(225,6,0,0.7)' }}>
-                    SONRAKİ YARIŞ
+                    {t('home.next_race')}
                   </span>
                   <span className="text-[11px] mono px-2 py-0.5 rounded-full"
                     style={{ background:'rgba(225,6,0,0.12)', color:'#E10600',
@@ -425,7 +427,7 @@ export function HomePage() {
                     </div>
                   ) : (
                     <p className="text-[18px] font-black" style={{ color:'#E10600' }}>
-                      BUGÜN / GEÇTİ
+                      {t('home.today')} / GEÇTİ
                     </p>
                   )}
                 </div>
@@ -531,7 +533,7 @@ export function HomePage() {
       {/* ── Seasons ──────────────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-6 pb-16">
         <p className="text-[11px] mono font-semibold tracking-[0.25em] mb-6"
-          style={{ color: 'var(--t3)' }}>SEZONLAR</p>
+          style={{ color: 'var(--t3)' }}>{t('home.seasons')}</p>
 
         {seasons.isLoading ? (
           <div className="grid sm:grid-cols-3 gap-4">
@@ -555,18 +557,18 @@ export function HomePage() {
                     {s.is_current && (
                       <span className="text-[10px] mono font-semibold px-2 py-0.5 rounded-full
                                        bg-[#E10600]/15 text-[#E10600] border border-[#E10600]/25">
-                        AKTİF
+                        {t('home.active_season')}
                       </span>
                     )}
                   </div>
 
                   <div className="space-y-1.5 mb-4">
                     <div className="flex justify-between text-[12px]">
-                      <span style={{ color: 'var(--t2)' }}>Tamamlanan</span>
+                      <span style={{ color: 'var(--t2)' }}>{t('home.completed')}</span>
                       <span className="font-semibold text-white">{s.rounds_completed}</span>
                     </div>
                     <div className="flex justify-between text-[12px]">
-                      <span style={{ color: 'var(--t3)' }}>Kalan</span>
+                      <span style={{ color: 'var(--t3)' }}>{t('home.remaining')}</span>
                       <span style={{ color: 'var(--t2)' }}>{s.rounds_upcoming}</span>
                     </div>
                   </div>
@@ -592,7 +594,7 @@ export function HomePage() {
         {seasons.data?.length === 0 && !seasons.isLoading && (
           <div className="card text-center py-16 px-8">
             <p className="text-5xl mb-4">🏎</p>
-            <p className="text-white font-semibold mb-2">Henüz sezon verisi yok</p>
+            <p className="text-white font-semibold mb-2">{t('home.no_data')}</p>
             <p className="text-[13px] mb-5" style={{ color: 'var(--t2)' }}>
               İlk senkronizasyonu başlat:
             </p>
@@ -623,7 +625,7 @@ export function HomePage() {
                 )}
               </div>
               <p className="font-bold text-white mb-1">
-                {liveStatus.data?.live ? 'Canlı Yarış' : 'Canlı Yarış (Demo)'}
+                {liveStatus.data?.live ? t('home.live_race') : `${t('home.live_race')} (Demo)`}
               </p>
               <p className="text-[12px] leading-relaxed" style={{ color: 'var(--t2)' }}>
                 {liveStatus.data?.live

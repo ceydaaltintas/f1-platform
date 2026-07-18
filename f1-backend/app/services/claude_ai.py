@@ -116,6 +116,36 @@ En fazla 4-5 teknik cümle, tek paragraf. Tam terminoloji kullan.
 """.strip() + "\n" + FORMAT_RULES
 )
 
+FORMAT_RULES_EN = """
+Format rules: Write plain text. NO Markdown — no asterisks (**), headings (#),
+bullet points (- or •), or numbered lists (1. 2. 3.), no line breaks.
+Write ONE flowing paragraph of complete sentences. Do not exceed the stated
+sentence count. If a driver code is provided, use ONLY that code — do not
+invent a name. If no driver code is given, do not generate any name or code —
+refer to "the driver" only. Always finish sentences completely.
+""".strip()
+
+BEGINNER_SYS_EN = (
+    """
+You are an F1 commentator explaining telemetry to someone new to motorsport.
+Rules:
+- Use plain, everyday English. No jargon whatsoever.
+- Instead of "DRS" say "rear wing opened", instead of "braking point" say "where the driver brakes".
+- Maximum 2-3 short, exciting sentences. Describe what the driver is doing right now.
+""".strip() + "\n" + FORMAT_RULES_EN
+)
+
+EXPERT_SYS_EN = (
+    """
+You are an F1 telemetry engineer. Analyse the data with full technical depth.
+Pick ONLY the 2-3 most relevant topics from: braking point optimisation,
+trail braking, ERS deployment, traction control limit, tyre thermal management,
+apex speed, minimum corner speed (MCS), delta time analysis.
+Do NOT cover all topics sequentially — focus on the most significant ones.
+Maximum 4-5 technical sentences, single paragraph. Use correct terminology.
+""".strip() + "\n" + FORMAT_RULES_EN
+)
+
 
 # ─── Kural Tabanlı Yorum ─────────────────────────────────────────────────────
 
@@ -447,25 +477,40 @@ async def interpret_point_comparison(
     return text
 
 
-async def interpret_telemetry(snapshot: dict, mode: str = "beginner", driver_code: str | None = None) -> str:
-    cache_k = _cache_key({"fn": "interpret", "mode": mode, "driver": driver_code, **snapshot})
+async def interpret_telemetry(snapshot: dict, mode: str = "beginner", driver_code: str | None = None, language: str = "tr") -> str:
+    cache_k = _cache_key({"fn": "interpret", "mode": mode, "lang": language, "driver": driver_code, **snapshot})
     cached = await cache_get(cache_k)
     if cached:
         return cached["text"]
 
-    system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
-    driver_line = f"Pilot kodu: {driver_code}\n" if driver_code else ""
-    content = (
-        f"{driver_line}"
-        f"Hız: {snapshot.get('speed')} km/sa | "
-        f"Gaz: %{snapshot.get('throttle')} | "
-        f"Fren: %{snapshot.get('brake')} | "
-        f"Vites: {snapshot.get('gear')} | "
-        f"DRS: {'Açık' if snapshot.get('drs') else 'Kapalı'} | "
-        f"RPM: {snapshot.get('rpm')} | "
-        f"Mesafe: {snapshot.get('dist_m', '?')} m\n"
-        "Bu F1 telemetri anını yorumla."
-    )
+    if language == "en":
+        system = BEGINNER_SYS_EN if mode == "beginner" else EXPERT_SYS_EN
+        driver_line = f"Driver code: {driver_code}\n" if driver_code else ""
+        content = (
+            f"{driver_line}"
+            f"Speed: {snapshot.get('speed')} km/h | "
+            f"Throttle: {snapshot.get('throttle')}% | "
+            f"Brake: {snapshot.get('brake')}% | "
+            f"Gear: {snapshot.get('gear')} | "
+            f"DRS: {'Open' if snapshot.get('drs') else 'Closed'} | "
+            f"RPM: {snapshot.get('rpm')} | "
+            f"Distance: {snapshot.get('dist_m', '?')} m\n"
+            "Interpret this F1 telemetry moment."
+        )
+    else:
+        system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
+        driver_line = f"Pilot kodu: {driver_code}\n" if driver_code else ""
+        content = (
+            f"{driver_line}"
+            f"Hız: {snapshot.get('speed')} km/sa | "
+            f"Gaz: %{snapshot.get('throttle')} | "
+            f"Fren: %{snapshot.get('brake')} | "
+            f"Vites: {snapshot.get('gear')} | "
+            f"DRS: {'Açık' if snapshot.get('drs') else 'Kapalı'} | "
+            f"RPM: {snapshot.get('rpm')} | "
+            f"Mesafe: {snapshot.get('dist_m', '?')} m\n"
+            "Bu F1 telemetri anını yorumla."
+        )
 
     text = ""
     source = "rule"

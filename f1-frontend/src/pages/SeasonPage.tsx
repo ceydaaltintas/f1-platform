@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Helmet } from 'react-helmet-async'
 import { seasonApi } from '../api/client'
-import { SESSION_LABELS, type Round, type SessionType } from '../types/f1'
+import { type Round, type SessionType } from '../types/f1'
 import { ErrorCard } from '../components/ui/ErrorCard'
+import { useTranslation } from 'react-i18next'
 
 const FLAG: Record<string, string> = {
   Australia:'🇦🇺', China:'🇨🇳', Japan:'🇯🇵', Bahrain:'🇧🇭',
@@ -21,6 +22,16 @@ function formatDate(d: string|null) {
 }
 
 function RoundCard({ round, index, highlight }: { round: Round; index: number; highlight?: boolean }) {
+  const { t } = useTranslation()
+  const SESSION_LABELS: Record<string, string> = {
+    practice1: t('session.practice1'),
+    practice2: t('session.practice2'),
+    practice3: t('session.practice3'),
+    qualifying: t('session.qualifying'),
+    sprint_qualifying: t('session.sprint_qualifying'),
+    sprint: t('session.sprint'),
+    race: t('session.race'),
+  }
   const flag   = FLAG[round.country ?? ''] ?? '🏁'
   const done   = round.round_status === 'completed'
   const hasActiveSess = round.sessions.some(s => s.status === 'active')
@@ -53,19 +64,19 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
               )}
               {!hasActiveSess && done && (
                 <span className="text-[10px] mono font-medium" style={{ color: 'rgba(0,210,190,0.7)' }}>
-                  ✓ TAMAMLANDI
+                  ✓ {t('season.status_completed')}
                 </span>
               )}
               {!hasActiveSess && !done && highlight && (
                 <span className="text-[10px] mono font-bold px-2 py-0.5 rounded-full
                                  bg-[#E10600]/10 text-[#E10600] border border-[#E10600]/20">
-                  SIRA­DAKİ
+                  {t('season.status_upcoming')}
                 </span>
               )}
               {!hasActiveSess && !done && !highlight && (
                 <span className="text-[10px] mono font-medium px-2 py-0.5 rounded-full
                                  bg-[#E10600]/10 text-[#E10600] border border-[#E10600]/20">
-                  YAKLAŞIYOR
+                  {t('season.status_upcoming')}
                 </span>
               )}
             </div>
@@ -109,7 +120,7 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
         </div>
       ) : (
         <p className="text-[12px] italic" style={{ color: 'var(--t3)' }}>
-          Oturum verisi henüz yok
+          {t('season.no_sessions')}
         </p>
       )}
     </div>
@@ -117,6 +128,7 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
 }
 
 export function SeasonPage() {
+  const { t } = useTranslation()
   const { year } = useParams<{ year: string }>()
   const y = Number(year)
 
@@ -197,13 +209,13 @@ export function SeasonPage() {
                 style={{ color: 'rgba(225,6,0,0.7)' }}>FORMULA 1</p>
               <div className="flex items-baseline gap-3">
                 <h1 className="text-5xl font-black text-white">{y}</h1>
-                <span className="text-2xl font-light" style={{ color: 'var(--t2)' }}>Sezonu</span>
+                <span className="text-2xl font-light" style={{ color: 'var(--t2)' }}>{t('season.title', { year: '' }).trim()}</span>
               </div>
               {season.data && (
                 <p className="text-[13px] mt-2" style={{ color: 'var(--t2)' }}>
-                  <span className="text-white font-semibold">{season.data.rounds_completed}</span> yarış tamamlandı
+                  <span className="text-white font-semibold">{season.data.rounds_completed}</span> {t('season.completed_rounds')}
                   {season.data.rounds_upcoming > 0 && (
-                    <span> · <span className="font-semibold">{season.data.rounds_upcoming}</span> yarış kaldı</span>
+                    <span> · <span className="font-semibold">{season.data.rounds_upcoming}</span> {t('season.upcoming_rounds')}</span>
                   )}
                 </p>
               )}
@@ -213,7 +225,7 @@ export function SeasonPage() {
               {season.data?.is_current && (
                 <span className="text-[11px] mono font-semibold px-3 py-1.5 rounded-full
                                  bg-[#E10600]/15 text-[#E10600] border border-[#E10600]/25">
-                  AKTİF SEZON
+                  {t('home.active_season')}
                 </span>
               )}
               <div className="text-right">
@@ -241,7 +253,7 @@ export function SeasonPage() {
             style={effectiveTab === 'upcoming'
               ? { background:'rgba(225,6,0,0.12)', color:'#E10600', border:'1px solid rgba(225,6,0,0.3)' }
               : { background:'var(--s1)', color:'var(--t3)', border:'1px solid var(--b1)' }}>
-            🏎 Yaklaşanlar
+            🏎 {t('season.upcoming')}
             <span className="text-[10px] px-1.5 py-0.5 rounded-md font-black mono"
               style={effectiveTab === 'upcoming'
                 ? { background:'rgba(225,6,0,0.2)', color:'#E10600' }
@@ -255,7 +267,7 @@ export function SeasonPage() {
             style={effectiveTab === 'completed'
               ? { background:'rgba(255,215,0,0.1)', color:'#FFD700', border:'1px solid rgba(255,215,0,0.3)' }
               : { background:'var(--s1)', color:'var(--t3)', border:'1px solid var(--b1)' }}>
-            🏆 Tamamlananlar
+            🏆 {t('season.completed')}
             <span className="text-[10px] px-1.5 py-0.5 rounded-md font-black mono"
               style={effectiveTab === 'completed'
                 ? { background:'rgba(255,215,0,0.15)', color:'#FFD700' }

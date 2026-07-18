@@ -8,6 +8,7 @@ import { useFavoritesStore } from '../store/favoritesStore'
 import { ChampionshipScenario } from '../components/analysis/ChampionshipScenario'
 import { HeadToHead } from '../components/analysis/HeadToHead'
 import { FantasyPicks } from '../components/fantasy/FantasyPicks'
+import { useTranslation } from 'react-i18next'
 
 // Mevcut yılı baz alarak yıl seçenekleri üret — 2027 gelince otomatik güncellenir
 function buildYearOptions(currentYear: number): number[] {
@@ -81,6 +82,7 @@ function DriverProfileCard({ driverId, teamColor }: { driverId: string; teamColo
 }
 
 export function StandingsPage() {
+  const { t } = useTranslation()
   const { year } = useParams<{ year: string }>()
 
   // Aktif sezonu API'den çek — hardcoded yıl yok
@@ -215,7 +217,7 @@ export function StandingsPage() {
           <div>
             <Link to="/" className="text-[11px] mono mb-2 block hover:text-white transition-colors"
               style={{ color:'var(--t3)' }}>← Ana Sayfa</Link>
-            <h1 className="text-3xl font-black text-white">Şampiyona</h1>
+            <h1 className="text-3xl font-black text-white">{t('standings.title', { year: y })}</h1>
             <p className="text-[13px] mt-1" style={{ color:'var(--t2)' }}>{y} Sezonu</p>
           </div>
           {/* Yıl seçici */}
@@ -235,9 +237,9 @@ export function StandingsPage() {
         {/* ── Tab seçici ──────────────────────────────────────── */}
         <div className="flex p-1 rounded-xl mb-6" style={{ background:'var(--s1)' }}>
           {([
-            ['drivers',      '🏎 Pilotlar'],
-            ['constructors', '🔧 Takımlar'],
-            ['results',      '🏁 Yarışlar'],
+            ['drivers',      `🏎 ${t('standings.drivers')}`],
+            ['constructors', `🔧 ${t('standings.constructors')}`],
+            ['results',      `🏁 ${t('standings.results')}`],
             ...(y === currentYear
               ? [['scenarios', '📊 Senaryolar'], ['h2h', '⚔️ H2H'], ['fantasy', '🎮 Fantasy']] as const
               : []),
@@ -504,7 +506,7 @@ export function StandingsPage() {
             ))}
             {(!results.data || results.data.length === 0) && (
               <div className="text-center py-16">
-                <p className="text-[14px] mb-2" style={{ color:'var(--t3)' }}>Henüz yarış sonucu yok</p>
+                <p className="text-[14px] mb-2" style={{ color:'var(--t3)' }}>{t('standings.no_results')}</p>
               </div>
             )}
           </div>

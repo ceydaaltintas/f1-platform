@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { aiApi } from '../../api/client'
 import type { InsightMode, TelemetryPoint } from '../../types/f1'
 
@@ -33,6 +34,8 @@ export function AIInsightPanel({
   selectedPoint, mode, driverCode,
   comparePoint, compareDriver,
 }: Props) {
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
   const [state, setState] = useState<State>({ kind: 'idle' })
   const isCompareMode = !!(comparePoint && compareDriver)
 
@@ -62,7 +65,7 @@ export function AIInsightPanel({
         }
       : { ...snapA, mode, driver_a: driverCode }
 
-    aiApi.interpret(payload, mode)
+    aiApi.interpret(payload, mode, lang)
       .then(r => {
         if (!cancelled) setState({
           kind: 'ok',
@@ -100,14 +103,14 @@ export function AIInsightPanel({
             <p className="text-[13px] font-bold text-white leading-none">
               {isCompareMode
                 ? `${driverCode} vs ${compareDriver}`
-                : 'AI Yorumu'}
+                : t('ai.title')}
             </p>
             <p className="text-[10px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
               {state.kind === 'ok'
                 ? sourceLabel(state.source)
                 : isCompareMode
-                  ? 'Aynı noktada karşılaştırma'
-                  : mode === 'beginner' ? 'Sade anlatım' : 'Teknik analiz'}
+                  ? (lang === 'en' ? 'Same point comparison' : 'Aynı noktada karşılaştırma')
+                  : mode === 'beginner' ? t('ai.mode_beginner') : t('ai.mode_expert')}
             </p>
           </div>
           {state.kind === 'loading' && (
@@ -126,7 +129,7 @@ export function AIInsightPanel({
             style={mode === 'beginner'
               ? { background: 'rgba(0,210,190,0.1)', color: '#00D2BE', border: '1px solid rgba(0,210,190,0.2)' }
               : { background: 'rgba(255,135,0,0.1)', color: '#FF8700', border: '1px solid rgba(255,135,0,0.2)' }}>
-            {mode === 'beginner' ? '🟢 Başlangıç' : '⚡ Uzman'}
+            {mode === 'beginner' ? `🟢 ${t('ai.beginner')}` : `⚡ ${t('ai.expert')}`}
           </span>
         )}
 
