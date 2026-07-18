@@ -80,6 +80,7 @@
     "throttle": "Throttle",
     "brake": "Brake",
     "rpm": "RPM",
+    "speed_unit": "km/h",
     "loading": "Loading telemetry...",
     "error": "Failed to load data.",
     "gear": "GEAR",
@@ -187,14 +188,6 @@
     "weather_error": "Could not load weather data",
     "forecast_title": "7-DAY FORECAST",
     "rain_warning": "High chance of rain on race day — {{pct}}%"
-  },
-  "strategy_sim": {
-    "early_pit": "Early pit",
-    "late_pit": "Late pit",
-    "undercut": "Undercut",
-    "classic_2stop": "Classic 2-stop",
-    "custom_pit": "Custom pit",
-    "lap_abbr": "Lap"
   },
   "community": {
     "comments": "LIVE COMMENTS",
@@ -400,7 +393,13 @@
     "laps_check_ok": "✓ {{done}}/{{total}} laps",
     "laps_check_warn": "⚠ {{done}}/{{total}} laps",
     "explanation": "💡 <strong>Grey section</strong> = completed laps. Coloured sections = remaining stints (compound × lap count). All stints should sum to total laps (verified with ✓).",
-    "error_msg": "⚠ Simulation failed."
+    "error_msg": "⚠ Simulation failed.",
+    "early_pit": "Early pit",
+    "late_pit": "Late pit",
+    "undercut": "Undercut",
+    "classic_2stop": "Classic 2-stop",
+    "scenario_custom_pit": "Custom pit",
+    "lap_abbr": "Lap"
   },
   "h2h": {
     "title": "Head-to-Head Comparison",

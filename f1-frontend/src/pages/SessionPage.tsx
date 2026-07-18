@@ -506,9 +506,9 @@ export function SessionPage() {
               style={activeChannel === c.key
                 ? { background: c.color + '18', border:`1px solid ${c.color}50`, color: c.color }
                 : { background:'var(--s1)', border:'1px solid var(--b1)', color:'var(--t2)' }}>
-              {c.label}
+              {t(`telemetry.${c.key}`, c.label)}
               <span className="ml-1.5 text-[10px]" style={{ color: activeChannel===c.key ? c.color+'aa' : 'var(--t3)' }}>
-                {c.unit}
+                {c.key === 'speed' ? t('telemetry.speed_unit') : c.unit}
               </span>
             </button>
           ))}

@@ -80,6 +80,7 @@
     "throttle": "Gaz",
     "brake": "Fren",
     "rpm": "RPM",
+    "speed_unit": "km/sa",
     "loading": "Telemetri yükleniyor...",
     "error": "Veri yüklenemedi.",
     "gear": "VİTES",
@@ -187,14 +188,6 @@
     "weather_error": "Hava verisi alınamadı",
     "forecast_title": "7 GÜNLÜK TAHMİN",
     "rain_warning": "Yarış günü yağış ihtimali yüksek — {{pct}}%"
-  },
-  "strategy_sim": {
-    "early_pit": "Erken pit",
-    "late_pit": "Geç pit",
-    "undercut": "Undercut",
-    "classic_2stop": "Klasik 2-stop",
-    "custom_pit": "Özel pit",
-    "lap_abbr": "Tur"
   },
   "community": {
     "comments": "CANLI YORUMLAR",
@@ -400,7 +393,13 @@
     "laps_check_ok": "✓ {{done}}/{{total}} tur",
     "laps_check_warn": "⚠ {{done}}/{{total}} tur",
     "explanation": "💡 <strong>Gri kısım</strong> = tamamlanan turlar. Renkli kısımlar = kalan stintler (lastik hamuru × tur sayısı). Tüm stintlerin toplamı yarış tur sayısına eşit olmalı (✓ işareti ile doğrulanır).",
-    "error_msg": "⚠ Simülasyon başarısız."
+    "error_msg": "⚠ Simülasyon başarısız.",
+    "early_pit": "Erken pit",
+    "late_pit": "Geç pit",
+    "undercut": "Undercut",
+    "classic_2stop": "Klasik 2-stop",
+    "scenario_custom_pit": "Özel pit",
+    "lap_abbr": "Tur"
   },
   "h2h": {
     "title": "Head-to-Head Karşılaştırma",

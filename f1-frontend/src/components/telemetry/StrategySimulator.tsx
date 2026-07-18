@@ -169,7 +169,7 @@ export function StrategySimulator({
     if (key === 'late_pit')     return `${tFn('strategy_sim.late_pit')} · ${compounds}${lapSuffix}`
     if (key === 'undercut')     return `Undercut · ${compounds}${lapSuffix}`
     if (key === 'classic_2stop') return `${tFn('strategy_sim.classic_2stop')} · ${compounds}${lapSuffix}`
-    if (key === 'custom_pit')   return `${tFn('strategy_sim.custom_pit')} · ${compounds}${lapSuffix}`
+    if (key === 'custom_pit')   return `${tFn('strategy_sim.scenario_custom_pit')} · ${compounds}${lapSuffix}`
     return s.label
   }
 
