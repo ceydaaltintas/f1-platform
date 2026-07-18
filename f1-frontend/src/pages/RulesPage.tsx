@@ -11,24 +11,6 @@ function posColor(i: number) {
   return 'var(--t3)'
 }
 
-const TYRE_COMPOUNDS = [
-  { name: 'SOFT', color: '#E10600', letter: 'S', desc: 'Maksimum kavrama, düşük dayanıklılık. Sıralama ve kısa stintler için ideal.' },
-  { name: 'MEDIUM', color: '#FFD700', letter: 'M', desc: 'Denge. Yarışın ana lastik stratejisinin temelini oluşturur.' },
-  { name: 'HARD', color: '#C0C0C0', letter: 'H', desc: 'Düşük kavrama, yüksek dayanıklılık. Uzun stintler ve yakıt tasarrufu.' },
-  { name: 'INTERMEDIATE', color: '#43B02A', letter: 'I', desc: 'Hafif ıslak pist. Yüzeyinde su oluk kanalları bulunur.' },
-  { name: 'WET', color: '#0072C6', letter: 'W', desc: 'Ağır yağmur. Maksimum su tahliyesi için derin oluklar.' },
-]
-
-const FLAGS = [
-  { name: 'Yeşil Bayrak', color: '#00D2BE', icon: '🟢', desc: 'Pist temiz, yarış/oturum devam ediyor.' },
-  { name: 'Sarı Bayrak', color: '#FFD700', icon: '🟡', desc: 'Tehlike! Yavaşla, sollama yasak. Çift sarı: Dur durabilecek hızda ol.' },
-  { name: 'Kırmızı Bayrak', color: '#E10600', icon: '🔴', desc: 'Oturum durduruldu. Tüm araçlar pit\'e döner.' },
-  { name: 'Mavi Bayrak', color: '#0072C6', icon: '🔵', desc: 'Tur gerisindeki araç, önündeki aracı geçirmeli.' },
-  { name: 'Siyah Bayrak', color: '#333', icon: '🏴', desc: 'Diskalifiye. Pilot pit\'e dönmek zorunda.' },
-  { name: 'Siyah-Beyaz Bayrak', color: '#888', icon: '🏁', desc: 'Sportmenlik dışı davranış uyarısı.' },
-  { name: 'Damalı Bayrak', color: '#fff', icon: '🏁', desc: 'Yarış/oturum sona erdi.' },
-]
-
 const POINTS_RACE = [
   { pos: 1, pts: 25 }, { pos: 2, pts: 18 }, { pos: 3, pts: 15 },
   { pos: 4, pts: 12 }, { pos: 5, pts: 10 }, { pos: 6, pts: 8 },
@@ -39,67 +21,6 @@ const POINTS_SPRINT = [
   { pos: 1, pts: 8 }, { pos: 2, pts: 7 }, { pos: 3, pts: 6 },
   { pos: 4, pts: 5 }, { pos: 5, pts: 4 }, { pos: 6, pts: 3 },
   { pos: 7, pts: 2 }, { pos: 8, pts: 1 },
-]
-
-const WEEKEND_FORMAT = [
-  { day: 'CUMA', sessions: [
-    { name: 'Antrenman 1', duration: '60 dk', desc: 'Araç ayarları, lastik testi, veri toplama' },
-    { name: 'Antrenman 2', duration: '60 dk', desc: 'Yarış simülasyonu, uzun stint denemeleri' },
-  ]},
-  { day: 'CUMARTESİ', sessions: [
-    { name: 'Antrenman 3', duration: '60 dk', desc: 'Son ayarlar, sıralama hazırlığı' },
-    { name: 'Sıralama', duration: 'Q1(18)+Q2(15)+Q3(12)', desc: 'Grid sırası belirlenir' },
-  ]},
-  { day: 'PAZAR', sessions: [
-    { name: 'Yarış', duration: '~2 saat / 305 km', desc: 'Şampiyona puanları dağıtılır' },
-  ]},
-]
-
-const REGS_2026 = [
-  {
-    title: 'Yeni Güç Ünitesi',
-    icon: '⚡',
-    color: '#E10600',
-    points: [
-      'Elektrik gücü 3 katına çıkıyor: MGU-K 350 kW (önceki: 120 kW)',
-      'MGU-H kaldırıldı — motor yapısı basitleşiyor',
-      'Yakıt %100 sürdürülebilir kaynaklardan üretilecek',
-      'Motor sesi daha yüksek olacak',
-    ],
-  },
-  {
-    title: 'Aktif Aerodinamik',
-    icon: '🔄',
-    color: '#00D2BE',
-    points: [
-      'Ön ve arka kanat pozisyonları otomatik ayarlanabilir',
-      'Düz yolda düşük sürükleme (Z-modu) — virajda yüksek yere basma',
-      'DRS kaldırıldı — yerini manual override (overtake modu) aldı',
-      'Araçlar arası takip mesafesi azalacak',
-    ],
-  },
-  {
-    title: 'Zemin Etkisi Değişiklikleri',
-    icon: '⬇️',
-    color: '#FFD700',
-    points: [
-      'Zemin etkisi azaltılıyor — araçlar daha hafif',
-      'Minimum ağırlık 768 kg\'dan 722 kg\'a düşürülüyor',
-      'Aracın toplam boyutu küçülüyor (200 mm daha kısa)',
-      'Ön kanat basitleştiriliyor',
-    ],
-  },
-  {
-    title: 'Maliyet Sınırı & Sportif',
-    icon: '💰',
-    color: '#a855f7',
-    points: [
-      'Bütçe tavanı 135 milyon $ olarak devam ediyor',
-      '3 zorunlu güç ünitesi (sezon başına)',
-      'Yeni takımlar için daha adil rekabet ortamı',
-      'Sprint yarış formatı genişletiliyor',
-    ],
-  },
 ]
 
 function AnimatedBar({ value, max, color, delay = 0 }: { value: number; max: number; color: string; delay?: number }) {
@@ -117,35 +38,89 @@ function AnimatedBar({ value, max, color, delay = 0 }: { value: number; max: num
   )
 }
 
-function TyreAnimation() {
-  return (
-    <div className="flex flex-wrap gap-4 justify-center py-4">
-      {TYRE_COMPOUNDS.map((t, i) => (
-        <div key={t.name} className="flex flex-col items-center gap-2 w-[140px]"
-          style={{ animation: `fadeUp 0.5s ease-out ${i * 0.1}s both` }}>
-          <div className="relative">
-            <svg width="72" height="72" viewBox="0 0 72 72">
-              <circle cx="36" cy="36" r="32" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
-              <circle cx="36" cy="36" r="32" fill="none" stroke={t.color} strokeWidth="8"
-                strokeDasharray={`${201 * ((5 - i) / 5)} 201`}
-                style={{ animation: `tyreRotate 2s linear ${i * 0.2}s both` }}
-                transform="rotate(-90 36 36)" />
-              <circle cx="36" cy="36" r="20" fill={t.color + '15'} stroke={t.color + '40'} strokeWidth="1" />
-              <text x="36" y="40" textAnchor="middle" fontSize="16" fontWeight="900"
-                fontFamily="IBM Plex Mono" fill={t.color}>{t.letter}</text>
-            </svg>
-          </div>
-          <p className="text-[12px] font-bold" style={{ color: t.color }}>{t.name}</p>
-          <p className="text-[10px] text-center leading-tight" style={{ color: 'var(--t3)' }}>{t.desc}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export function RulesPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('general')
+
+  const TYRE_COMPOUNDS = [
+    { name: 'SOFT',         color: '#E10600', letter: 'S', desc: t('rules.tyre_soft_desc') },
+    { name: 'MEDIUM',       color: '#FFD700', letter: 'M', desc: t('rules.tyre_medium_desc') },
+    { name: 'HARD',         color: '#C0C0C0', letter: 'H', desc: t('rules.tyre_hard_desc') },
+    { name: 'INTERMEDIATE', color: '#43B02A', letter: 'I', desc: t('rules.tyre_inter_desc') },
+    { name: 'WET',          color: '#0072C6', letter: 'W', desc: t('rules.tyre_wet_desc') },
+  ]
+
+  const FLAGS = [
+    { name: t('rules.flag_green'),    color: '#00D2BE', icon: '🟢', desc: t('rules.flag_green_desc') },
+    { name: t('rules.flag_yellow'),   color: '#FFD700', icon: '🟡', desc: t('rules.flag_yellow_desc') },
+    { name: t('rules.flag_red'),      color: '#E10600', icon: '🔴', desc: t('rules.flag_red_desc') },
+    { name: t('rules.flag_blue'),     color: '#0072C6', icon: '🔵', desc: t('rules.flag_blue_desc') },
+    { name: t('rules.flag_black'),    color: '#333',    icon: '🏴', desc: t('rules.flag_black_desc') },
+    { name: t('rules.flag_bw'),       color: '#888',    icon: '🏁', desc: t('rules.flag_bw_desc') },
+    { name: t('rules.flag_chequered'),color: '#fff',    icon: '🏁', desc: t('rules.flag_chequered_desc') },
+  ]
+
+  const WEEKEND_FORMAT = [
+    { day: t('rules.day_friday'), sessions: [
+      { name: t('session.practice1'), duration: '60 min', desc: t('rules.fp1_desc') },
+      { name: t('session.practice2'), duration: '60 min', desc: t('rules.fp2_desc') },
+    ]},
+    { day: t('rules.day_saturday'), sessions: [
+      { name: t('session.practice3'), duration: '60 min', desc: t('rules.fp3_desc') },
+      { name: t('session.qualifying'), duration: 'Q1(18)+Q2(15)+Q3(12)', desc: t('rules.quali_desc') },
+    ]},
+    { day: t('rules.day_sunday'), sessions: [
+      { name: t('session.race'), duration: t('rules.race_duration'), desc: t('rules.race_desc') },
+    ]},
+  ]
+
+  const REGS_2026 = [
+    {
+      title: t('rules.reg_pu_title'), icon: '⚡', color: '#E10600',
+      points: [
+        t('rules.reg_pu_1'), t('rules.reg_pu_2'), t('rules.reg_pu_3'), t('rules.reg_pu_4'),
+      ],
+    },
+    {
+      title: t('rules.reg_aero_title'), icon: '🔄', color: '#00D2BE',
+      points: [
+        t('rules.reg_aero_1'), t('rules.reg_aero_2'), t('rules.reg_aero_3'), t('rules.reg_aero_4'),
+      ],
+    },
+    {
+      title: t('rules.reg_ground_title'), icon: '⬇️', color: '#FFD700',
+      points: [
+        t('rules.reg_ground_1'), t('rules.reg_ground_2'), t('rules.reg_ground_3'), t('rules.reg_ground_4'),
+      ],
+    },
+    {
+      title: t('rules.reg_cost_title'), icon: '💰', color: '#a855f7',
+      points: [
+        t('rules.reg_cost_1'), t('rules.reg_cost_2'), t('rules.reg_cost_3'), t('rules.reg_cost_4'),
+      ],
+    },
+  ]
+
+  const COMPARISON = [
+    { label: t('rules.cmp_length'),   old: '5640 mm', val: '5440 mm', diff: '-200 mm', diffColor: '#00D2BE' },
+    { label: t('rules.cmp_width'),    old: '2000 mm', val: '2000 mm', diff: t('rules.cmp_same'), diffColor: 'var(--t3)' },
+    { label: t('rules.cmp_weight'),   old: '798 kg',  val: '722 kg',  diff: '-76 kg',  diffColor: '#00D2BE' },
+    { label: t('rules.cmp_wb'),       old: '3600 mm', val: '3400 mm', diff: '-200 mm', diffColor: '#00D2BE' },
+    { label: t('rules.cmp_mguk'),     old: '120 kW',  val: '350 kW',  diff: '+192%',   diffColor: '#E10600' },
+    { label: 'MGU-H', old: t('rules.cmp_yes'), val: t('rules.cmp_removed'), diff: '—', diffColor: '#E10600' },
+    { label: t('rules.cmp_fuel'),     old: t('rules.cmp_fossil'), val: '100% ' + t('rules.cmp_sustainable'), diff: t('rules.cmp_new'), diffColor: '#00D2BE' },
+    { label: t('rules.cmp_aero'),     old: t('rules.cmp_fixed_wing'), val: t('rules.cmp_active_wing'), diff: t('rules.cmp_new'), diffColor: '#a855f7' },
+    { label: 'DRS', old: t('rules.cmp_yes'), val: t('rules.cmp_removed') + ' (Overtake)', diff: t('rules.cmp_new'), diffColor: '#a855f7' },
+  ]
+
+  const PENALTIES = [
+    { penalty: t('rules.pen_5s'),   desc: t('rules.pen_5s_desc'),  severity: 1 },
+    { penalty: t('rules.pen_10s'),  desc: t('rules.pen_10s_desc'), severity: 2 },
+    { penalty: 'Drive-through',     desc: t('rules.pen_dt_desc'),  severity: 3 },
+    { penalty: 'Stop & Go (10s)',   desc: t('rules.pen_sg_desc'),  severity: 4 },
+    { penalty: t('rules.pen_grid'), desc: t('rules.pen_grid_desc'),severity: 2 },
+    { penalty: t('rules.pen_dsq'),  desc: t('rules.pen_dsq_desc'), severity: 5 },
+  ]
 
   return (
     <>
@@ -166,20 +141,16 @@ export function RulesPage() {
       </Helmet>
 
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
         <div>
           <p className="text-[10px] mono font-semibold tracking-[0.3em] mb-2" style={{ color: '#E10600' }}>
             FORMULA 1
           </p>
-          <h1 className="text-[32px] font-black text-white leading-tight">
-            {t('rules.title')}
-          </h1>
+          <h1 className="text-[32px] font-black text-white leading-tight">{t('rules.title')}</h1>
           <p className="text-[14px] mt-1" style={{ color: 'var(--t2)' }}>
             {t('rules.subtitle', { year: 2026 })}
           </p>
         </div>
 
-        {/* Tab seçici */}
         <div className="flex p-1 rounded-xl" style={{ background: 'var(--s1)' }}>
           {([
             ['general', t('rules.tab_general')],
@@ -187,87 +158,99 @@ export function RulesPage() {
           ] as const).map(([tabKey, label]) => (
             <button key={tabKey} onClick={() => setTab(tabKey)}
               className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-all"
-              style={tab === tabKey
-                ? { background: '#E10600', color: 'white' }
-                : { color: 'var(--t3)' }}>
+              style={tab === tabKey ? { background: '#E10600', color: 'white' } : { color: 'var(--t3)' }}>
               {label}
             </button>
           ))}
         </div>
 
-        {/* ── Genel Kurallar ──────────────────────────────────── */}
+        {/* ── General Rules ── */}
         {tab === 'general' && (
           <div className="space-y-8">
 
-            {/* Puan Sistemi */}
+            {/* Points */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">🏆 Puan Sistemi</h2>
+                <h2 className="text-[15px] font-bold text-white">🏆 {t('rules.sec_points')}</h2>
               </div>
               <div className="p-5 grid md:grid-cols-2 gap-6">
                 <div>
-                  <p className="text-[11px] mono font-semibold mb-3" style={{ color: 'var(--t3)' }}>YARIŞ PUANLARI</p>
+                  <p className="text-[11px] mono font-semibold mb-3" style={{ color: 'var(--t3)' }}>
+                    {t('rules.race_points_label')}
+                  </p>
                   <div className="space-y-1.5">
                     {POINTS_RACE.map((p, i) => (
                       <div key={p.pos} className="flex items-center gap-3">
-                        <span className="text-[11px] mono w-5 text-right font-bold" style={{ color: posColor(i) }}>
-                          P{p.pos}
-                        </span>
+                        <span className="text-[11px] mono w-5 text-right font-bold" style={{ color: posColor(i) }}>P{p.pos}</span>
                         <div className="flex-1">
                           <AnimatedBar value={p.pts} max={25} color={i < 3 ? '#E10600' : '#888'} delay={i * 0.05} />
                         </div>
                       </div>
                     ))}
-                    <p className="text-[10px] mt-2" style={{ color: 'var(--t3)' }}>
-                      2026'dan itibaren en hızlı tur bonusu kaldırılmıştır
-                    </p>
+                    <p className="text-[10px] mt-2" style={{ color: 'var(--t3)' }}>{t('rules.fastest_lap_note')}</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-[11px] mono font-semibold mb-3" style={{ color: 'var(--t3)' }}>SPRİNT PUANLARI</p>
+                  <p className="text-[11px] mono font-semibold mb-3" style={{ color: 'var(--t3)' }}>
+                    {t('rules.sprint_points_label')}
+                  </p>
                   <div className="space-y-1.5">
                     {POINTS_SPRINT.map((p, i) => (
                       <div key={p.pos} className="flex items-center gap-3">
-                        <span className="text-[11px] mono w-5 text-right font-bold" style={{ color: posColor(i) }}>
-                          P{p.pos}
-                        </span>
+                        <span className="text-[11px] mono w-5 text-right font-bold" style={{ color: posColor(i) }}>P{p.pos}</span>
                         <div className="flex-1">
                           <AnimatedBar value={p.pts} max={8} color={i < 3 ? '#FF8700' : '#888'} delay={i * 0.05} />
                         </div>
                       </div>
                     ))}
-                    <p className="text-[10px] mt-2" style={{ color: 'var(--t3)' }}>
-                      Sprint yarışları seçili hafta sonlarında yapılır (~100 km)
-                    </p>
+                    <p className="text-[10px] mt-2" style={{ color: 'var(--t3)' }}>{t('rules.sprint_note')}</p>
                   </div>
                 </div>
               </div>
             </section>
 
-            {/* Lastik Bileşikleri */}
+            {/* Tyres */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">🔴 Lastik Bileşikleri</h2>
+                <h2 className="text-[15px] font-bold text-white">🔴 {t('rules.sec_tyres')}</h2>
               </div>
               <div className="p-5">
-                <TyreAnimation />
+                <div className="flex flex-wrap gap-4 justify-center py-4">
+                  {TYRE_COMPOUNDS.map((tc, i) => (
+                    <div key={tc.name} className="flex flex-col items-center gap-2 w-[140px]"
+                      style={{ animation: `fadeUp 0.5s ease-out ${i * 0.1}s both` }}>
+                      <div className="relative">
+                        <svg width="72" height="72" viewBox="0 0 72 72">
+                          <circle cx="36" cy="36" r="32" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+                          <circle cx="36" cy="36" r="32" fill="none" stroke={tc.color} strokeWidth="8"
+                            strokeDasharray={`${201 * ((5 - i) / 5)} 201`}
+                            style={{ animation: `tyreRotate 2s linear ${i * 0.2}s both` }}
+                            transform="rotate(-90 36 36)" />
+                          <circle cx="36" cy="36" r="20" fill={tc.color + '15'} stroke={tc.color + '40'} strokeWidth="1" />
+                          <text x="36" y="40" textAnchor="middle" fontSize="16" fontWeight="900"
+                            fontFamily="IBM Plex Mono" fill={tc.color}>{tc.letter}</text>
+                        </svg>
+                      </div>
+                      <p className="text-[12px] font-bold" style={{ color: tc.color }}>{tc.name}</p>
+                      <p className="text-[10px] text-center leading-tight" style={{ color: 'var(--t3)' }}>{tc.desc}</p>
+                    </div>
+                  ))}
+                </div>
                 <div className="mt-4 rounded-lg px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
                   <p className="text-[11px] leading-relaxed" style={{ color: 'var(--t2)' }}>
-                    Pirelli her yarış için 3 kuru lastik seti belirler (C1-C5 aralığından). Yumuşak lastik daha hızlı ama
-                    daha çabuk aşınır. Yarışta en az <span className="text-white font-bold">2 farklı bileşik</span> kullanmak zorunludur.
-                    Yağmurda intermediate veya wet lastik kullanılır — bu durumda bileşik kuralı geçersizdir.
+                    {t('rules.tyre_rule_note')}
                   </p>
                 </div>
               </div>
             </section>
 
-            {/* Bayraklar */}
+            {/* Flags */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">🚩 Bayrak Kuralları</h2>
+                <h2 className="text-[15px] font-bold text-white">🚩 {t('rules.sec_flags')}</h2>
               </div>
               <div className="p-5 grid sm:grid-cols-2 gap-3">
-                {FLAGS.map((f, i) => (
+                {FLAGS.map(f => (
                   <div key={f.name} className="flex items-start gap-3 rounded-lg px-3 py-2.5"
                     style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <span className="text-xl shrink-0">{f.icon}</span>
@@ -280,21 +263,18 @@ export function RulesPage() {
               </div>
             </section>
 
-            {/* Yarış Haftası */}
+            {/* Weekend Format */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">📅 Yarış Haftası Formatı</h2>
+                <h2 className="text-[15px] font-bold text-white">📅 {t('rules.sec_weekend')}</h2>
               </div>
               <div className="p-5">
                 <div className="grid md:grid-cols-3 gap-4">
                   {WEEKEND_FORMAT.map((day, di) => (
-                    <div key={day.day} className="rounded-xl border overflow-hidden"
-                      style={{ borderColor: 'var(--b1)' }}>
+                    <div key={day.day} className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--b1)' }}>
                       <div className="px-4 py-2 text-center" style={{ background: di === 2 ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.03)' }}>
                         <p className="text-[11px] mono font-black tracking-widest"
-                          style={{ color: di === 2 ? '#E10600' : 'var(--t3)' }}>
-                          {day.day}
-                        </p>
+                          style={{ color: di === 2 ? '#E10600' : 'var(--t3)' }}>{day.day}</p>
                       </div>
                       <div className="p-3 space-y-2">
                         {day.sessions.map(s => (
@@ -313,20 +293,19 @@ export function RulesPage() {
               </div>
             </section>
 
-            {/* Sıralama Formatı */}
+            {/* Qualifying Format */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">⏱ Sıralama Turları</h2>
+                <h2 className="text-[15px] font-bold text-white">⏱ {t('rules.sec_quali')}</h2>
               </div>
               <div className="p-5">
                 <div className="flex flex-col sm:flex-row gap-3">
                   {[
-                    { seg: 'Q1', time: '18 dakika', drivers: '22 → 16', elim: '6 pilot elenir', color: '#E10600' },
-                    { seg: 'Q2', time: '15 dakika', drivers: '16 → 10', elim: '6 pilot elenir', color: '#FF8700' },
-                    { seg: 'Q3', time: '12 dakika', drivers: '10 pilot', elim: 'Pole pozisyonu belirlenir', color: '#a855f7' },
-                  ].map((q, i) => (
-                    <div key={q.seg} className="flex-1 rounded-xl border overflow-hidden"
-                      style={{ borderColor: q.color + '40' }}>
+                    { seg: 'Q1', time: t('rules.q1_time'), drivers: '22 → 16', elim: t('rules.q1_elim'), color: '#E10600' },
+                    { seg: 'Q2', time: t('rules.q2_time'), drivers: '16 → 10', elim: t('rules.q2_elim'), color: '#FF8700' },
+                    { seg: 'Q3', time: t('rules.q3_time'), drivers: t('rules.q3_drivers'), elim: t('rules.q3_elim'), color: '#a855f7' },
+                  ].map(q => (
+                    <div key={q.seg} className="flex-1 rounded-xl border overflow-hidden" style={{ borderColor: q.color + '40' }}>
                       <div className="px-4 py-2 text-center" style={{ background: q.color + '15' }}>
                         <p className="text-[20px] font-black mono" style={{ color: q.color }}>{q.seg}</p>
                       </div>
@@ -338,59 +317,48 @@ export function RulesPage() {
                     </div>
                   ))}
                 </div>
-                {/* Q akış gösterimi */}
-                <div className="flex items-center justify-center gap-2 mt-4">
-                  {['22 Pilot', '→', 'Q1', '→', '16', '→', 'Q2', '→', '10', '→', 'Q3', '→', 'Pole'].map((t, i) => (
+                <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
+                  {[`22 ${t('rules.drivers')}`, '→', 'Q1', '→', '16', '→', 'Q2', '→', '10', '→', 'Q3', '→', 'Pole'].map((item, i) => (
                     <span key={i} className="text-[10px] mono font-bold"
-                      style={{ color: t.startsWith('Q') ? '#E10600' : t === 'Pole' ? '#FFD700' : 'var(--t3)',
+                      style={{ color: item.startsWith('Q') ? '#E10600' : item === 'Pole' ? '#FFD700' : 'var(--t3)',
                                animation: `fadeUp 0.3s ease-out ${i * 0.05}s both` }}>
-                      {t}
+                      {item}
                     </span>
                   ))}
                 </div>
               </div>
             </section>
 
-            {/* Aktif Aerodinamik — Overtake Modu */}
+            {/* Active Aero */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">💨 Aktif Aerodinamik & Overtake Modu</h2>
+                <h2 className="text-[15px] font-bold text-white">💨 {t('rules.sec_aero')}</h2>
               </div>
               <div className="p-5">
                 <div className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(225,6,0,0.06)', border: '1px solid rgba(225,6,0,0.15)' }}>
-                  <p className="text-[11px]" style={{ color: '#E10600' }}>
-                    2026'da DRS kaldırıldı. Yerine aktif aerodinamik sistemi geldi.
-                  </p>
+                  <p className="text-[11px]" style={{ color: '#E10600' }}>{t('rules.drs_removed_note')}</p>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                      <p className="text-[12px] font-bold text-white">Z-Modu (Düzlük Modu)</p>
-                      <p className="text-[11px] mt-1" style={{ color: 'var(--t2)' }}>
-                        Düz yollarda ön ve arka kanatlar otomatik olarak düzleşir, hava direnci azalır.
-                        Tüm araçlarda otomatik aktif olur — özel koşul gerekmez.
-                      </p>
+                      <p className="text-[12px] font-bold text-white">{t('rules.z_mode_title')}</p>
+                      <p className="text-[11px] mt-1" style={{ color: 'var(--t2)' }}>{t('rules.z_mode_desc')}</p>
                     </div>
                     <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
                       <p className="text-[12px] font-bold text-white">Manual Override (Overtake)</p>
-                      <p className="text-[11px] mt-1" style={{ color: 'var(--t2)' }}>
-                        Pilot direksiyondaki butona basarak kanatları düzlük moduna zorlar.
-                        Tur başına sınırlı kullanım hakkı — savunma ve atak için stratejik kullanılır.
-                      </p>
+                      <p className="text-[11px] mt-1" style={{ color: 'var(--t2)' }}>{t('rules.overtake_desc')}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-center">
                     <svg viewBox="0 0 220 130" width="220" height="130">
-                      {/* Viraj modu */}
                       <g transform="translate(10,15)">
                         <rect x="5" y="25" width="70" height="4" rx="2" fill="#888" />
                         <rect x="15" y="8" width="50" height="6" rx="2" fill="#888" transform="rotate(-15 40 11)" />
                         <rect x="15" y="40" width="50" height="6" rx="2" fill="#888" transform="rotate(15 40 43)" />
-                        <text x="40" y="70" textAnchor="middle" fontSize="8" fill="var(--t3)" fontFamily="IBM Plex Mono">VİRAJ</text>
-                        <text x="40" y="80" textAnchor="middle" fontSize="7" fill="var(--t3)" fontFamily="IBM Plex Mono">Yüksek basma</text>
+                        <text x="40" y="70" textAnchor="middle" fontSize="8" fill="var(--t3)" fontFamily="IBM Plex Mono">{t('rules.corner_label')}</text>
+                        <text x="40" y="80" textAnchor="middle" fontSize="7" fill="var(--t3)" fontFamily="IBM Plex Mono">{t('rules.high_df')}</text>
                       </g>
                       <text x="110" y="40" textAnchor="middle" fontSize="16" fill="#00D2BE">→</text>
-                      {/* Düzlük modu */}
                       <g transform="translate(130,15)">
                         <rect x="5" y="25" width="70" height="4" rx="2" fill="#00D2BE" />
                         <rect x="15" y="20" width="50" height="4" rx="2" fill="#00D2BE">
@@ -399,8 +367,8 @@ export function RulesPage() {
                         <rect x="15" y="32" width="50" height="4" rx="2" fill="#00D2BE">
                           <animate attributeName="y" values="40;32;32" dur="0.8s" fill="freeze" />
                         </rect>
-                        <text x="40" y="70" textAnchor="middle" fontSize="8" fill="#00D2BE" fontWeight="bold" fontFamily="IBM Plex Mono">DÜZLÜK</text>
-                        <text x="40" y="80" textAnchor="middle" fontSize="7" fill="#00D2BE" fontFamily="IBM Plex Mono">Düşük direnç</text>
+                        <text x="40" y="70" textAnchor="middle" fontSize="8" fill="#00D2BE" fontWeight="bold" fontFamily="IBM Plex Mono">{t('rules.straight_label')}</text>
+                        <text x="40" y="80" textAnchor="middle" fontSize="7" fill="#00D2BE" fontFamily="IBM Plex Mono">{t('rules.low_drag')}</text>
                       </g>
                     </svg>
                   </div>
@@ -408,20 +376,13 @@ export function RulesPage() {
               </div>
             </section>
 
-            {/* Cezalar */}
+            {/* Penalties */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">⚖️ Yaygın Cezalar</h2>
+                <h2 className="text-[15px] font-bold text-white">⚖️ {t('rules.sec_penalties')}</h2>
               </div>
               <div className="p-5 grid sm:grid-cols-2 gap-3">
-                {[
-                  { penalty: '5 saniye ceza', desc: 'Küçük ihlaller: pist sınırı, güvenli olmayan çıkış', severity: 1 },
-                  { penalty: '10 saniye ceza', desc: 'Orta ihlaller: çarpışmaya sebep olma', severity: 2 },
-                  { penalty: 'Drive-through', desc: 'Ağır ihlaller: pit lane hız limiti aşımı', severity: 3 },
-                  { penalty: 'Stop & Go (10s)', desc: 'Çok ağır ihlaller: tehlikeli sürüş', severity: 4 },
-                  { penalty: 'Grid cezası', desc: 'Motor/şanzıman değişimi, parc fermé ihlali', severity: 2 },
-                  { penalty: 'Diskalifiye', desc: 'Teknik kural ihlali, yakıt limitini aşma', severity: 5 },
-                ].map((p, i) => (
+                {PENALTIES.map(p => (
                   <div key={p.penalty} className="flex items-start gap-3 rounded-lg px-3 py-2.5"
                     style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <div className="flex gap-0.5 mt-1 shrink-0">
@@ -440,14 +401,12 @@ export function RulesPage() {
           </div>
         )}
 
-        {/* ── 2026 Regülasyonları ─────────────────────────────── */}
+        {/* ── 2026 Regulations ── */}
         {tab === 'regulations' && (
           <div className="space-y-6">
-
             <div className="card p-5">
               <p className="text-[14px] leading-relaxed" style={{ color: 'var(--t2)' }}>
-                2026 sezonu Formula 1 tarihindeki en büyük regülasyon değişikliklerinden birini getiriyor.
-                Yeni güç üniteleri, aktif aerodinamik ve sürdürülebilir yakıtlar ile F1 yeni bir çağa giriyor.
+                {t('rules.regs_intro', { year: 2026 })}
               </p>
             </div>
 
@@ -471,36 +430,26 @@ export function RulesPage() {
               </section>
             ))}
 
-            {/* Karşılaştırma Tablosu */}
+            {/* Comparison Table */}
             <section className="card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-                <h2 className="text-[15px] font-bold text-white">📊 2025 vs 2026 Karşılaştırma</h2>
+                <h2 className="text-[15px] font-bold text-white">📊 {t('rules.sec_comparison')}</h2>
               </div>
               <div className="overflow-x-auto">
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'IBM Plex Mono, monospace' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
-                      {['ÖZELLİK', '2025', '2026', 'FARK'].map((h, i) => (
+                      {[t('rules.cmp_feature'), '2025', '2026', t('rules.cmp_diff')].map((h, i) => (
                         <th key={h} style={{
                           padding: '10px 14px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
-                          color: h === '2026' ? '#00D2BE' : h === 'FARK' ? '#E10600' : 'rgba(240,244,255,0.3)',
+                          color: h === '2026' ? '#00D2BE' : h === t('rules.cmp_diff') ? '#E10600' : 'rgba(240,244,255,0.3)',
                           textAlign: i === 0 ? 'left' : 'right',
                         }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { label: 'Uzunluk', old: '5640 mm', val: '5440 mm', diff: '-200 mm', diffColor: '#00D2BE' },
-                      { label: 'Genişlik', old: '2000 mm', val: '2000 mm', diff: 'Aynı', diffColor: 'var(--t3)' },
-                      { label: 'Min. ağırlık', old: '798 kg', val: '722 kg', diff: '-76 kg', diffColor: '#00D2BE' },
-                      { label: 'Dingil mesafesi', old: '3600 mm', val: '3400 mm', diff: '-200 mm', diffColor: '#00D2BE' },
-                      { label: 'Elektrik (MGU-K)', old: '120 kW', val: '350 kW', diff: '+192%', diffColor: '#E10600' },
-                      { label: 'MGU-H', old: 'Var', val: 'Kaldırıldı', diff: '—', diffColor: '#E10600' },
-                      { label: 'Yakıt', old: 'Fosil bazlı', val: '%100 sürdürülebilir', diff: 'Yeni', diffColor: '#00D2BE' },
-                      { label: 'Aerodinamik', old: 'Sabit kanat', val: 'Aktif kanat', diff: 'Yeni', diffColor: '#a855f7' },
-                      { label: 'DRS', old: 'Var', val: 'Kaldırıldı (Overtake)', diff: 'Yeni', diffColor: '#a855f7' },
-                    ].map(r => (
+                    {COMPARISON.map(r => (
                       <tr key={r.label} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--t2)' }}>{r.label}</td>
                         <td style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, textAlign: 'right', color: 'rgba(240,244,255,0.5)' }}>{r.old}</td>
