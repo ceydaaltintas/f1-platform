@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -168,12 +168,16 @@ async def list_rounds(
     result = await db.execute(query)
     rounds = result.scalars().all()
 
-    # Geçmiş tarihli "upcoming" session'ları otomatik "finished" yap
+    # Geçmiş tarihli "upcoming" session'ları otomatik "finished" yap.
+    # 4 saatlik tampon: kırmızı bayrak / yağmur molası gibi durumlarda
+    # session hâlâ devam ediyor olabilir; başlama saatinin 4 saat ötesine
+    # geçmişse kesinlikle bitmiştir.
     now = datetime.now(timezone.utc)
+    stale_cutoff = now - timedelta(hours=4)
     stale_sessions_result = await db.execute(
         select(Session).where(
             Session.status == "upcoming",
-            Session.session_date < now,
+            Session.session_date < stale_cutoff,
             Session.round_id.in_([r.id for r in rounds]),
         )
     )
