@@ -558,14 +558,35 @@ LIVE_SYS_TEMPLATES = {
     },
 }
 
+LIVE_SYS_TEMPLATES_EN = {
+    "race": {
+        "beginner": "You are a live F1 race commentator. Based on the current race situation, give a short, exciting, plain-English commentary. Maximum 2 sentences.\n",
+        "expert": "You are a technical F1 race analyst providing live commentary. Based on the current race situation, give a concise technical analysis. Maximum 2 sentences.\n",
+    },
+    "practice": {
+        "beginner": "You are a live F1 practice session commentator. Briefly comment on lap times, tyre choices and driver performance in plain English. Maximum 2 sentences.\n",
+        "expert": "You are a technical F1 analyst covering a live practice session. Comment briefly on lap times, sector performance and tyre strategy. Maximum 2 sentences.\n",
+    },
+    "qualifying": {
+        "beginner": "You are a live F1 qualifying commentator. Briefly comment on driver performance, fastest laps and elimination situations in plain English. Maximum 2 sentences.\n",
+        "expert": "You are a technical F1 analyst covering live qualifying. Comment briefly on sector times, tyre strategy and the pole position battle. Maximum 2 sentences.\n",
+    },
+}
+
 LIVE_FALLBACK = {
-    "race": "Yarış devam ediyor, #{leader} numaralı araç liderlikte.",
-    "practice": "Antrenman devam ediyor, #{leader} numaralı araç en hızlı tur süresine sahip.",
-    "qualifying": "Sıralama turları devam ediyor, #{leader} numaralı araç en hızlı.",
+    "race": "The race is underway, with {leader} currently leading.",
+    "practice": "Practice is ongoing, {leader} holds the fastest lap.",
+    "qualifying": "Qualifying is in progress, {leader} is fastest so far.",
+}
+
+LIVE_FALLBACK_TR = {
+    "race": "Yarış devam ediyor, {leader} liderlikte.",
+    "practice": "Antrenman devam ediyor, {leader} en hızlı tur süresine sahip.",
+    "qualifying": "Sıralama turları devam ediyor, {leader} en hızlı.",
 }
 
 
-async def interpret_live_race(context: dict, mode: str = "beginner") -> str:
+async def interpret_live_race(context: dict, mode: str = "beginner", language: str = "tr") -> str:
     """Anlık oturum durumunu yorumlar — yarış, antrenman veya sıralama."""
     session_type = context.get("session_type", "race")
     if session_type.startswith("practice"):
@@ -575,9 +596,14 @@ async def interpret_live_race(context: dict, mode: str = "beginner") -> str:
     else:
         category = "race"
 
-    templates = LIVE_SYS_TEMPLATES.get(category, LIVE_SYS_TEMPLATES["race"])
-    system = templates.get(mode, templates["beginner"]) + FORMAT_RULES
-    content = f"Anlık durum: {json.dumps(context, ensure_ascii=False)}"
+    if language == "en":
+        templates = LIVE_SYS_TEMPLATES_EN.get(category, LIVE_SYS_TEMPLATES_EN["race"])
+        system = templates.get(mode, templates["beginner"]) + FORMAT_RULES_EN
+        content = f"Current situation: {json.dumps(context, ensure_ascii=False)}"
+    else:
+        templates = LIVE_SYS_TEMPLATES.get(category, LIVE_SYS_TEMPLATES["race"])
+        system = templates.get(mode, templates["beginner"]) + FORMAT_RULES
+        content = f"Anlık durum: {json.dumps(context, ensure_ascii=False)}"
 
     text = ""
     if _groq_ok():
@@ -592,7 +618,8 @@ async def interpret_live_race(context: dict, mode: str = "beginner") -> str:
             logger.warning("Anthropic canlı yorum başarısız: %s", e)
     if not text:
         leader = context.get("leader")
-        fallback = LIVE_FALLBACK.get(category, LIVE_FALLBACK["race"])
+        fallback_map = LIVE_FALLBACK if language == "en" else LIVE_FALLBACK_TR
+        fallback = fallback_map.get(category, fallback_map["race"])
         text = fallback.format(leader=leader)
     else:
         text = _clean_ai_text(text)

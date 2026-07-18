@@ -78,7 +78,8 @@ function windDir(deg?: number): string {
 const DEMO_SESSION_ID = 25
 
 export function LivePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
   const { sessionId } = useParams<{ sessionId: string }>()
   const isDemo = sessionId === 'demo'
   // Demo için gerçek Kanada GP verisi kullan
@@ -147,7 +148,7 @@ export function LivePage() {
   const esRef = useRef<EventSource | null>(null)
   useEffect(() => {
     if (isDemo || !effectiveSid || isNaN(effectiveSid)) return
-    const es = new EventSource(`${BASE}/api/v1/live/${effectiveSid}/commentary?mode=beginner`)
+    const es = new EventSource(`${BASE}/api/v1/live/${effectiveSid}/commentary?mode=beginner&language=${lang}`)
     esRef.current = es
     es.onmessage = e => {
       try { setCommentary(JSON.parse(e.data).text ?? '') } catch {}
@@ -158,7 +159,7 @@ export function LivePage() {
   // Tick
   const [tick, setTick] = useState('')
   useEffect(() => {
-    const id = setInterval(() => setTick(new Date().toLocaleTimeString('tr-TR')), 1000)
+    const id = setInterval(() => setTick(new Date().toLocaleTimeString(lang === 'tr' ? 'tr-TR' : 'en-GB')), 1000)
     return () => clearInterval(id)
   }, [])
 
@@ -708,14 +709,14 @@ export function LivePage() {
               <p className="text-[13px] font-bold text-white">{t('live.radio')}</p>
               {radioClips.length > 0 && (
                 <span className="text-[10px] mono ml-auto" style={{ color: 'var(--t3)' }}>
-                  {radioClips.length} kayıt
+                  {t('live.recordings_count', { n: radioClips.length })}
                 </span>
               )}
             </div>
             <div className="p-3 space-y-2 overflow-y-auto" style={{ maxHeight: 280 }}>
               {radioClips.length === 0 ? (
                 <p className="text-[12px] mono text-center py-4" style={{ color: 'var(--t3)' }}>
-                  Henüz radyo kaydı yok
+                  {t('live.no_radio')}
                 </p>
               ) : radioClips.map((c: any, i: number) => (
                 <div key={`${c.recording_url}-${i}`}
@@ -726,7 +727,7 @@ export function LivePage() {
                     <p className="text-[12px] font-black mono text-white leading-none">{c.code}</p>
                     {c.date && (
                       <p className="text-[9px] mono mt-0.5" style={{ color: 'rgba(240,244,255,0.65)' }}>
-                        {new Date(c.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {new Date(c.date).toLocaleTimeString(lang === 'tr' ? 'tr-TR' : 'en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </p>
                     )}
                   </div>

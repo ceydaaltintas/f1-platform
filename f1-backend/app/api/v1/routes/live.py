@@ -1832,7 +1832,7 @@ async def get_team_radio(session_id: int, db: AsyncSession = Depends(get_db)):
 # ─── SSE: AI Canlı Yorum Akışı ───────────────────────────────────────────────
 
 @router.get("/{session_id}/commentary")
-async def live_commentary(session_id: int, mode: str = "beginner"):
+async def live_commentary(session_id: int, mode: str = "beginner", language: str = "tr"):
     """
     Server-Sent Events akışı ile AI canlı yarış yorumu.
     Her 30 saniyede bir anlık yarış durumuna göre yeni yorum üretir.
@@ -1901,7 +1901,7 @@ async def live_commentary(session_id: int, mode: str = "beginner"):
 
                 if context:
                     try:
-                        commentary_text = await claude_ai.interpret_live_race(context, mode)
+                        commentary_text = await claude_ai.interpret_live_race(context, mode, language=language)
                     except Exception as e:
                         logger.warning("AI yorum hatası: %s", e)
                         commentary_text = ""
