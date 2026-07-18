@@ -49,9 +49,12 @@ async def constructor_standings(year: int):
 
 
 @router.get("/drivers/{driver_id}/profile")
-async def driver_profile(driver_id: str):
+async def driver_profile(
+    driver_id: str,
+    language: str = Query("tr", pattern="^(tr|en)$"),
+):
     """Pilot kariyer istatistikleri + AI biyografi."""
-    ck = cache_key("driver_profile_v2", driver_id)
+    ck = cache_key("driver_profile_v2", driver_id, language)
     cached = await cache_get(ck)
     if cached:
         return cached
@@ -65,7 +68,6 @@ async def driver_profile(driver_id: str):
         driver_info = {}
     full_name = f"{driver_info.get('givenName', '')} {driver_info.get('familyName', '')}".strip() or driver_id
     nationality = driver_info.get("nationality", "")
-    dob = driver_info.get("dateOfBirth")
 
     # Jolpica'dan kariyer verileri
     try:
@@ -98,17 +100,27 @@ async def driver_profile(driver_id: str):
     # AI biyografi
     bio = ""
     try:
-        bio_ck = cache_key("driver_bio_v2", driver_id)
+        bio_ck = cache_key("driver_bio_v2", driver_id, language)
         bio = await cache_get(bio_ck)
         if not bio:
             from app.services import claude_ai
-            prompt = (
-                f"Formula 1 pilotu {full_name} ({nationality}, {last_team or 'F1'} takımı) hakkında "
-                f"2 cümlelik kısa Türkçe biyografi yaz. "
-                f"Kariyer: {total_races} yarış, {wins} galibiyet, {podiums} podyum. "
-                f"Sürüş tarzı ve öne çıkan özellikleri."
-            )
-            system = "Sen bir F1 uzmanısın. Çok kısa, bilgilendirici pilot tanıtımları yazarsın. Maksimum 2 cümle, sade Türkçe. Sadece F1 kariyerinden bahset."
+            en = language == "en"
+            if en:
+                prompt = (
+                    f"Write a short 2-sentence biography of Formula 1 driver {full_name} "
+                    f"({nationality}, {last_team or 'F1'} team). "
+                    f"Career: {total_races} races, {wins} wins, {podiums} podiums. "
+                    f"Focus on driving style and standout qualities."
+                )
+                system = "You are an F1 expert. Write very short, informative driver profiles. Maximum 2 sentences, plain English. Focus only on F1 career."
+            else:
+                prompt = (
+                    f"Formula 1 pilotu {full_name} ({nationality}, {last_team or 'F1'} takımı) hakkında "
+                    f"2 cümlelik kısa Türkçe biyografi yaz. "
+                    f"Kariyer: {total_races} yarış, {wins} galibiyet, {podiums} podyum. "
+                    f"Sürüş tarzı ve öne çıkan özellikleri."
+                )
+                system = "Sen bir F1 uzmanısın. Çok kısa, bilgilendirici pilot tanıtımları yazarsın. Maksimum 2 cümle, sade Türkçe. Sadece F1 kariyerinden bahset."
             if claude_ai._groq_ok():
                 bio = await claude_ai._groq_interpret(prompt, system)
             elif claude_ai._anthropic_ok():

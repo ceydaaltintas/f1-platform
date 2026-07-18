@@ -38,10 +38,11 @@ const NATIONALITY_FLAG: Record<string, string> = {
 }
 
 function DriverProfileCard({ driverId, teamColor }: { driverId: string; teamColor: string }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
   const { data, isLoading } = useQuery({
-    queryKey: ['driver-profile', driverId],
-    queryFn: () => client.get(`/drivers/${driverId}/profile`).then(r => r.data),
+    queryKey: ['driver-profile', driverId, lang],
+    queryFn: () => client.get(`/drivers/${driverId}/profile`, { params: { language: lang } }).then(r => r.data),
     staleTime: 86_400_000,
   })
 
