@@ -11,6 +11,7 @@ from app.core.redis_client import cache_delete_pattern, cache_get, cache_key, ca
 from app.models.f1 import Driver, Round, Season, Session, Team
 from app.schemas.f1 import DriverOut, RoundOut, SeasonOut, TeamOut
 from app.services.sync import _determine_current_season, sync_full_season, sync_sessions_for_round
+from app.services.live_session import check_openf1_live_status
 
 router = APIRouter(tags=["seasons"])
 logger = logging.getLogger(__name__)
@@ -168,27 +169,42 @@ async def list_rounds(
     result = await db.execute(query)
     rounds = result.scalars().all()
 
-    # Geçmiş tarihli "upcoming" session'ları otomatik "finished" yap.
-    # 4 saatlik tampon: kırmızı bayrak / yağmur molası gibi durumlarda
-    # session hâlâ devam ediyor olabilir; başlama saatinin 4 saat ötesine
-    # geçmişse kesinlikle bitmiştir.
+    # Geçmiş tarihli "upcoming" session'ları kontrol et.
+    # session_key varsa OpenF1'den gerçek durumu sor; yoksa 4 saat tamponla kapat.
     now = datetime.now(timezone.utc)
-    stale_cutoff = now - timedelta(hours=4)
-    stale_sessions_result = await db.execute(
+    candidates_result = await db.execute(
         select(Session).where(
             Session.status == "upcoming",
-            Session.session_date < stale_cutoff,
+            Session.session_date < now,
             Session.round_id.in_([r.id for r in rounds]),
         )
     )
-    stale_sessions = stale_sessions_result.scalars().all()
-    if stale_sessions:
-        for s in stale_sessions:
-            s.status = "finished"
+    candidates = candidates_result.scalars().all()
+    finished_ids: list[int] = []
+    for s in candidates:
+        if s.session_key:
+            try:
+                of1_status = await check_openf1_live_status(s.session_key)
+                if of1_status == "finished":
+                    finished_ids.append(s.id)
+                # "live" veya "unknown" → dokunma
+            except Exception:
+                # OpenF1 erişilemezse 4 saat tamponla karar ver
+                if s.session_date < now - timedelta(hours=4):
+                    finished_ids.append(s.id)
+        else:
+            # session_key yoksa (henüz senkronize edilmemiş) — 4 saat tampon
+            if s.session_date < now - timedelta(hours=4):
+                finished_ids.append(s.id)
+
+    if finished_ids:
+        for s in candidates:
+            if s.id in finished_ids:
+                s.status = "finished"
         await db.commit()
         for r in rounds:
             await db.refresh(r, ["sessions"])
-        logger.info("%d stale session 'finished' olarak güncellendi", len(stale_sessions))
+        logger.info("%d stale session 'finished' olarak güncellendi", len(finished_ids))
         await cache_delete_pattern(f"rounds:{year}:*")
 
     data = [RoundOut.model_validate(r).model_dump(mode="json") for r in rounds]
