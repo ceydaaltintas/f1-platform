@@ -164,13 +164,10 @@ export function StandingsPage() {
 
   const results = useQuery({
     queryKey: ['season', 'results', y],
-    queryFn:  () => withFallback(
-      `/seasons/${y}/results`,
-      async () => []
-    ),
+    queryFn:  () => client.get(`/seasons/${y}/results`).then(r => r.data),
     enabled:  effectiveTab === 'results',
     staleTime: 300_000,
-    retry: 0,
+    retry: 2,
   })
 
   // Fantasy için bir sonraki round'u doğrudan DB'den al — Jolpica yavaş
