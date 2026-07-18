@@ -38,6 +38,7 @@ const NATIONALITY_FLAG: Record<string, string> = {
 }
 
 function DriverProfileCard({ driverId, teamColor }: { driverId: string; teamColor: string }) {
+  const { t } = useTranslation()
   const { data, isLoading } = useQuery({
     queryKey: ['driver-profile', driverId],
     queryFn: () => client.get(`/drivers/${driverId}/profile`).then(r => r.data),
@@ -51,8 +52,6 @@ function DriverProfileCard({ driverId, teamColor }: { driverId: string; teamColo
   )
 
   if (!data) return null
-
-  const { t } = useTranslation()
   const stats = [
     { label: t('standings.results').toUpperCase(), value: data.total_races, color: 'white' },
     { label: t('standings_page.wins'), value: data.wins, color: data.wins > 0 ? '#FFD700' : 'white' },
