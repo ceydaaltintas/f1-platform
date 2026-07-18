@@ -163,8 +163,15 @@
     "col_driver": "PİLOT",
     "col_best": "EN İYİ",
     "col_gap": "FARK",
+    "col_interval": "ARALIK",
     "col_best_lap": "EN İYİ TUR",
+    "col_lap": "TUR",
+    "lap_label": "TUR",
     "quali_results": "{{seg}} SONUÇLARI ({{n}})"
+  },
+  "track_map": {
+    "click_hint": "Grafiğe tıklayınca konum gösterilir",
+    "corner": "Köşe:"
   },
   "community": {
     "comments": "CANLI YORUMLAR",

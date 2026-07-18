@@ -163,8 +163,15 @@
     "col_driver": "DRIVER",
     "col_best": "BEST",
     "col_gap": "GAP",
+    "col_interval": "INTERVAL",
     "col_best_lap": "BEST LAP",
+    "col_lap": "LAP",
+    "lap_label": "LAP",
     "quali_results": "{{seg}} RESULTS ({{n}})"
+  },
+  "track_map": {
+    "click_hint": "Click the chart to show position",
+    "corner": "Corner:"
   },
   "community": {
     "comments": "LIVE COMMENTS",

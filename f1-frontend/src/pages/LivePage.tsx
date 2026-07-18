@@ -95,8 +95,8 @@ export function LivePage() {
   const sessionTitle = isDemo
     ? 'Kanada Grand Prix 2026'
     : sessionInfo.data
-      ? `${sessionInfo.data.round?.name ?? ''} — ${SESSION_LABELS[sessionInfo.data.type as SessionType] ?? sessionInfo.data.type}`
-      : `Oturum #${effectiveSid}`
+      ? `${sessionInfo.data.round?.name ?? ''} — ${t(`session.${sessionInfo.data.type}`, SESSION_LABELS[sessionInfo.data.type as SessionType] ?? sessionInfo.data.type)}`
+      : t('common.session', { id: effectiveSid })
 
   const timing = useQuery({
     queryKey: ['live-timing', effectiveSid],
@@ -299,7 +299,7 @@ export function LivePage() {
           <div className="flex items-center justify-between px-5 py-3.5 border-b"
             style={{ borderColor: 'var(--b1)' }}>
             <div className="flex items-center gap-3">
-              <p className="text-[13px] font-bold text-white">Sıralama</p>
+              <p className="text-[13px] font-bold text-white">{t('live.standings_title')}</p>
               {(() => {
                 const clock = timing.data?.session_clock
                 if (!clock?.remaining_s && clock?.remaining_s !== 0) return null
@@ -328,7 +328,7 @@ export function LivePage() {
                 style={{ background: (QUALI_COLOR[activeSegment] ?? '#888') + '18',
                          border: `1px solid ${(QUALI_COLOR[activeSegment] ?? '#888')}40` }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: QUALI_COLOR[activeSegment] ?? '#888', animation: 'pulse-dot 1s infinite' }} />
-                <span className="text-[10px] mono" style={{ color: 'var(--t3)' }}>AKTİF</span>
+                <span className="text-[10px] mono" style={{ color: 'var(--t3)' }}>{t('live.active_badge')}</span>
                 <span className="text-[16px] font-black mono leading-none" style={{ color: QUALI_COLOR[activeSegment] ?? '#888' }}>
                   {activeSegment}
                 </span>
@@ -336,7 +336,7 @@ export function LivePage() {
             ) : isRaceLike && timing.data?.current_lap ? (
               <div className="flex items-baseline gap-1 px-3 py-1 rounded-lg"
                 style={{ background: 'rgba(225,6,0,0.1)', border: '1px solid rgba(225,6,0,0.2)' }}>
-                <span className="text-[10px] mono mr-1" style={{ color: 'var(--t3)' }}>TUR</span>
+                <span className="text-[10px] mono mr-1" style={{ color: 'var(--t3)' }}>{t('live.lap_label')}</span>
                 <span className="text-[20px] font-black mono leading-none" style={{ color: '#E10600' }}>
                   {timing.data.current_lap}
                 </span>
@@ -373,11 +373,11 @@ export function LivePage() {
                   { label: 'P',      align: 'left'  },
                   { label: '',       align: 'center' },
                   { label: '',       align: 'left'  },
-                  { label: 'PİLOT', align: 'left'  },
-                  { label: isPractice ? 'EN İYİ' : 'FARK', align: 'right' },
-                  { label: isPractice ? 'FARK' : 'ARALIK', align: 'right' },
+                  { label: t('live.col_driver'), align: 'left'  },
+                  { label: isPractice ? t('live.col_best') : t('live.col_gap'), align: 'right' },
+                  { label: isPractice ? t('live.col_gap') : t('live.col_interval'), align: 'right' },
                   { label: 'L',      align: 'right' },
-                  { label: isPractice ? 'TUR' : 'PIT', align: 'right' },
+                  { label: isPractice ? t('live.col_lap') : t('live.pit_indicator'), align: 'right' },
                 ].map(({ label, align }, i) => (
                   <th key={i} style={{
                     padding: '7px 6px', textAlign: align as any,
@@ -392,7 +392,7 @@ export function LivePage() {
               {entries.length === 0 ? (
                 <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center',
                   color: 'rgba(240,244,255,0.6)', fontSize: 12 }}>
-                  Veri yükleniyor...
+                  {t('live.loading_data')}
                 </td></tr>
               ) : entries.map((e: any) => {
                 const color = e.team_colour ?? TEAM_COLOR[e.code] ?? '#888'
@@ -533,7 +533,7 @@ export function LivePage() {
               {entries.length === 0 ? (
                 <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center',
                   color: 'rgba(240,244,255,0.6)', fontSize: 12 }}>
-                  Veri yükleniyor...
+                  {t('live.loading_data')}
                 </td></tr>
               ) : entries.map((e: any) => {
                 const color = e.team_colour ?? TEAM_COLOR[e.code] ?? '#888'
@@ -611,12 +611,12 @@ export function LivePage() {
           {/* Pist Haritası */}
           <div className="card overflow-hidden">
             <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-              <p className="text-[13px] font-bold text-white">Pist Haritası</p>
+              <p className="text-[13px] font-bold text-white">{t('live.track_map_title')}</p>
             </div>
             {trackMap.isLoading || !trackMap.data?.points?.length ? (
               <div className="flex items-center justify-center h-48">
                 <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
-                  {trackMap.isLoading ? 'Pist yükleniyor...' : 'Pist verisi bekleniyor...'}
+                  {trackMap.isLoading ? t('live.track_loading') : t('live.track_waiting')}
                 </p>
               </div>
             ) : (
@@ -693,7 +693,7 @@ export function LivePage() {
                 ) : (
                   <p className="text-[12px] italic w-full text-center" style={{ color:'var(--t3)' }}>
                     {isDemo
-                      ? 'AI yorumu canlı oturum sırasında aktif olur'
+                      ? t('live.ai_live_hint')
                       : t('live.commentary_placeholder')}
                   </p>
                 )}

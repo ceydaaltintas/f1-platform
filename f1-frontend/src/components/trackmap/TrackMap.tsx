@@ -1,4 +1,5 @@
 import { useRef, useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { TrackPoint, TelemetryPoint } from '../../types/f1'
 
 interface DriverPos { ratio: number; code: string; color: string }
@@ -90,6 +91,7 @@ export function TrackMap({
   showCorners = true,
   height = 460,
 }: Props) {
+  const { t } = useTranslation()
   const svgRef = useRef<SVGSVGElement>(null)
   const initRef = useRef<VB>({ x: 0, y: 0, w: 1000, h: 1000 })
   // drag: vb'yi sürükle başındaki değerden hesapla — drift olmaz
@@ -217,7 +219,7 @@ export function TrackMap({
               {primaryLabel && <b style={{ color: primaryColor, marginLeft: 4 }}>· {primaryLabel}</b>}
             </span>
           ) : (
-            <span style={{ color: 'var(--t3)' }}>Grafiğe tıklayınca konum gösterilir</span>
+            <span style={{ color: 'var(--t3)' }}>{t('track_map.click_hint')}</span>
           )}
         </div>
 
@@ -249,7 +251,7 @@ export function TrackMap({
       {corners.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-4 py-2 border-b"
           style={{ borderColor: 'var(--b1)' }}>
-          <span className="text-[10px] mono self-center mr-1" style={{ color: 'var(--t3)' }}>Köşe:</span>
+          <span className="text-[10px] mono self-center mr-1" style={{ color: 'var(--t3)' }}>{t('track_map.corner')}</span>
           {corners.map((idx, n) => (
             <button key={n}
               onClick={() => zoomToCorner(ptsA[idx])}
