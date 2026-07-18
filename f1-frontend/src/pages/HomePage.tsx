@@ -459,7 +459,7 @@ export function HomePage() {
                           className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border opacity-50"
                           style={{ borderColor: 'var(--b1)', background: 'var(--s2)', minWidth: 160 }}>
                           <span className="text-[11px] font-medium" style={{ color: 'var(--t3)' }}>
-                            {SESSION_LABELS[s.type as SessionType] ?? s.type}
+                            {t(`session.${s.type}`, SESSION_LABELS[s.type as SessionType] ?? s.type)}
                           </span>
                           <span className="text-[9px] mono" style={{ color: 'var(--t3)' }}>
                             {sessionTime}
@@ -483,7 +483,7 @@ export function HomePage() {
                         )}
                         <span className="text-[11px] font-medium"
                           style={{ color: s.status==='active' ? '#E10600' : 'var(--t2)' }}>
-                          {SESSION_LABELS[s.type as SessionType] ?? s.type}
+                          {t(`session.${s.type}`, SESSION_LABELS[s.type as SessionType] ?? s.type)}
                           {s.status==='active' && <span className="ml-1 text-[9px] font-bold">{t('nav.live')}</span>}
                         </span>
                       </div>
