@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.redis_client import cache_delete_pattern, cache_get, cache_key, cache_set
-from app.models.f1 import Driver, F1Session, Round, Season, Team
+from app.models.f1 import Driver, Round, Season, Session, Team
 from app.schemas.f1 import DriverOut, RoundOut, SeasonOut, TeamOut
 from app.services.sync import _determine_current_season, sync_full_season, sync_sessions_for_round
 
@@ -171,10 +171,10 @@ async def list_rounds(
     # Geçmiş tarihli "upcoming" session'ları otomatik "finished" yap
     now = datetime.now(timezone.utc)
     stale_sessions_result = await db.execute(
-        select(F1Session).where(
-            F1Session.status == "upcoming",
-            F1Session.session_date < now,
-            F1Session.round_id.in_([r.id for r in rounds]),
+        select(Session).where(
+            Session.status == "upcoming",
+            Session.session_date < now,
+            Session.round_id.in_([r.id for r in rounds]),
         )
     )
     stale_sessions = stale_sessions_result.scalars().all()
