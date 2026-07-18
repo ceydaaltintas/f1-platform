@@ -9,6 +9,7 @@ import { RaceGlobe } from '../components/globe/RaceGlobe'
 import { useTranslation } from 'react-i18next'
 
 function LiveTicker() {
+  const { t } = useTranslation()
   // Aktif sezonu dinamik çek — 2027 gelince otomatik güncellenir
   const currentYear = useQuery({
     queryKey: ['current-year'],
@@ -29,12 +30,12 @@ function LiveTicker() {
 
   const items: string[] = standings.data
     ? [
-        `🏆 ${y} Pilot Şampiyonası`,
+        `🏆 ${y} ${t('standings.drivers')}`,
         ...standings.data.slice(0, 10).map((d: any) =>
-          `${d.position}. ${d.code} · ${d.points} puan`
+          `${d.position}. ${d.code} · ${d.points} ${t('standings.points')}`
         ),
       ]
-    : ['Şampiyona verisi yükleniyor...']
+    : [t('common.loading')]
 
   // İki kopya yan yana → sonsuz kaydırma
   const doubled = [...items, ...items]
@@ -48,7 +49,7 @@ function LiveTicker() {
           <span className="w-1.5 h-1.5 rounded-full bg-[#E10600]"
             style={{ animation: 'pulse-dot 1s infinite' }} />
           <span className="text-[10px] mono font-bold text-[#E10600] tracking-widest whitespace-nowrap">
-            CANLI
+            {t('nav.live')}
           </span>
         </div>
         {/* Kayan şerit */}
@@ -72,9 +73,9 @@ function daysUntil(d: string | null) {
   if (!d) return null
   return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000)
 }
-function formatShortDate(d: string | null) {
+function formatShortDate(d: string | null, locale = 'tr-TR') {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })
+  return new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
 }
 
 // ── Canlı Geri Sayım ─────────────────────────────────────────────────────────
@@ -125,9 +126,20 @@ function Colon({ active = false, blink = false }: { active?: boolean; blink?: bo
 
 // ── Şampiyona Şeridi ──────────────────────────────────────────────────────────
 function StandingsStrip() {
+  const { t } = useTranslation()
+  const currentYear = useQuery({
+    queryKey: ['current-year-strip'],
+    queryFn: () => client.get('/seasons').then(r => {
+      const cur = (r.data as any[]).find(s => s.is_current)
+      return cur?.year ?? new Date().getFullYear()
+    }),
+    staleTime: 3_600_000,
+  })
+  const y = currentYear.data ?? new Date().getFullYear()
   const { data } = useQuery({
-    queryKey: ['standings-strip'],
-    queryFn:  () => client.get('/seasons/2026/standings/drivers').then(r => r.data),
+    queryKey: ['standings-strip', y],
+    queryFn:  () => client.get(`/seasons/${y}/standings/drivers`).then(r => r.data),
+    enabled: !!currentYear.data,
     staleTime: 300_000,
   })
   if (!data?.length) return null
@@ -136,7 +148,7 @@ function StandingsStrip() {
       <div className="max-w-5xl mx-auto px-6 py-2.5 flex items-center gap-6 overflow-x-auto">
         <p className="text-[9px] mono font-bold tracking-[0.2em] shrink-0"
           style={{ color:'var(--t3)' }}>
-          🏆 ŞAMPİYONA
+          🏆 {t('home.championship')}
         </p>
         {data.slice(0,5).map((d: any, i: number) => (
           <div key={d.driver_id} className="flex items-center gap-2 shrink-0">
@@ -150,9 +162,9 @@ function StandingsStrip() {
             {i < 4 && <span style={{ color:'var(--t3)' }}>·</span>}
           </div>
         ))}
-        <Link to="/standings/2026" className="text-[10px] mono ml-auto shrink-0 hover:text-white transition-colors"
+        <Link to={`/standings/${y}`} className="text-[10px] mono ml-auto shrink-0 hover:text-white transition-colors"
           style={{ color:'var(--t3)' }}>
-          Tümü →
+          {t('home.all_link')}
         </Link>
       </div>
     </div>
@@ -168,7 +180,7 @@ const FLAG: Record<string, string> = {
 }
 
 export function HomePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const seasons = useQuery({ queryKey:['seasons'], queryFn:()=>seasonApi.list(), staleTime:300_000 })
   const current = seasons.data?.find(s => s.is_current)
 
@@ -438,12 +450,12 @@ export function HomePage() {
                 {/* Oturumlar */}
                 <div className="flex flex-col gap-2 justify-center shrink-0">
                   <p className="text-[9px] mono font-semibold tracking-widest mb-1"
-                    style={{ color:'var(--t3)' }}>OTURUMLAR</p>
+                    style={{ color:'var(--t3)' }}>{t('home.sessions')}</p>
                   {round.sessions.length > 0 ? round.sessions.map(s => {
                     const isClickable = s.status === 'active' || s.status === 'finished'
                     const sessionTime = s.session_date
-                      ? new Date(s.session_date).toLocaleDateString('tr-TR', { weekday:'short', day:'numeric', month:'short' })
-                        + ' ' + new Date(s.session_date).toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' })
+                      ? new Date(s.session_date).toLocaleDateString(i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-GB', { weekday:'short', day:'numeric', month:'short' })
+                        + ' ' + new Date(s.session_date).toLocaleTimeString(i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-GB', { hour:'2-digit', minute:'2-digit' })
                       : ''
 
                     if (!isClickable) {
@@ -477,14 +489,14 @@ export function HomePage() {
                         <span className="text-[11px] font-medium"
                           style={{ color: s.status==='active' ? '#E10600' : 'var(--t2)' }}>
                           {SESSION_LABELS[s.type as SessionType] ?? s.type}
-                          {s.status==='active' && <span className="ml-1 text-[9px] font-bold">CANLI</span>}
+                          {s.status==='active' && <span className="ml-1 text-[9px] font-bold">{t('nav.live')}</span>}
                         </span>
                       </div>
                       <span className="text-[10px] text-white/25 group-hover:text-white/60">→</span>
                     </Link>
                     )
                   }) : (
-                    <p className="text-[12px]" style={{ color:'var(--t3)' }}>Yakında</p>
+                    <p className="text-[12px]" style={{ color:'var(--t3)' }}>{t('session_page.coming_soon')}</p>
                   )}
                 </div>
               </div>
@@ -497,7 +509,7 @@ export function HomePage() {
                 style={{ textDecoration: 'none' }}>
                 <p className="text-[9px] mono font-semibold tracking-[0.2em] mb-3"
                   style={{ color:'var(--t3)' }}>
-                  SON YARIŞ
+                  {t('home.last_race')}
                 </p>
                 <p className="text-[15px] font-bold text-white mb-4 leading-tight">
                   {lastRace.race_name}
@@ -525,7 +537,7 @@ export function HomePage() {
                 </div>
 
                 <p className="text-[10px] mono mt-3" style={{ color: '#E10600' }}>
-                  Yarış özeti →
+                  {t('home.recap_link')}
                 </p>
               </Link>
             )}
@@ -586,7 +598,7 @@ export function HomePage() {
                       }} />
                   </div>
                   <p className="text-[10px] mono mt-2" style={{ color: 'var(--t3)' }}>
-                    {pct}% tamamlandı
+                    {t('home.progress', { pct })}
                   </p>
                 </Link>
               )
@@ -599,7 +611,7 @@ export function HomePage() {
             <p className="text-5xl mb-4">🏎</p>
             <p className="text-white font-semibold mb-2">{t('home.no_data')}</p>
             <p className="text-[13px] mb-5" style={{ color: 'var(--t2)' }}>
-              İlk senkronizasyonu başlat:
+              {t('home.sync_start')}
             </p>
             <code className="text-[12px] mono px-4 py-2.5 rounded-xl block w-fit mx-auto"
               style={{ background: 'var(--s2)', color: '#00D2BE', border: '1px solid var(--b1)' }}>
@@ -632,18 +644,18 @@ export function HomePage() {
               </p>
               <p className="text-[12px] leading-relaxed" style={{ color: 'var(--t2)' }}>
                 {liveStatus.data?.live
-                  ? 'Anlık sıralama, pist haritası, race control, AI yorum →'
-                  : 'Kanada GP verisiyle simülasyon ve pit analizi dene →'}
+                  ? t('home.live_sessions_hint')
+                  : t('home.live_demo_hint')}
               </p>
             </Link>
 
             {[
-              { icon:'📡', title:'Gerçek Zamanlı Telemetri',
-                desc:'Hız, gaz, fren, DRS, RPM verileri. Grafiğe tıkla, AI yorumla.' },
-              { icon:'🤖', title:'AI Destekli Analiz',
-                desc:'Groq/Claude ile anlık telemetri ve strateji simülasyonu.' },
-              { icon:'🗺', title:'Pist & Strateji',
-                desc:'GPS pist haritası, viraj analizi, pit stop simülatörü.' },
+              { icon:'📡', title: t('home.features.telemetry_title'),
+                desc: t('home.features.telemetry_desc') },
+              { icon:'🤖', title: t('home.features.ai_title'),
+                desc: t('home.features.ai_desc') },
+              { icon:'🗺', title: t('home.features.track_title'),
+                desc: t('home.features.track_desc') },
             ].map(f => (
               <div key={f.title} className="card p-6">
                 <p className="text-2xl mb-3">{f.icon}</p>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { LiveInterval } from '../../store/wsStore'
 
 interface Driver {
@@ -32,6 +33,7 @@ function formatInterval(iv: string | number | null): string {
 }
 
 export function TimingTower({ intervals, drivers, currentLap, totalLaps }: Props) {
+  const { t } = useTranslation()
   const [sorted, setSorted] = useState<LiveInterval[]>([])
   const [posChanges, setPosChanges] = useState<Record<number, 'up' | 'down' | null>>({})
   const prevOrder = useRef<number[]>([])
@@ -69,7 +71,7 @@ export function TimingTower({ intervals, drivers, currentLap, totalLaps }: Props
   if (!sorted.length) {
     return (
       <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-4">
-        <p className="text-[10px] text-[#222] tracking-widest mb-3">CANLI SIRALAMA</p>
+        <p className="text-[10px] text-[#222] tracking-widest mb-3">{t('live.timing')}</p>
         <div className="space-y-1">
           {Array(5).fill(null).map((_, i) => (
             <div key={i} className="h-8 bg-[#111] rounded animate-pulse" />
@@ -83,10 +85,10 @@ export function TimingTower({ intervals, drivers, currentLap, totalLaps }: Props
     <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-4">
       {/* Başlık */}
       <div className="flex justify-between items-center mb-3">
-        <p className="text-[10px] text-[#222] tracking-widest">CANLI SIRALAMA</p>
+        <p className="text-[10px] text-[#222] tracking-widest">{t('live.timing')}</p>
         {currentLap !== undefined && (
           <p className="text-[10px] text-[#444] font-mono">
-            TUR {currentLap}/{totalLaps ?? '?'}
+            {t('live.lap', { current: currentLap, total: totalLaps ?? '?' })}
           </p>
         )}
       </div>
@@ -95,9 +97,9 @@ export function TimingTower({ intervals, drivers, currentLap, totalLaps }: Props
       <div className="grid grid-cols-[24px_36px_1fr_72px_72px] gap-1 mb-1 px-1">
         <span className="text-[9px] text-[#1e1e1e]">P</span>
         <span className="text-[9px] text-[#1e1e1e]"></span>
-        <span className="text-[9px] text-[#1e1e1e]">PILOT</span>
-        <span className="text-[9px] text-[#1e1e1e] text-right">GAP</span>
-        <span className="text-[9px] text-[#1e1e1e] text-right">ARALIK</span>
+        <span className="text-[9px] text-[#1e1e1e]">{t('live.col_driver')}</span>
+        <span className="text-[9px] text-[#1e1e1e] text-right">{t('live.col_gap')}</span>
+        <span className="text-[9px] text-[#1e1e1e] text-right">{t('live.col_best')}</span>
       </div>
 
       {/* Sıralama satırları */}

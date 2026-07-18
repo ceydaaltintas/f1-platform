@@ -2,8 +2,10 @@ import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
 import clsx from 'clsx'
+import { useTranslation } from 'react-i18next'
 
 export function BottomNav() {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const { data: currentYear = new Date().getFullYear() } = useQuery({
     queryKey: ['current-year'],
@@ -14,10 +16,10 @@ export function BottomNav() {
     staleTime: 3_600_000,
   })
   const ITEMS = [
-    { to: '/',                              icon: '🏠', label: 'Ana Sayfa' },
+    { to: '/',                              icon: '🏠', label: t('bottom_nav.home') },
     { to: `/season/${currentYear}`,         icon: '📅', label: String(currentYear) },
-    { to: `/standings/${currentYear}`,      icon: '🏆', label: 'Sıralama' },
-    { to: '/login',                         icon: '👤', label: 'Profil' },
+    { to: `/standings/${currentYear}`,      icon: '🏆', label: t('bottom_nav.standings') },
+    { to: '/login',                         icon: '👤', label: t('bottom_nav.profile') },
   ]
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden"

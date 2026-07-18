@@ -75,7 +75,7 @@ export function AIInsightPanel({
         })
       })
       .catch(() => {
-        if (!cancelled) setState({ kind: 'error', msg: 'Sunucu yanıt vermedi.' })
+        if (!cancelled) setState({ kind: 'error', msg: t('ai_insight.error') })
       })
 
     return () => { cancelled = true }
@@ -86,7 +86,7 @@ export function AIInsightPanel({
   const sourceLabel = (source?: string) => {
     if (source === 'groq')      return '⚡ Groq · Llama 3.3'
     if (source === 'anthropic') return '🤖 Claude'
-    return '📐 Kural tabanlı'
+    return t('ai_insight.rule_based')
   }
 
   return (
@@ -109,7 +109,7 @@ export function AIInsightPanel({
               {state.kind === 'ok'
                 ? sourceLabel(state.source)
                 : isCompareMode
-                  ? (lang === 'en' ? 'Same point comparison' : 'Aynı noktada karşılaştırma')
+                  ? t('ai_insight.compare_hint')
                   : mode === 'beginner' ? t('ai.mode_beginner') : t('ai.mode_expert')}
             </p>
           </div>
@@ -164,10 +164,10 @@ export function AIInsightPanel({
                 <p className="text-[11px] font-black mono" style={{ color }}>{label}</p>
                 <div className="grid grid-cols-2 gap-1">
                   {[
-                    { k: 'Hız', v: pt.speed != null ? `${pt.speed} km/sa` : '—' },
-                    { k: 'Gaz', v: pt.throttle != null ? `%${pt.throttle}` : '—' },
-                    { k: 'Fren', v: pt.brake != null ? `%${pt.brake}` : '—' },
-                    { k: 'Vites', v: pt.gear != null ? `${pt.gear}` : '—' },
+                    { k: t('ai_insight.speed_label'), v: pt.speed != null ? `${pt.speed} km/h` : '—' },
+                    { k: t('session_page.stat_throttle'), v: pt.throttle != null ? `%${pt.throttle}` : '—' },
+                    { k: t('session_page.stat_brake'), v: pt.brake != null ? `%${pt.brake}` : '—' },
+                    { k: t('session_page.stat_gear'), v: pt.gear != null ? `${pt.gear}` : '—' },
                   ].map(({ k, v }) => (
                     <div key={k}>
                       <p className="text-[9px] mono" style={{ color: 'var(--t3)' }}>{k}</p>
@@ -188,8 +188,8 @@ export function AIInsightPanel({
             </span>
             <p className="text-[12px] leading-relaxed" style={{ color: 'var(--t2)' }}>
               {isCompareMode
-                ? `Grafiğe tıkla — ${driverCode} ve ${compareDriver}'ın aynı noktada farkını göster`
-                : 'Grafiğe tıkla — Claude o anı analiz eder'}
+                ? t('ai_insight.click_compare', { d1: driverCode, d2: compareDriver })
+                : t('ai_insight.click_single')}
             </p>
           </div>
         )}
@@ -199,8 +199,8 @@ export function AIInsightPanel({
           <div className="space-y-2 animate-fade-in">
             <p className="text-[12px] mono" style={{ color: 'var(--t2)' }}>
               {isCompareMode
-                ? `${driverCode} vs ${compareDriver} karşılaştırılıyor...`
-                : `${driverCode} analiz ediliyor...`}
+                ? t('ai_insight.comparing', { d1: driverCode, d2: compareDriver })
+                : t('ai.loading')}
             </p>
             {[100, 75, 88].map((w, i) => (
               <div key={i} className="h-2.5 rounded-full animate-pulse"

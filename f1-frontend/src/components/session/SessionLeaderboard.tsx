@@ -4,6 +4,7 @@ import { client } from '../../api/client'
 import { ErrorCard } from '../ui/ErrorCard'
 import { formatLapTime, formatSectorTime } from '../../utils/format'
 import { COMPOUND_COLORS } from '../../types/f1'
+import { useTranslation } from 'react-i18next'
 
 // ── Tipler ──────────────────────────────────────────────────────────────────
 
@@ -60,15 +61,10 @@ function S({ time, best }: { time: number | null; best: boolean }) {
   )
 }
 
-const SESSION_LABELS: Record<string, string> = {
-  practice1: 'Antrenman 1', practice2: 'Antrenman 2', practice3: 'Antrenman 3',
-  qualifying: 'Sıralama', sprint_qualifying: 'Sprint Sıralama',
-  sprint: 'Sprint', race: 'Yarış',
-}
-
 // ── Ana bileşen ─────────────────────────────────────────────────────────────
 
 export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, currentLap }: Props) {
+  const { t } = useTranslation()
   const [qualiFilter, setQualiFilter] = useState<'ALL' | 'Q3' | 'Q2' | 'Q1'>('ALL')
 
   const lapNum = currentLap && currentLap !== 'fastest' ? parseInt(currentLap) : undefined
@@ -85,7 +81,7 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
   if (isLoading) return (
     <div className="card p-5">
       <div className="flex items-center gap-2 mb-4">
-        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>SIRALAMA</p>
+        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>{t('live.standings_title').toUpperCase()}</p>
         <div className="flex gap-1">{[0,1,2].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#E10600]" style={{ animation:`bounce-dot 0.8s ${i*0.15}s infinite` }} />)}</div>
       </div>
       <div className="space-y-2">{Array(8).fill(0).map((_,i) => <div key={i} className="h-9 rounded-lg animate-pulse" style={{ background:'var(--s2)' }} />)}</div>
@@ -95,8 +91,8 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
 
   if (isError || !data) return (
     <ErrorCard compact
-      title="Sıralama yüklenemedi"
-      message="Bu oturum için sıralama verisi alınamadı."
+      title={t('leaderboard.error_title')}
+      message={t('leaderboard.error_msg')}
       onRetry={() => window.location.reload()}
     />
   )
@@ -104,11 +100,11 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
   if (data.syncing) return (
     <div className="card p-5">
       <div className="flex items-center gap-2 mb-4">
-        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>SIRALAMA</p>
+        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>{t('live.standings_title').toUpperCase()}</p>
         <div className="flex gap-1">{[0,1,2].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#E10600]" style={{ animation:`bounce-dot 0.8s ${i*0.15}s infinite` }} />)}</div>
       </div>
       <p className="text-[12px] text-center py-6" style={{ color: 'var(--t3)' }}>
-        Oturum verisi hazırlanıyor, lütfen 30–60 saniye sonra yenileyin.
+        {t('leaderboard.loading_hint')}
       </p>
       <style>{`@keyframes bounce-dot{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-4px)}}`}</style>
     </div>
@@ -119,6 +115,11 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
   const isDynamic        = isRace && !!lapNum
   const sessionType      = data.session_type ?? ''
   const segments         = data.segments ?? {}
+  const SESSION_LABELS: Record<string, string> = {
+    practice1: t('session.practice1'), practice2: t('session.practice2'), practice3: t('session.practice3'),
+    qualifying: t('session.qualifying'), sprint_qualifying: t('session.sprint_qualifying'),
+    sprint: t('session.sprint'), race: t('session.race'),
+  }
 
   // ── YARIŞ ────────────────────────────────────────────────────────────────
   if (isRace) {
@@ -129,20 +130,20 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
       <div className="card overflow-hidden">
         {/* Başlık */}
         <div className="flex items-center gap-3 px-5 py-3.5 border-b" style={{ borderColor:'var(--b1)' }}>
-          <p className="text-[13px] font-bold text-white">{SESSION_LABELS[sessionType] ?? sessionType} Sıralaması</p>
+          <p className="text-[13px] font-bold text-white">{t('leaderboard.title', { session: SESSION_LABELS[sessionType] ?? sessionType })}</p>
           {isDynamic
-            ? <span className="text-[11px] mono px-2 py-0.5 rounded font-semibold" style={{ background:'rgba(255,135,0,0.12)', color:'#FF8700', border:'1px solid rgba(255,135,0,0.3)' }}>⏱ Tur {lapNum} anında</span>
-            : <span className="text-[11px] mono" style={{ color:'var(--t3)' }}>Bitiş sıralaması · {entries.length} pilot</span>
+            ? <span className="text-[11px] mono px-2 py-0.5 rounded font-semibold" style={{ background:'rgba(255,135,0,0.12)', color:'#FF8700', border:'1px solid rgba(255,135,0,0.3)' }}>{t('leaderboard.at_lap', { n: lapNum })}</span>
+            : <span className="text-[11px] mono" style={{ color:'var(--t3)' }}>{t('leaderboard.final', { n: entries.length })}</span>
           }
         </div>
 
         {/* Tablo başlığı */}
         <div className="grid px-4 py-2 border-b text-[10px] mono font-semibold tracking-wider"
           style={{ gridTemplateColumns:COLS, borderColor:'var(--b1)', color:'var(--t3)', background:'rgba(255,255,255,0.02)' }}>
-          <span>P</span><span /><span>PİLOT</span>
-          <span>{isDynamic ? 'GEÇ. TUR' : 'GRID'}</span>
-          <span>{isDynamic ? 'FARK' : 'FARK / DURUM'}</span>
-          <span>EN HIZLI</span>
+          <span>{t('leaderboard.col_pos')}</span><span /><span>{t('leaderboard.col_driver')}</span>
+          <span>{isDynamic ? t('leaderboard.col_prev_lap') : t('leaderboard.col_grid')}</span>
+          <span>GAP</span>
+          <span>{t('leaderboard.col_best_lap')}</span>
           <span>PTS</span>
         </div>
 
@@ -201,8 +202,8 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
 
         <div className="px-5 py-2" style={{ background:'rgba(255,255,255,0.01)' }}>
           <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-            Pilota tıkla → telemetrisini yükle
-            {isDynamic ? ' · Tur seçince dinamik güncellenir' : ' · Jolpica bitiş sıralaması'}
+            {t('leaderboard.click_hint')}
+            {isDynamic ? '' : ' · Jolpica'}
           </p>
         </div>
       </div>
@@ -221,12 +222,12 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
       {/* Başlık */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor:'var(--b1)' }}>
         <div className="flex items-center gap-3">
-          <p className="text-[13px] font-bold text-white">{SESSION_LABELS[sessionType] ?? sessionType} Sıralaması</p>
-          <span className="text-[11px] mono" style={{ color:'var(--t3)' }}>{allEntries.length} pilot</span>
+          <p className="text-[13px] font-bold text-white">{t('leaderboard.title', { session: SESSION_LABELS[sessionType] ?? sessionType })}</p>
+          <span className="text-[11px] mono" style={{ color:'var(--t3)' }}>{allEntries.length}</span>
         </div>
         <div className="flex items-center gap-1.5 text-[10px] mono">
           <span className="w-2 h-2 rounded-full bg-[#00D2BE]" />
-          <span style={{ color:'var(--t2)' }}>Oturum en iyi</span>
+          <span style={{ color:'var(--t2)' }}>Session best</span>
         </div>
       </div>
 
@@ -241,7 +242,7 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
                 color: qualiFilter===tab ? Q_COLOR[tab] : 'var(--t3)',
                 borderBottom: qualiFilter===tab ? `2px solid ${Q_COLOR[tab]}` : '2px solid transparent',
               }}>
-              {tab==='ALL' ? 'Tümü' : tab}
+              {tab==='ALL' ? t('tyre_deg.all') : tab}
               <span className="ml-1 text-[10px] opacity-60">({segCounts[tab]})</span>
             </button>
           ))}
@@ -251,14 +252,14 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
       {/* Tablo başlığı */}
       <div className="grid px-4 py-2 border-b text-[10px] mono font-semibold tracking-wider"
         style={{ gridTemplateColumns:COLS, borderColor:'var(--b1)', color:'var(--t3)', background:'rgba(255,255,255,0.02)' }}>
-        <span>P</span><span /><span>PİLOT</span>
-        <span>EN İYİ TUR</span><span>FARK</span>
+        <span>{t('leaderboard.col_pos')}</span><span /><span>{t('leaderboard.col_driver')}</span>
+        <span>{t('leaderboard.col_best_lap')}</span><span>GAP</span>
         <span>S1</span><span>S2</span><span>S3</span><span>L</span>
       </div>
 
       {/* Satırlar */}
       {filtered.length === 0
-        ? <p className="px-5 py-8 text-center text-[12px]" style={{ color:'var(--t3)' }}>Veri yok.</p>
+        ? <p className="px-5 py-8 text-center text-[12px]" style={{ color:'var(--t3)' }}>{t('leaderboard.no_data')}</p>
         : filtered.map((e, i) => {
             const isSelected = e.code === selectedDriver
             const isLeader   = i === 0
@@ -309,7 +310,7 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
 
       <div className="px-5 py-2.5" style={{ background:'rgba(255,255,255,0.01)' }}>
         <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-          Pilota tıkla → telemetrisini yükle &nbsp;·&nbsp; Oturum en iyi sektör = teal
+          {t('leaderboard.click_hint')} · Session best sector = teal
         </p>
       </div>
     </div>

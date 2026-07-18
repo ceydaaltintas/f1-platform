@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import * as d3 from 'd3'
 // @ts-ignore
 import { feature } from 'topojson-client'
+import { useTranslation } from 'react-i18next'
 import type { Round } from '../../types/f1'
 
 // ── Devre koordinatları (lat, lng) ──────────────────────────────────────────
@@ -87,9 +88,9 @@ const COLOR = {
   glow_next:      'rgba(255,215,0,0.5)',
 }
 
-function formatDate(d: string | null) {
+function formatDate(d: string | null, locale: string) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+  return new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 function daysUntil(d: string | null): number | null {
@@ -100,6 +101,8 @@ function daysUntil(d: string | null): number | null {
 // ── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-GB'
   const svgRef        = useRef<SVGSVGElement>(null)
   const rotationRef   = useRef<[number, number, number]>([-30, -25, 0])
   const isDragging    = useRef(false)
@@ -455,7 +458,7 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
                   style={{ animation:`bounce-dot 0.8s ${i*0.15}s infinite` }} />
               ))}
             </div>
-            <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>Küre yükleniyor...</p>
+            <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>{t('globe.loading')}</p>
           </div>
         </div>
       )}
@@ -464,13 +467,13 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
         <div className="flex items-center justify-between px-4 py-2.5 border-b"
           style={{ borderColor:'var(--b1)' }}>
           <p className="text-[11px] mono font-semibold tracking-widest" style={{ color:'var(--t3)' }}>
-            2026 YARIŞ TAKVİMİ
+            {t('globe.calendar_title', { year: rounds[0]?.race_date ? new Date(rounds[0].race_date).getFullYear() : new Date().getFullYear() })}
           </p>
           <div className="flex items-center gap-3 text-[10px] mono">
             {[
-              { color: COLOR.next,      label: 'Sıradaki', size: 10 },
-              { color: COLOR.completed, label: 'Bitti',    size: 8  },
-              { color: COLOR.upcoming,  label: 'Yaklaşıyor', size: 6 },
+              { color: COLOR.next,      label: t('globe.upcoming'),   size: 10 },
+              { color: COLOR.completed, label: t('globe.finished'),   size: 8  },
+              { color: COLOR.upcoming,  label: t('globe.approaching'), size: 6 },
             ].map(({ color, label, size }) => (
               <span key={label} className="flex items-center gap-1">
                 <span className="rounded-full inline-block shrink-0"
@@ -497,14 +500,12 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
         <div className="flex items-center justify-between px-4 py-2 border-t"
           style={{ borderColor:'var(--b1)' }}>
           <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-            {paused
-              ? '⏸ Durduruldu — tekrar tıkla veya sürükle'
-              : '✦ Tıkla = durdur · Sürükle = döndür · İşarete gel = detay'}
+            {paused ? t('globe.hint_paused') : t('globe.hint')}
           </p>
           {paused && (
             <span className="text-[10px] mono px-2 py-0.5 rounded"
               style={{ background:'rgba(255,215,0,0.1)', color:'#FFD700', border:'1px solid rgba(255,215,0,0.2)' }}>
-              ⏸ Duraklatıldı
+              {t('globe.paused_badge')}
             </span>
           )}
         </div>
@@ -525,6 +526,8 @@ export function RaceGlobe({ rounds, nextRoundNumber, raceResults = {} }: Props) 
 // ── Tooltip ──────────────────────────────────────────────────────────────────
 
 function GlobeTooltip({ marker, x, y }: TooltipState) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-GB'
   const days  = daysUntil(marker.race_date)
   const color = marker.isNext ? COLOR.next
     : marker.round_status === 'completed' ? COLOR.completed
@@ -558,11 +561,11 @@ function GlobeTooltip({ marker, x, y }: TooltipState) {
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[10px] mono font-bold px-1.5 py-0.5 rounded"
           style={{ background: color + '20', color }}>
-          TUR {marker.round_number}
+          {t('globe.round', { n: marker.round_number })}
         </span>
         {marker.isNext && (
           <span className="text-[10px] mono font-bold" style={{ color: COLOR.next }}>
-            ● SIRADAKI
+            {t('globe.next_badge')}
           </span>
         )}
       </div>
@@ -578,13 +581,13 @@ function GlobeTooltip({ marker, x, y }: TooltipState) {
 
       {/* Tarih */}
       <p className="text-[11px] mono" style={{ color:'var(--t3)' }}>
-        {formatDate(marker.race_date)}
+        {formatDate(marker.race_date, locale)}
       </p>
 
       {/* Geri sayım */}
       {days !== null && days > 0 && (
         <p className="text-[12px] mono font-bold mt-1" style={{ color: COLOR.next }}>
-          {days} gün kaldı
+          {t('globe.days_left', { n: days })}
         </p>
       )}
 

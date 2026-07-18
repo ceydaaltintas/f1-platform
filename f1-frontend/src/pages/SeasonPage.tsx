@@ -16,13 +16,14 @@ const FLAG: Record<string, string> = {
   UK:'🇬🇧',
 }
 
-function formatDate(d: string|null) {
+function formatDate(d: string|null, locale = 'tr-TR') {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('tr-TR', { day:'numeric', month:'long' })
+  return new Date(d).toLocaleDateString(locale, { day:'numeric', month:'long' })
 }
 
 function RoundCard({ round, index, highlight }: { round: Round; index: number; highlight?: boolean }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-GB'
   const SESSION_LABELS: Record<string, string> = {
     practice1: t('session.practice1'),
     practice2: t('session.practice2'),
@@ -53,13 +54,13 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-[10px] mono font-semibold px-1.5 py-0.5 rounded"
                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--t3)' }}>
-                TUR {round.round_number}
+                {t('globe.round', { n: round.round_number })}
               </span>
               {hasActiveSess && (
                 <span className="flex items-center gap-1 text-[10px] mono font-bold px-2 py-0.5
                                  rounded-full bg-[#E10600]/15 text-[#E10600] border border-[#E10600]/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />
-                  CANLI
+                  {t('season_page.live_badge')}
                 </span>
               )}
               {!hasActiveSess && done && (
@@ -84,7 +85,7 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
               {round.name}
             </p>
             <p className="text-[12px] mt-0.5 truncate" style={{ color: 'var(--t2)' }}>
-              {round.circuit_name} · {formatDate(round.race_date)}
+              {round.circuit_name} · {formatDate(round.race_date, locale)}
             </p>
           </div>
         </div>
@@ -113,7 +114,7 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
                   <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />
                 )}
                 {SESSION_LABELS[s.type as SessionType] ?? s.type}
-                {isActive && <span className="text-[9px] font-bold ml-0.5">CANLI</span>}
+                {isActive && <span className="text-[9px] font-bold ml-0.5">{t('season_page.live_in_session')}</span>}
               </Link>
             )
           })}
@@ -128,7 +129,8 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
 }
 
 export function SeasonPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-GB'
   const { year } = useParams<{ year: string }>()
   const y = Number(year)
 
@@ -167,9 +169,9 @@ export function SeasonPage() {
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background:'var(--bg)' }}>
       <div className="max-w-md w-full">
         <ErrorCard
-          title={`${y} sezonu yüklenemedi`}
-          message="Sezon verisi bulunamadı veya henüz senkronize edilmedi."
-          hint={`İlk kez yüklemek için: POST /api/v1/seasons/${y}/sync`}
+          title={t('season_page.error_title', { year: y })}
+          message={t('season_page.error_msg')}
+          hint={t('season_page.error_hint', { year: y })}
           onRetry={() => window.location.reload()}
         />
       </div>
@@ -201,7 +203,7 @@ export function SeasonPage() {
       <div className="border-b" style={{ borderColor: 'var(--b1)', background: 'var(--s1)' }}>
         <div className="max-w-5xl mx-auto px-6 py-8">
           <Link to="/" className="text-[12px] mono mb-4 inline-block hover:text-white transition-colors"
-            style={{ color: 'var(--t3)' }}>← Ana Sayfa</Link>
+            style={{ color: 'var(--t3)' }}>{t('season_page.back_home')}</Link>
 
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
             <div>
@@ -230,7 +232,7 @@ export function SeasonPage() {
               )}
               <div className="text-right">
                 <span className="text-3xl font-black text-white mono">{pct}%</span>
-                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>tamamlandı</p>
+                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>{t('season_page.completed')}</p>
               </div>
             </div>
           </div>
@@ -283,15 +285,15 @@ export function SeasonPage() {
             {upcoming.length === 0 ? (
               <div className="text-center py-20">
                 <p className="text-[40px] mb-4">🏁</p>
-                <p className="text-[16px] font-bold text-white mb-2">Sezon tamamlandı!</p>
+                <p className="text-[16px] font-bold text-white mb-2">{t('season_page.season_done')}</p>
                 <p className="text-[13px] mono" style={{ color:'var(--t3)' }}>
-                  {y} sezonu tüm yarışları tamamlandı.
+                  {t('season_page.season_done_desc', { year: y })}
                 </p>
                 <button onClick={() => setActiveTab('completed')}
                   className="mt-5 px-4 py-2 rounded-xl text-[12px] mono font-semibold transition-all"
                   style={{ background:'rgba(255,215,0,0.1)', color:'#FFD700',
                            border:'1px solid rgba(255,215,0,0.3)' }}>
-                  🏆 Sonuçlara git →
+                  {t('season_page.go_results')}
                 </button>
               </div>
             ) : (
@@ -308,7 +310,7 @@ export function SeasonPage() {
             {completed.length === 0 ? (
               <div className="text-center py-20">
                 <p className="text-[13px] mono" style={{ color:'var(--t3)' }}>
-                  Henüz tamamlanan yarış yok.
+                  {t('season_page.no_completed')}
                 </p>
               </div>
             ) : (

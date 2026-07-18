@@ -3,6 +3,7 @@ import { aiApi } from '../../api/client'
 import { formatLapTime, formatSectorTime } from '../../utils/format'
 import { COMPOUND_COLORS } from '../../types/f1'
 import type { LapInfo, KeyMoment, InsightMode } from '../../types/f1'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   lap: LapInfo | null
@@ -18,16 +19,12 @@ interface Props {
 
 type State = { kind: 'idle' } | { kind: 'loading' } | { kind: 'ok'; text: string } | { kind: 'error' }
 
-const COMPOUND_LABEL: Record<string, string> = {
-  SOFT: 'Yumuşak', MEDIUM: 'Orta', HARD: 'Sert',
-  INTERMEDIATE: 'Ara', WET: 'Islak',
-}
-
 export function LapSummaryCard({
   lap, keyMoments, mode, driverCode,
   compareLap, compareDriver,
   tyreCompound, tyreAge,
 }: Props) {
+  const { t } = useTranslation()
   const [state, setState] = useState<State>({ kind: 'idle' })
 
   // Tur, mod veya pilot değişince analizi yeniden üret
@@ -40,7 +37,7 @@ export function LapSummaryCard({
     // Lastik bilgisini lap_info'ya ekle (backend'de None görünmesin)
     const lapWithCompound = {
       ...lap,
-      compound: tyreCompound ?? lap.compound ?? 'Bilinmiyor',
+      compound: tyreCompound ?? lap.compound ?? t('compounds.UNKNOWN'),
     }
 
     aiApi.lapSummary(lapWithCompound as any, keyMoments, mode)
@@ -64,7 +61,7 @@ export function LapSummaryCard({
         style={{ borderColor: 'var(--b1)' }}>
         <div className="flex items-center gap-3">
           <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>
-            TUR ANALİZİ
+            {t('lap_summary.title')}
           </p>
           {state.kind === 'loading' && (
             <div className="flex gap-1">
@@ -81,19 +78,19 @@ export function LapSummaryCard({
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ background: compColor }} />
             <span className="text-[12px] mono font-bold" style={{ color: compColor }}>
-              {COMPOUND_LABEL[compound] ?? compound}
+              {t(`compounds.${compound}`, compound)}
             </span>
             {tyreAge != null && tyreAge > 0 && (
               <span className="text-[11px] mono px-2 py-0.5 rounded"
                 style={{ background: compColor + '15', color: compColor,
                          border: `1px solid ${compColor}30` }}>
-                {tyreAge} turluk
+                {t('strategy_sim.tyre_age_laps', { n: tyreAge })}
               </span>
             )}
           </div>
         ) : (
           <span className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
-            Lastik verisi yok
+            {t('compounds.UNKNOWN')}
           </span>
         )}
       </div>
@@ -156,7 +153,7 @@ export function LapSummaryCard({
                 <p className="text-[12px] mono font-bold mt-2"
                   style={{ color: compareLap.duration < lap.duration ? '#00D2BE' : '#E10600' }}>
                   {compareLap.duration < lap.duration ? '▲ ' : '▼ '}
-                  {formatLapTime(Math.abs(compareLap.duration - lap.duration))} fark
+                  {formatLapTime(Math.abs(compareLap.duration - lap.duration))}
                 </p>
               )}
             </div>
@@ -173,7 +170,7 @@ export function LapSummaryCard({
                 style={{ width: `${w}%`, background: 'rgba(225,6,0,0.08)' }} />
             ))}
             <p className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
-              Tur analiz ediliyor...
+              {t('ai.loading')}
             </p>
           </div>
         )}
@@ -184,12 +181,12 @@ export function LapSummaryCard({
         )}
         {state.kind === 'error' && (
           <p className="text-[12px]" style={{ color: 'var(--t3)' }}>
-            Tur özeti alınamadı — AI servisi yanıt vermedi.
+            {t('lap_summary.error')}
           </p>
         )}
         {state.kind === 'idle' && (
           <p className="text-[12px] italic" style={{ color: 'var(--t3)' }}>
-            Telemetri yükleniyor...
+            {t('lap_summary.loading')}
           </p>
         )}
       </div>

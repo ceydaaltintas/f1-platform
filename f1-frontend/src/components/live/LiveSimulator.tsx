@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   sessionId: number
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled = false }: Props) {
+  const { t } = useTranslation()
   const [selectedDriver, setSelectedDriver] = useState(defaultDriver)
   const [enabled, setEnabled] = useState(false)
 
@@ -48,9 +50,9 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
         style={{ borderColor: 'var(--b1)' }}>
         <span className="text-xl">🔮</span>
         <div>
-          <p className="text-[13px] font-bold text-white leading-none">Canlı Simülasyon</p>
+          <p className="text-[13px] font-bold text-white leading-none">{t('live_sim.title')}</p>
           <p className="text-[10px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
-            Yakalama · Pit senaryosu · Optimal pit penceresi
+            {t('live_sim.subtitle')}
           </p>
         </div>
         {enabled && isFetching && (
@@ -63,7 +65,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
           <div className="rounded-xl p-3 text-center"
             style={{ background:'rgba(255,255,255,0.04)', border:'1px solid var(--b1)' }}>
             <p className="text-[12px]" style={{ color:'var(--t3)' }}>
-              🏁 Yarış bitti — canlı simülasyon artık çalıştırılamaz.
+              🏁 {t('live_sim.race_finished')}
             </p>
           </div>
         )}
@@ -79,7 +81,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
               color: selectedDriver ? '#E10600' : 'var(--t3)', outline: 'none',
             }}
           >
-            <option value="">Pilot seç...</option>
+            <option value="">{t('live_sim.select_driver')}</option>
             {drivers.map(d => (
               <option key={d} value={d}>{d}</option>
             ))}
@@ -89,7 +91,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
             disabled={!selectedDriver || isLoading || disabled}
             className="px-4 py-2.5 rounded-xl text-[12px] font-bold transition-all disabled:opacity-40"
             style={{ background: '#E10600', color: 'white' }}>
-            {isLoading ? '⏳' : '▶ Simüle Et'}
+            {isLoading ? '⏳' : `▶ ${t('live_sim.simulate_btn')}`}
           </button>
         </div>
 
@@ -112,7 +114,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
               {data.message}
             </p>
             <p className="text-[11px] mt-1" style={{ color:'var(--t3)' }}>
-              Tur gerisindeki pilotlar için simülasyon yapılamaz.
+              {t('live_sim.lapped_note')}
             </p>
           </div>
         )}
@@ -123,21 +125,21 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
             <div className="flex items-center gap-4 px-4 py-3 rounded-xl"
               style={{ background: 'var(--s2)', border: '1px solid var(--b1)' }}>
               <div>
-                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>POZİSYON</p>
+                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>{t('live_sim.position')}</p>
                 <p className="text-[22px] font-black mono" style={{ color: '#E10600' }}>
                   P{data.current_position}
                 </p>
               </div>
               <div className="w-px h-10 self-stretch" style={{ background: 'var(--b1)' }} />
               <div>
-                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>ORT. PACE</p>
+                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>{t('live_sim.avg_pace')}</p>
                 <p className="text-[16px] font-black mono text-white">
                   {data.avg_pace ? `${data.avg_pace.toFixed(3)}s` : '—'}
                 </p>
               </div>
               <div className="w-px h-10 self-stretch" style={{ background: 'var(--b1)' }} />
               <div>
-                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>LİDERE FARK</p>
+                <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>{t('live_sim.gap_to_leader')}</p>
                 <p className="text-[16px] font-black mono text-white">
                   {data.current_gap > 0 ? `+${data.current_gap.toFixed(1)}s` : 'LDR'}
                 </p>
@@ -151,24 +153,24 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                 style={{ borderColor: 'rgba(255,135,0,0.2)' }}>
                 <span>🔧</span>
                 <p className="text-[12px] font-bold" style={{ color: '#FF8700' }}>
-                  Şu An Pit Girerse
+                  {t('live_sim.pit_now')}
                 </p>
               </div>
               <div className="px-4 py-3 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px]" style={{ color: 'var(--t2)' }}>Tahmini çıkış pozisyonu</span>
+                  <span className="text-[12px]" style={{ color: 'var(--t2)' }}>{t('live_sim.est_exit_pos')}</span>
                   <span className="text-[20px] font-black mono" style={{ color: '#FF8700' }}>
                     P{data.pit_scenario.position_after_pit}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span style={{ color: 'var(--t3)' }}>Pit kaybı tahmini</span>
+                  <span style={{ color: 'var(--t3)' }}>{t('live_sim.pit_loss_est')}</span>
                   <span className="mono font-bold" style={{ color: 'var(--t2)' }}>~{data.pit_loss_estimate}s</span>
                 </div>
                 {data.pit_scenario.cars_overtaken.length > 0 && (
                   <div>
                     <p className="text-[10px] mono mb-1.5" style={{ color: 'var(--t3)' }}>
-                      GEÇECEKLER (undercut)
+                      {t('live_sim.will_overtake')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {data.pit_scenario.cars_overtaken.map((c: any) => (
@@ -184,7 +186,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                 {data.pit_scenario.cars_still_ahead.length > 0 && (
                   <div>
                     <p className="text-[10px] mono mb-1.5" style={{ color: 'var(--t3)' }}>
-                      ÖNDE KALACAKLAR
+                      {t('live_sim.still_ahead')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {data.pit_scenario.cars_still_ahead.slice(0, 5).map((c: any) => (
@@ -217,7 +219,7 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                   <span>{data.optimal_pit.safe_to_pit_now ? '✅' : '⚠️'}</span>
                   <p className="text-[12px] font-bold"
                     style={{ color: data.optimal_pit.safe_to_pit_now ? '#00D2BE' : '#E10600' }}>
-                    Pit Penceresi Analizi
+                    {t('live_sim.pit_window')}
                   </p>
                 </div>
                 <div className="px-4 py-3">
@@ -226,13 +228,13 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                   </p>
                   <div className="flex gap-4 mt-2.5 text-[11px] mono">
                     <span style={{ color: 'var(--t3)' }}>
-                      Arkadaki: <strong className="text-white">{data.optimal_pit.closest_behind}</strong>
+                      {t('live_sim.behind')}: <strong className="text-white">{data.optimal_pit.closest_behind}</strong>
                     </span>
                     <span style={{ color: 'var(--t3)' }}>
-                      Fark: <strong className="text-white">{data.optimal_pit.gap_to_behind.toFixed(1)}s</strong>
+                      {t('live_sim.gap')}: <strong className="text-white">{data.optimal_pit.gap_to_behind.toFixed(1)}s</strong>
                     </span>
                     <span style={{ color: 'var(--t3)' }}>
-                      Gereken min: <strong className="text-white">{data.optimal_pit.needed_gap}s</strong>
+                      {t('live_sim.min_needed')}: <strong className="text-white">{data.optimal_pit.needed_gap}s</strong>
                     </span>
                   </div>
                 </div>
@@ -246,10 +248,10 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                 <div className="px-4 py-2.5 border-b flex items-center gap-2"
                   style={{ borderColor: 'var(--b1)' }}>
                   <span>📡</span>
-                  <p className="text-[12px] font-bold text-white">Yakalama Analizi</p>
+                  <p className="text-[12px] font-bold text-white">{t('live_sim.catch_analysis')}</p>
                   {data.remaining_laps != null && (
                     <span className="text-[10px] mono ml-auto" style={{ color: 'var(--t3)' }}>
-                      Kalan {data.remaining_laps} tur
+                      {t('live_sim.remaining_laps', { n: data.remaining_laps })}
                     </span>
                   )}
                 </div>
@@ -262,22 +264,22 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
                         </span>
                         <span className="text-[13px] font-black mono text-white">{c.ahead_code}</span>
                         <span className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
-                          {c.gap_seconds.toFixed(1)}s önde
+                          {t('live_sim.gap_ahead', { n: c.gap_seconds.toFixed(1) })}
                         </span>
                       </div>
                       {c.catchable ? (
                         <div className="text-right">
                           <span className="text-[13px] font-black mono" style={{ color: '#00D2BE' }}>
-                            {c.laps_to_catch != null ? `~${c.laps_to_catch.toFixed(0)} tur` : 'Mücadelede'}
+                            {c.laps_to_catch != null ? t('live_sim.laps_to_catch', { n: c.laps_to_catch.toFixed(0) }) : t('live_sim.in_battle')}
                           </span>
                           <p className="text-[9px] mono" style={{ color: 'var(--t3)' }}>
-                            {c.pace_gain_per_lap ? `+${c.pace_gain_per_lap.toFixed(3)}s/tur kazanıyor` : (c.reason ?? 'DRS mesafesinde')}
+                            {c.pace_gain_per_lap ? t('live_sim.pace_gaining', { n: c.pace_gain_per_lap.toFixed(3) }) : (c.reason ?? t('live_sim.drs_range'))}
                           </p>
                         </div>
                       ) : (
                         <div className="text-right">
                           <span className="text-[11px] mono" style={{ color: '#f87171' }}>
-                            Yakalanamaz
+                            {t('live_sim.cannot_catch')}
                           </span>
                           {c.reason && (
                             <p className="text-[9px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
@@ -295,20 +297,20 @@ export function LiveSimulator({ sessionId, drivers, defaultDriver = '', disabled
             {data.catch_analysis.length === 0 && (
               <p className="text-[12px] text-center py-2" style={{ color: 'var(--t3)' }}>
                 {data.current_position === 1
-                  ? '🏆 Lider konumunda — yakalama analizi yok'
-                  : 'Pace farkı çok küçük — yakalama analizi yapılamıyor'}
+                  ? `🏆 ${t('live_sim.catch_none_leader')}`
+                  : t('live_sim.catch_none_close')}
               </p>
             )}
 
             <p className="text-[10px] mono text-center" style={{ color: 'var(--t3)' }}>
-              15 saniyede bir otomatik güncellenir · Pit kaybı tahmini: ~{data.pit_loss_estimate}s
+              {t('live_sim.auto_update', { pit_loss: data.pit_loss_estimate })}
             </p>
           </div>
         )}  {/* !data.lapped && data kapanış */}
 
         {!data && !isLoading && (
           <p className="text-[12px] text-center py-4" style={{ color: 'var(--t3)' }}>
-            Pilot seç ve simüle et butonuna bas
+            {t('live_sim.prompt')}
           </p>
         )}
       </div>

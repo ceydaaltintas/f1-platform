@@ -62,7 +62,7 @@ export function Navbar() {
   const navLinks = [
     { to: `/season/${currentYear}`, label: `${t('nav.season')} ${currentYear}` },
     { to: `/standings/${currentYear}`, label: t('nav.standings') },
-    { to: '/rules', label: 'Kurallar' },
+    { to: '/rules', label: t('nav.rules') },
     { to: '/live/demo', label: '🎭 Demo' },
   ]
 

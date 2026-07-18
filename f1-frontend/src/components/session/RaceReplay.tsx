@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
 import type { TrackPoint } from '../../types/f1'
+import { useTranslation } from 'react-i18next'
 
 const TEAM_COLOR: Record<string, string> = {
   VER:'#3671C6', NOR:'#FF8000', LEC:'#E8002D', HAM:'#27F4D2',
@@ -29,6 +30,7 @@ interface Props {
 }
 
 export function RaceReplay({ sessionId, trackPoints }: Props) {
+  const { t } = useTranslation()
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const animRef     = useRef<number>(0)
   const progressRef = useRef(0)
@@ -229,12 +231,12 @@ export function RaceReplay({ sessionId, trackPoints }: Props) {
 
   if (lapsQuery.isLoading) return (
     <div className="card p-5 text-center">
-      <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>Replay yükleniyor...</p>
+      <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>{t('replay.loading')}</p>
     </div>
   )
   if (lapsQuery.isError || !drivers.length) return (
     <div className="card p-5 text-center">
-      <p className="text-[13px] mono" style={{ color:'var(--t3)' }}>Bu oturum için replay verisi yok.</p>
+      <p className="text-[13px] mono" style={{ color:'var(--t3)' }}>{t('replay.no_data')}</p>
     </div>
   )
 
@@ -249,9 +251,9 @@ export function RaceReplay({ sessionId, trackPoints }: Props) {
         <div className="flex items-center gap-3">
           <span className="text-xl">🎬</span>
           <div>
-            <p className="text-[13px] font-bold text-white">Yarış Replay</p>
+            <p className="text-[13px] font-bold text-white">{t('replay.title')}</p>
             <p className="text-[10px] mono mt-0.5" style={{ color:'var(--t3)' }}>
-              {drivers.length} araç · Lap tabanlı animasyon
+              {t('replay.subtitle', { n: drivers.length })}
             </p>
           </div>
         </div>
@@ -289,7 +291,7 @@ export function RaceReplay({ sessionId, trackPoints }: Props) {
             }}
             className="px-4 py-2 rounded-xl text-[13px] font-bold"
             style={{ background:'#E10600', color:'white', minWidth: 90 }}>
-            {playing ? '⏸ Duraklat' : progress >= 1 ? '↺ Tekrar' : '▶ Oynat'}
+            {playing ? `⏸ ${t('replay.pause')}` : progress >= 1 ? `↺ ${t('replay.replay')}` : `▶ ${t('replay.play')}`}
           </button>
           <button
             onClick={() => { progressRef.current=0; setProgress(0); setPlaying(false); draw(0) }}

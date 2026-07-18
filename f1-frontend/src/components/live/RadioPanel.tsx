@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RadioRecording } from '../../store/wsStore'
+import { useTranslation } from 'react-i18next'
 
 interface Driver {
   code: string
@@ -12,13 +13,14 @@ interface Props {
   onClear: () => void
 }
 
-function timeAgo(isoStr: string): string {
+function timeAgo(isoStr: string, t: (key: string, opts?: any) => string): string {
   const diff = (Date.now() - new Date(isoStr).getTime()) / 1000
-  if (diff < 60) return `${Math.round(diff)}sn önce`
-  return `${Math.round(diff / 60)}dk önce`
+  if (diff < 60) return t('radio.sec_ago', { n: Math.round(diff) })
+  return t('radio.min_ago', { n: Math.round(diff / 60) })
 }
 
 export function RadioPanel({ recordings, drivers, onClear }: Props) {
+  const { t } = useTranslation()
   const [playing, setPlaying] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -42,19 +44,19 @@ export function RadioPanel({ recordings, drivers, onClear }: Props) {
   return (
     <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-4">
       <div className="flex justify-between items-center mb-3">
-        <p className="text-[10px] text-[#222] tracking-widest">TAKIM RADYOSU</p>
+        <p className="text-[10px] text-[#222] tracking-widest">{t('live.radio')}</p>
         {recordings.length > 0 && (
           <button
             onClick={onClear}
             className="text-[9px] text-[#333] hover:text-[#555] transition-colors"
           >
-            Temizle
+            {t('live.clear')}
           </button>
         )}
       </div>
 
       {recordings.length === 0 ? (
-        <p className="text-[#1a1a1a] text-xs italic">Radyo mesajı bekleniyor...</p>
+        <p className="text-[#1a1a1a] text-xs italic">{t('radio.waiting')}</p>
       ) : (
         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
           {recordings.map((rec, i) => {
@@ -97,7 +99,7 @@ export function RadioPanel({ recordings, drivers, onClear }: Props) {
                     {drv?.code ?? `#${rec.driver_number}`}
                   </span>
                   <span className="text-[9px] text-[#333] ml-2">
-                    {timeAgo(rec.date)}
+                    {timeAgo(rec.date, t)}
                   </span>
                 </div>
 

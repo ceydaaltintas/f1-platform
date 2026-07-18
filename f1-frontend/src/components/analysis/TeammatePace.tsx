@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
 import { formatLapTime } from '../../utils/format'
+import { useTranslation } from 'react-i18next'
 
 interface DriverPace {
   code:   string
@@ -51,67 +52,68 @@ function GapBar({ gap, maxGap, color }: { gap: number; maxGap: number; color: st
   )
 }
 
-function TeamRow({ t, maxGap }: { t: TeamData; maxGap: number }) {
-  const color = teamColor(t.team)
+function TeamRow({ team, maxGap }: { team: TeamData; maxGap: number }) {
+  const { t } = useTranslation()
+  const color = teamColor(team.team)
   return (
     <div className="px-5 py-5 border-b" style={{ borderColor:'var(--b1)' }}>
-      {/* Takım adı */}
+      {/* Team name */}
       <div className="flex items-center gap-2 mb-4">
         <div className="w-3 h-3 rounded-full shrink-0" style={{ background: color }} />
         <p className="text-[12px] font-bold mono tracking-widest" style={{ color:'var(--t2)' }}>
-          {t.team.toUpperCase()}
+          {team.team.toUpperCase()}
         </p>
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Hızlı pilot */}
+        {/* Faster driver */}
         <div className="shrink-0 text-right" style={{ width:56 }}>
-          <p className="text-[17px] font-black mono" style={{ color }}>{t.faster.code}</p>
+          <p className="text-[17px] font-black mono" style={{ color }}>{team.faster.code}</p>
           <p className="text-[12px] font-semibold mono mt-0.5" style={{ color:'var(--t2)' }}>
-            {formatLapTime(t.faster.median)}
+            {formatLapTime(team.faster.median)}
           </p>
-          <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>{t.faster.laps} tur</p>
+          <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>{team.faster.laps}</p>
         </div>
 
-        {/* Bar + fark */}
+        {/* Bar + gap */}
         <div className="flex-1 space-y-2">
           <div className="flex justify-between items-center">
             <p className="text-[12px] font-semibold mono" style={{ color:'var(--t2)' }}>
-              {t.faster.code} daha hızlı
+              {t('teammate_pace.faster', { driver: team.faster.code })}
             </p>
             <p className="text-[18px] font-black mono" style={{ color }}>
-              {t.gap_ms >= 1
-                ? `${t.gap_ms.toFixed(3)}s`
-                : `${(t.gap_ms * 1000).toFixed(0)}ms`}
+              {team.gap_ms >= 1
+                ? `${team.gap_ms.toFixed(3)}s`
+                : `${(team.gap_ms * 1000).toFixed(0)}ms`}
             </p>
           </div>
-          <GapBar gap={t.gap_ms} maxGap={maxGap} color={color} />
+          <GapBar gap={team.gap_ms} maxGap={maxGap} color={color} />
         </div>
 
-        {/* Yavaş pilot */}
+        {/* Slower driver */}
         <div className="shrink-0" style={{ width:56 }}>
           <p className="text-[17px] font-black mono" style={{ color:'rgba(240,244,255,0.5)' }}>
-            {t.slower.code}
+            {team.slower.code}
           </p>
           <p className="text-[12px] font-semibold mono mt-0.5" style={{ color:'var(--t3)' }}>
-            {formatLapTime(t.slower.median)}
+            {formatLapTime(team.slower.median)}
           </p>
-          <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>{t.slower.laps} tur</p>
+          <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>{team.slower.laps}</p>
         </div>
       </div>
 
-      {/* En hızlı tur satırı */}
+      {/* Best lap row */}
       <div className="flex justify-between mt-3 pt-3 border-t"
         style={{ borderColor:'rgba(255,255,255,0.07)' }}>
         <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
-          En hızlı:{' '}
-          <span className="font-bold" style={{ color:'#00D2BE' }}>{formatLapTime(t.faster.best)}</span>
+          {t('teammate_pace.fastest_lap')}{' '}
+          <span className="font-bold" style={{ color:'#00D2BE' }}>{formatLapTime(team.faster.best)}</span>
           <span className="mx-2" style={{ color:'var(--t3)' }}>vs</span>
-          <span className="font-semibold" style={{ color:'var(--t2)' }}>{formatLapTime(t.slower.best)}</span>
+          <span className="font-semibold" style={{ color:'var(--t2)' }}>{formatLapTime(team.slower.best)}</span>
         </p>
         <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
           Δ <span className="font-bold" style={{ color:'#00D2BE' }}>
-            {(t.slower.best - t.faster.best).toFixed(3)}s
+            {(team.slower.best - team.faster.best).toFixed(3)}s
           </span>
         </p>
       </div>
@@ -120,6 +122,7 @@ function TeamRow({ t, maxGap }: { t: TeamData; maxGap: number }) {
 }
 
 export function TeammatePace({ sessionId }: Props) {
+  const { t } = useTranslation()
   const [subTab, setSubTab]   = useState<'teams' | 'custom'>('teams')
   const [dA, setDA]           = useState('')
   const [dB, setDB]           = useState('')
@@ -135,7 +138,7 @@ export function TeammatePace({ sessionId }: Props) {
   const allDrivers: DriverPace[] = data?.all_drivers  ?? []
   const sessionType: string      = data?.session_type ?? ''
   const isQuali = sessionType.includes('qualifying')
-  const paceLabel = isQuali ? 'En İyi Tur' : 'Medyan Pace'
+  const paceLabel = isQuali ? t('teammate_pace.pace_label_quali') : t('teammate_pace.pace_label_race')
   const maxGap = Math.max(...teams.map(t => t.gap_ms), 0.001)
 
   // Serbest karşılaştırma için seçili pilotlar
@@ -160,17 +163,17 @@ export function TeammatePace({ sessionId }: Props) {
   if (isLoading) return (
     <div className="card p-5 text-center">
       <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>
-        Pace verisi hesaplanıyor...
+        {t('teammate_pace.loading')}
       </p>
     </div>
   )
   if (data?.syncing) return (
     <div className="card p-5 text-center space-y-2">
       <p className="text-[12px] mono font-semibold" style={{ color:'var(--t3)' }}>
-        Oturum verisi hazırlanıyor...
+        {t('teammate_pace.session_loading')}
       </p>
       <p className="text-[11px]" style={{ color:'var(--t3)' }}>
-        30–60 saniye sonra sayfayı yenileyin.
+        {t('teammate_pace.refresh_hint')}
       </p>
     </div>
   )
@@ -178,7 +181,7 @@ export function TeammatePace({ sessionId }: Props) {
   if (isError || (!teams.length && !allDrivers.length)) return (
     <div className="card p-5 text-center">
       <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
-        Bu oturum için pace verisi bulunamadı.
+        {t('teammate_pace.no_data')}
       </p>
     </div>
   )
@@ -190,9 +193,9 @@ export function TeammatePace({ sessionId }: Props) {
         <div className="flex items-center gap-3">
           <span className="text-xl">⚡</span>
           <div>
-            <p className="text-[14px] font-bold text-white">Pace Karşılaştırması</p>
+            <p className="text-[14px] font-bold text-white">{t('teammate_pace.title')}</p>
             <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>
-              {isQuali ? 'En iyi tur karşılaştırması' : 'Medyan tur süresi · güvenlik aracı / pit-out hariç'}
+              {isQuali ? t('teammate_pace.subtitle_quali') : t('teammate_pace.subtitle_race')}
             </p>
           </div>
         </div>
@@ -201,12 +204,12 @@ export function TeammatePace({ sessionId }: Props) {
       {/* Alt sekmeler */}
       <div className="flex border-b" style={{ borderColor:'var(--b1)' }}>
         {([
-          ['teams',  '👥 Takım Arkadaşları'],
-          ['custom', '⚔️ Serbest Karşılaştırma'],
-        ] as const).map(([t, label]) => (
-          <button key={t} onClick={() => setSubTab(t)}
+          ['teams',  t('teammate_pace.tab_teams')],
+          ['custom', t('teammate_pace.tab_custom')],
+        ] as const).map(([tabKey, label]) => (
+          <button key={tabKey} onClick={() => setSubTab(tabKey)}
             className="flex-1 py-2.5 text-[12px] font-semibold transition-all"
-            style={subTab === t
+            style={subTab === tabKey
               ? { background:'rgba(225,6,0,0.08)', color:'#E10600', borderBottom:'2px solid #E10600' }
               : { color:'var(--t3)', borderBottom:'2px solid transparent' }}>
             {label}
@@ -217,12 +220,12 @@ export function TeammatePace({ sessionId }: Props) {
       {/* ── Takım arkadaşları ─────────────────────────── */}
       {subTab === 'teams' && (
         <>
-          {teams.map(t => <TeamRow key={t.team} t={t} maxGap={maxGap} />)}
+          {teams.map(tm => <TeamRow key={tm.team} team={tm} maxGap={maxGap} />)}
           <div className="px-5 py-3">
             <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
               {isQuali
-                ? 'Sıralama turunda en iyi tur süresi karşılaştırılıyor'
-                : 'Uç değerler çıkarılmış (%5 alt, %15 üst) · En hızlı tur gerçek best lap'}
+                ? t('teammate_pace.subtitle_quali')
+                : 'Outliers removed (5% low, 15% high) · Fastest lap is real best'}
             </p>
           </div>
         </>
@@ -261,7 +264,7 @@ export function TeammatePace({ sessionId }: Props) {
               <div className="rounded-2xl p-5 text-center"
                 style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
                 <p className="text-[11px] mono mb-2" style={{ color:'var(--t3)' }}>
-                  {isQuali ? 'EN İYİ TUR FARKI' : 'MEDYAN PACE FARKI'}
+                  {isQuali ? t('teammate_pace.pace_label_quali').toUpperCase() + ' GAP' : t('teammate_pace.pace_label_race').toUpperCase() + ' GAP'}
                 </p>
                 <p className="text-[42px] font-black mono leading-none"
                   style={{ color: customGap < 0.1 ? '#00D2BE' : customGap < 0.5 ? '#FFD700' : '#E10600' }}>
@@ -271,9 +274,8 @@ export function TeammatePace({ sessionId }: Props) {
                 </p>
                 <p className="text-[14px] font-bold mt-2">
                   <span style={{ color:'#E10600' }}>{customFaster.code}</span>
-                  <span className="mx-2" style={{ color:'var(--t3)' }}>daha hızlı</span>
+                  <span className="mx-2" style={{ color:'var(--t3)' }}>{t('teammate_pace.faster_than')}</span>
                   <span style={{ color:'#FF8700' }}>{customSlower.code}</span>
-                  <span style={{ color:'var(--t3)' }}>'dan</span>
                 </p>
               </div>
 
@@ -284,7 +286,7 @@ export function TeammatePace({ sessionId }: Props) {
                     <tr style={{ background:'rgba(255,255,255,0.03)' }}>
                       <th style={{ padding:'10px 14px', textAlign:'left', fontSize:11,
                         fontWeight:600, letterSpacing:'0.08em', color:'var(--t2)' }}>
-                        METRİK
+                        {t('teammate_pace.col_metric')}
                       </th>
                       <th style={{ padding:'10px 14px', textAlign:'center', fontSize:13,
                         fontWeight:900, color:'#E10600' }}>{customFaster.code}</th>
@@ -292,7 +294,7 @@ export function TeammatePace({ sessionId }: Props) {
                         fontWeight:900, color:'#FF8700' }}>{customSlower.code}</th>
                       <th style={{ padding:'10px 14px', textAlign:'right', fontSize:11,
                         fontWeight:600, color:'var(--t2)' }}>
-                        FARK
+                        {t('teammate_pace.col_gap')}
                       </th>
                     </tr>
                   </thead>
@@ -306,14 +308,14 @@ export function TeammatePace({ sessionId }: Props) {
                         diffColor: '#E10600',
                       },
                       {
-                        label: 'En İyi Tur',
+                        label: t('teammate_pace.pace_label_quali'),
                         a: formatLapTime(customFaster.best),
                         b: formatLapTime(customSlower.best),
                         diff: `+${(customSlower.best - customFaster.best).toFixed(3)}s`,
                         diffColor: '#00D2BE',
                       },
                       {
-                        label: 'Analiz Edilen Tur',
+                        label: t('teammate_pace.laps_analyzed'),
                         a: `${customFaster.laps}`,
                         b: `${customSlower.laps}`,
                         diff: '',
@@ -340,7 +342,7 @@ export function TeammatePace({ sessionId }: Props) {
               <div>
                 <p className="text-[12px] mono font-semibold tracking-widest mb-3"
                   style={{ color:'var(--t2)' }}>
-                  TÜM PILOTLARA GÖRE PACE SIRALAMASI
+                  {t('teammate_pace.pace_ranking')}
                 </p>
                 <div className="space-y-1">
                   {allDrivers.map((d, i) => {
@@ -371,7 +373,7 @@ export function TeammatePace({ sessionId }: Props) {
                         </div>
                         <span className="text-[12px] mono shrink-0 w-20 text-right font-semibold"
                           style={{ color: i===0 ? 'var(--t2)' : 'var(--t2)' }}>
-                          {i === 0 ? '— lider' : `+${gap.toFixed(3)}s`}
+                          {i === 0 ? `— ${t('teammate_pace.leader')}` : `+${gap.toFixed(3)}s`}
                         </span>
                       </div>
                     )

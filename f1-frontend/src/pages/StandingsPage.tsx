@@ -52,12 +52,13 @@ function DriverProfileCard({ driverId, teamColor }: { driverId: string; teamColo
 
   if (!data) return null
 
+  const { t } = useTranslation()
   const stats = [
-    { label: 'YARIŞ', value: data.total_races, color: 'white' },
-    { label: 'GALİBİYET', value: data.wins, color: data.wins > 0 ? '#FFD700' : 'white' },
-    { label: 'PODYUM', value: data.podiums, color: data.podiums > 0 ? '#00D2BE' : 'white' },
+    { label: t('standings.results').toUpperCase(), value: data.total_races, color: 'white' },
+    { label: t('standings_page.wins'), value: data.wins, color: data.wins > 0 ? '#FFD700' : 'white' },
+    { label: 'PODIUM', value: data.podiums, color: data.podiums > 0 ? '#00D2BE' : 'white' },
     { label: 'POLE', value: data.poles, color: data.poles > 0 ? '#a855f7' : 'white' },
-    { label: 'İLK YARIŞ', value: data.debut_year ?? '—', color: 'var(--t2)' },
+    { label: 'DEBUT', value: data.debut_year ?? '—', color: 'var(--t2)' },
   ]
 
   return (
@@ -82,7 +83,7 @@ function DriverProfileCard({ driverId, teamColor }: { driverId: string; teamColo
 }
 
 export function StandingsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { year } = useParams<{ year: string }>()
 
   // Aktif sezonu API'den çek — hardcoded yıl yok
@@ -216,9 +217,9 @@ export function StandingsPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <Link to="/" className="text-[11px] mono mb-2 block hover:text-white transition-colors"
-              style={{ color:'var(--t3)' }}>← Ana Sayfa</Link>
+              style={{ color:'var(--t3)' }}>{t('standings_page.back_home')}</Link>
             <h1 className="text-3xl font-black text-white">{t('standings.title', { year: y })}</h1>
-            <p className="text-[13px] mt-1" style={{ color:'var(--t2)' }}>{y} Sezonu</p>
+            <p className="text-[13px] mt-1" style={{ color:'var(--t2)' }}>{t('standings_page.year_season', { year: y })}</p>
           </div>
           {/* Yıl seçici */}
           <div className="flex gap-2">
@@ -241,7 +242,7 @@ export function StandingsPage() {
             ['constructors', `🔧 ${t('standings.constructors')}`],
             ['results',      `🏁 ${t('standings.results')}`],
             ...(y === currentYear
-              ? [['scenarios', '📊 Senaryolar'], ['h2h', '⚔️ H2H'], ['fantasy', '🎮 Fantasy']] as const
+              ? [['scenarios', `📊 ${t('standings_page.scenarios')}`], ['h2h', `⚔️ ${t('standings_page.h2h')}`], ['fantasy', `🎮 ${t('standings.fantasy')}`]] as const
               : []),
           ] as const).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t as any)}
@@ -260,7 +261,7 @@ export function StandingsPage() {
             style={{ background:'rgba(255,135,0,0.08)', border:'1px solid rgba(255,135,0,0.2)' }}>
             <span>⚠️</span>
             <p className="text-[12px]" style={{ color:'rgba(255,135,0,0.9)' }}>
-              Jolpica API şu an yanıt vermiyor — puanlar gösterilemiyor, pilot/takım listesi veritabanından geliyor.
+              {t('standings_page.fallback_warning')}
             </p>
           </div>
         )}
@@ -281,9 +282,9 @@ export function StandingsPage() {
           (effectiveTab === 'results'      && !results.isLoading      && results.isError)
         ) && (
           <ErrorCard
-            title="Şampiyona verisi alınamadı"
-            message="Jolpica API şu an yanıt vermiyor."
-            hint="Birkaç dakika sonra tekrar deneyin. API genellikle kısa süre içinde toparlanıyor."
+            title={t('standings_page.error_title')}
+            message={t('standings_page.error_msg')}
+            hint={t('standings_page.error_hint')}
             onRetry={() => {
               if (effectiveTab === 'drivers')      drivers.refetch()
               if (effectiveTab === 'constructors') constructors.refetch()
@@ -369,7 +370,7 @@ export function StandingsPage() {
                     {d.wins > 0 && (
                       <div className="text-center shrink-0 ml-1">
                         <p className="text-[14px] font-black" style={{ color:'#FFD700' }}>{d.wins}</p>
-                        <p className="text-[8px] mono" style={{ color:'var(--t3)' }}>GALİBİYET</p>
+                        <p className="text-[8px] mono" style={{ color:'var(--t3)' }}>{t('standings_page.wins')}</p>
                       </div>
                     )}
 
@@ -377,7 +378,7 @@ export function StandingsPage() {
                     <button
                       onClick={e => { e.stopPropagation(); toggleDriver(d.code) }}
                       className="shrink-0 ml-1 text-lg transition-all hover:scale-110"
-                      title={isFavorite(d.code) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                      title={isFavorite(d.code) ? t('standings_page.favorite_remove') : t('standings_page.favorite_add')}
                     >
                       {isFavorite(d.code) ? '⭐' : '☆'}
                     </button>
@@ -446,7 +447,7 @@ export function StandingsPage() {
                     {c.wins > 0 && (
                       <div className="text-center shrink-0 ml-1">
                         <p className="text-[14px] font-black" style={{ color:'#FFD700' }}>{c.wins}</p>
-                        <p className="text-[8px] mono" style={{ color:'var(--t3)' }}>GALİBİYET</p>
+                        <p className="text-[8px] mono" style={{ color:'var(--t3)' }}>{t('standings_page.wins')}</p>
                       </div>
                     )}
                   </div>
@@ -476,7 +477,7 @@ export function StandingsPage() {
                     </p>
                     <p className="text-[10px] mono mt-1" style={{ color:'var(--t3)' }}>
                       {r.date
-                        ? new Date(r.date).toLocaleDateString('tr-TR', { day:'numeric', month:'long', year:'numeric' })
+                        ? new Date(r.date).toLocaleDateString(i18n?.language?.startsWith('tr') ? 'tr-TR' : 'en-GB', { day:'numeric', month:'long', year:'numeric' })
                         : '—'}
                     </p>
                   </div>
@@ -530,7 +531,7 @@ export function StandingsPage() {
               ? (
                 <div className="card p-4 text-center">
                   <p className="text-[12px]" style={{ color: 'var(--t3)' }}>
-                    Bu sezon için önümüzdeki yarış bulunamadı.
+                    {t('standings_page.season_not_found')}
                   </p>
                 </div>
               )

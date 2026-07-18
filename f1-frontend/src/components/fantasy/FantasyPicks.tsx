@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
 import { useUIStore } from '../../store/uiStore'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   year: number
@@ -10,6 +11,7 @@ interface Props {
 const MEDALS = ['🥇', '🥈', '🥉']
 
 export function FantasyPicks({ year, roundNumber }: Props) {
+  const { t } = useTranslation()
   const { insightMode } = useUIStore()
 
   const { data, isLoading } = useQuery({
@@ -23,7 +25,7 @@ export function FantasyPicks({ year, roundNumber }: Props) {
 
   if (isLoading) return (
     <div className="card p-4">
-      <p className="text-[10px] mono font-semibold tracking-widest mb-3" style={{ color: 'var(--t3)' }}>FANTASY TAHMİN</p>
+      <p className="text-[10px] mono font-semibold tracking-widest mb-3" style={{ color: 'var(--t3)' }}>{t('fantasy.label')}</p>
       {[1,2,3].map(i => <div key={i} className="h-10 rounded mb-2 animate-pulse" style={{ background: 'var(--s2)' }}/>)}
     </div>
   )
@@ -32,7 +34,7 @@ export function FantasyPicks({ year, roundNumber }: Props) {
   return (
     <div className="card p-4">
       <p className="text-[10px] mono font-semibold tracking-widest mb-4" style={{ color: 'var(--t3)' }}>
-        BU HAFTASONU İÇİN FANTASY ÖNERİSİ
+        {t('fantasy.this_weekend')}
       </p>
 
       {/* Top picks */}
@@ -56,7 +58,7 @@ export function FantasyPicks({ year, roundNumber }: Props) {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[11px] mono" style={{ color: 'var(--t2)' }}>{p.avg_points} pt/yarış</p>
+              <p className="text-[11px] mono" style={{ color: 'var(--t2)' }}>{p.avg_points} {t('fantasy.pts_per_race')}</p>
               <p className="text-[9px] mono" style={{ color: 'var(--t3)' }}>P{p.avg_position.toFixed(1)} ort.</p>
             </div>
           </div>

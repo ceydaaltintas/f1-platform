@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CartesianGrid,
   Line,
@@ -36,6 +37,7 @@ export function TelemetryChart({
   compareData,
   compareColor = '#FF8700',
 }: Props) {
+  const { t } = useTranslation()
   const ch = CHANNELS.find((c) => c.key === activeChannel)!
 
   // İki veri setini mesafe ekseninde birleştir
@@ -56,7 +58,7 @@ export function TelemetryChart({
     <div className="card pt-4 pb-2 px-2">
       <p className="text-[12px] mono font-semibold tracking-[0.15em] pl-3 mb-3"
         style={{ color: 'var(--t2)' }}>
-        {ch.label.toUpperCase()} {ch.unit ? `(${ch.unit})` : ''} · Tıkla → AI yorum al
+        {ch.label.toUpperCase()} {ch.unit ? `(${ch.unit})` : ''} · {t('telemetry.click_hint')}
       </p>
 
       <ResponsiveContainer width="100%" height={height}>
@@ -123,7 +125,7 @@ export function TelemetryChart({
             labelFormatter={(v) => `📍 ${Math.round(Number(v))} m`}
             formatter={(v: any, name: string) => [
               `${v} ${ch.unit}`,
-              name === activeChannel ? ch.label : 'Karşılaştırma',
+              name === activeChannel ? ch.label : t('telemetry.compare_active'),
             ]}
           />
 
@@ -154,11 +156,11 @@ export function TelemetryChart({
 
       <div className="flex gap-5 pl-3 pb-1 mt-2">
         <span className="text-[11px] mono" style={{ color:'rgba(255,135,0,0.6)' }}>
-          ▓ Fren bölgesi
+          ▓ {t('telemetry.brake_zone')}
         </span>
         {compareData && (
           <span className="text-[11px] mono" style={{ color: compareColor + '99' }}>
-            ── Karşılaştırma
+            ── {t('telemetry.compare_active')}
           </span>
         )}
       </div>

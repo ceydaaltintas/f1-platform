@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { client, getCurrentUserId } from '../../api/client'
 import { useCommunityStore, type Comment } from '../../store/communityStore'
+import { useTranslation } from 'react-i18next'
 
 function timeAgo(iso: string): string {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000
@@ -25,6 +26,7 @@ function CommentItem({ comment, onUpvote, onUpdated, onDeleted }: {
   onUpdated: (c: Comment) => void
   onDeleted: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const color = nameColor(comment.username)
   const isOwn = comment.user_id === getCurrentUserId()
   const [editing, setEditing] = useState(false)
@@ -37,7 +39,7 @@ function CommentItem({ comment, onUpvote, onUpdated, onDeleted }: {
     onSuccess: (c) => { onUpdated(c); setEditing(false); setError(null) },
     onError: (e: any) => {
       const msg = e.response?.data?.detail
-      setError(typeof msg === 'string' ? msg : 'Güncellenemedi')
+      setError(typeof msg === 'string' ? msg : t('common.error'))
     },
   })
 
@@ -62,7 +64,7 @@ function CommentItem({ comment, onUpvote, onUpdated, onDeleted }: {
           {comment.lap_number && (
             <span className="text-[10px] mono px-1.5 py-0.5 rounded"
               style={{ background: 'rgba(225,6,0,0.12)', color: '#E10600', border: '1px solid rgba(225,6,0,0.2)' }}>
-              Tur {comment.lap_number}
+              {t('community.lap_badge', { n: comment.lap_number })}
             </span>
           )}
           <span className="text-[10px] mono ml-auto" style={{ color: 'var(--t3)' }}>
@@ -95,13 +97,13 @@ function CommentItem({ comment, onUpvote, onUpdated, onDeleted }: {
                 disabled={!draft.trim() || updateMutation.isPending}
                 className="px-3 py-1 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-30"
                 style={{ background: 'rgba(225,6,0,0.15)', border: '1px solid rgba(225,6,0,0.3)', color: '#E10600' }}>
-                {updateMutation.isPending ? '⏳' : 'Kaydet'}
+                {updateMutation.isPending ? '⏳' : t('common.save')}
               </button>
               <button
                 onClick={() => { setEditing(false); setDraft(comment.content); setError(null) }}
                 className="px-3 py-1 rounded-lg text-[11px] transition-all"
                 style={{ color: 'var(--t3)' }}>
-                İptal
+                {t('community.cancel')}
               </button>
             </div>
           </div>
@@ -125,13 +127,13 @@ function CommentItem({ comment, onUpvote, onUpdated, onDeleted }: {
               <button onClick={() => setEditing(true)}
                 className="text-[11px] transition-colors hover:text-white"
                 style={{ color: 'var(--t3)' }}>
-                Düzenle
+                {t('community.edit')}
               </button>
               <button onClick={() => deleteMutation.mutate()}
                 disabled={deleteMutation.isPending}
                 className="text-[11px] transition-colors hover:text-[#f87171] disabled:opacity-50"
                 style={{ color: 'var(--t3)' }}>
-                {deleteMutation.isPending ? '⏳' : 'Sil'}
+                {deleteMutation.isPending ? '⏳' : t('community.delete')}
               </button>
             </>
           )}
@@ -144,6 +146,7 @@ function CommentItem({ comment, onUpvote, onUpdated, onDeleted }: {
 function CommentInput({ sessionId, lapNumber, onPosted }: {
   sessionId: number; lapNumber?: number; onPosted: (c: Comment) => void
 }) {
+  const { t } = useTranslation()
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -154,8 +157,8 @@ function CommentInput({ sessionId, lapNumber, onPosted }: {
       }).then(r => r.data),
     onSuccess: (c) => { setText(''); setError(null); onPosted(c) },
     onError: (e: any) => {
-      const msg = e.response?.data?.detail ?? 'Yorum gönderilemedi'
-      setError(typeof msg === 'string' ? msg : 'Hata oluştu')
+      const msg = e.response?.data?.detail ?? t('community.send_error')
+      setError(typeof msg === 'string' ? msg : t('common.error'))
     },
   })
 
@@ -165,7 +168,7 @@ function CommentInput({ sessionId, lapNumber, onPosted }: {
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) mutation.mutate(text.trim()) }}
-        placeholder={lapNumber ? `Tur ${lapNumber} için yorum yaz...` : 'Yorumunu yaz... (Ctrl+Enter)'}
+        placeholder={lapNumber ? t('community.lap_comment', { n: lapNumber }) : t('community.comment_placeholder')}
         rows={2}
         maxLength={500}
         className="w-full rounded-xl text-[13px] resize-none mono"
@@ -194,7 +197,7 @@ function CommentInput({ sessionId, lapNumber, onPosted }: {
             border: '1px solid rgba(225,6,0,0.3)',
             color: text.trim() ? '#E10600' : 'var(--t3)',
           }}>
-          {mutation.isPending ? '⏳' : 'Gönder ↵'}
+          {mutation.isPending ? '⏳' : `${t('community.send')} ↵`}
         </button>
       </div>
     </div>
@@ -210,6 +213,7 @@ interface FeedProps {
 }
 
 export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className, refetchInterval }: FeedProps) {
+  const { t } = useTranslation()
   const { comments, addComment, updateComment, removeComment, setInitialComments } = useCommunityStore()
   const queryClient = useQueryClient()
   const listRef = useRef<HTMLDivElement>(null)
@@ -245,9 +249,9 @@ export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className, 
         <div className="flex items-center gap-2.5">
           <span className="text-base">💬</span>
           <div>
-            <p className="text-[13px] font-bold text-white leading-none">Canlı Yorumlar</p>
+            <p className="text-[13px] font-bold text-white leading-none">{t('community.comments')}</p>
             <p className="text-[10px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
-              {filtered.length} yorum
+              {t('community.comment_count', { n: filtered.length })}
             </p>
           </div>
         </div>
@@ -272,7 +276,7 @@ export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className, 
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
             <span className="text-3xl opacity-30">💬</span>
-            <p className="text-[12px]" style={{ color: 'var(--t3)' }}>İlk yorumu sen yap!</p>
+            <p className="text-[12px]" style={{ color: 'var(--t3)' }}>{t('community.no_comments')}</p>
           </div>
         ) : (
           filtered.map(c => (
@@ -289,10 +293,10 @@ export function CommentFeed({ sessionId, lapNumber, isAuthenticated, className, 
         ) : (
           <div className="border-t pt-4 text-center" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             <p className="text-[12px]" style={{ color: 'var(--t3)' }}>
-              Yorum yapmak için{' '}
+              {t('community.login_prompt')}{' '}
               <Link to="/login" className="font-semibold hover:text-white transition-colors"
                 style={{ color: 'var(--red)' }}>
-                giriş yap
+                {t('community.login_link')}
               </Link>
             </p>
           </div>

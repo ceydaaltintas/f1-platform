@@ -12,6 +12,7 @@ import {
 import { client } from '../../api/client'
 import { EnergyShareCard } from '../ui/EnergyShareCard'
 import { useShareCard } from '../../hooks/useShareCard'
+import { useTranslation } from 'react-i18next'
 
 interface PerLap {
   lap: number; deploy_kj: number; regen_kj: number
@@ -34,43 +35,22 @@ interface Props {
   sessionId: number; sessionDrivers: string[]; primaryDriver?: string; sessionName?: string
 }
 
-// Sözlük tanımları
-const GLOSSARY = [
-  {
-    term: '⚡ Deploy',
-    short: 'Batarya kullanımı',
-    detail: 'Biriktirilen elektrik enerjisinin hıza dönüştürülmesi. Yüksek hızlı düzlüklerde ve frenden çıkışta kullanılır.',
-    color: '#E10600',
-  },
-  {
-    term: '🔋 Regen',
-    short: 'Enerji toplama',
-    detail: 'Frenleme sırasında MGU-K motorunun jeneratör olarak çalışması ve kinetik enerjiyi bataryaya aktarması.',
-    color: '#00D2BE',
-  },
-  {
-    term: '🔀 X-mode',
-    short: 'Aktif aero açık',
-    detail: '2026\'da DRS\'nin yerini alan sistem. Düzlüklerde aktif, sürükleme azaltır. Beklenenden hızlı ivmelenme = X-mode işareti.',
-    color: '#FFD700',
-  },
-  {
-    term: '🎯 Agresiflik',
-    short: 'Deploy yoğunluğu',
-    detail: 'Pilotun tur başına depleted ettiği enerjinin limit değere oranı. 100 = limit sınırında sürüş.',
-    color: '#FF8700',
-  },
-]
-
 function GlossaryCard() {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const GLOSSARY = [
+    { term: '⚡ Deploy', short: t('energy.glossary_deploy_short'), detail: t('energy.glossary_deploy_detail'), color: '#E10600' },
+    { term: '🔋 Regen',  short: t('energy.glossary_regen_short'),  detail: t('energy.glossary_regen_detail'),  color: '#00D2BE' },
+    { term: '🔀 X-mode', short: t('energy.glossary_xmode_short'),  detail: t('energy.glossary_xmode_detail'),  color: '#FFD700' },
+    { term: '🎯 Agresiflik', short: t('energy.glossary_aggr_short'), detail: t('energy.glossary_aggr_detail'), color: '#FF8700' },
+  ]
   return (
     <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--b1)' }}>
       <button onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-4 py-3 text-left transition-all"
         style={{ background: 'var(--s2)' }}>
         <p className="text-[12px] font-semibold mono" style={{ color: 'var(--t2)' }}>
-          📖 Terimler ne anlama geliyor?
+          📖 {t('energy.glossary_title')}
         </p>
         <span className="text-[11px] mono" style={{ color: 'var(--t3)' }}>{open ? '▲' : '▼'}</span>
       </button>
@@ -110,6 +90,7 @@ function ScoreBar({ label, value, color, description }: {
 }
 
 export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessionName }: Props) {
+  const { t } = useTranslation()
   const defaultA = primaryDriver && sessionDrivers.includes(primaryDriver)
     ? primaryDriver : (sessionDrivers[0] ?? 'VER')
   const defaultB = sessionDrivers.find(d => d !== defaultA) ?? sessionDrivers[1] ?? 'NOR'
@@ -181,8 +162,8 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
   })
 
   // Profile açıklama metinleri
-  const aggrDesc = (v: number) => v >= 80 ? 'Çok agresif — her turda enerjiyi erken tüketiyor' : v >= 50 ? 'Dengeli deploy stratejisi' : 'Tutucu — enerjiyi yarışın sonuna saklıyor'
-  const harvDesc = (v: number) => v >= 60 ? 'Verimli frenleme — iyi enerji toplama' : v >= 30 ? 'Ortalama harvest performansı' : 'Fren noktaları kısa — az enerji toplanıyor'
+  const aggrDesc = (v: number) => v >= 80 ? t('energy.aggr_high') : v >= 50 ? t('energy.aggr_mid') : t('energy.aggr_low')
+  const harvDesc = (v: number) => v >= 60 ? t('energy.harv_high') : v >= 30 ? t('energy.harv_mid') : t('energy.harv_low')
 
   return (
     <div className="card overflow-hidden">
@@ -191,9 +172,9 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
         <div className="flex items-center gap-3 mb-4">
           <span className="text-xl">⚡</span>
           <div>
-            <p className="text-[14px] font-bold text-white">2026 Enerji Yönetimi</p>
+            <p className="text-[14px] font-bold text-white">{t('energy.title')}</p>
             <p className="text-[11px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
-              Tahmini · Throttle / Brake / Speed sinyallerinden fizik modeli
+              {t('energy.subtitle')}
             </p>
           </div>
         </div>
@@ -213,7 +194,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
           </select>
           {(queryA.isFetching || queryB.isFetching) && (
             <p className="text-[11px] mono animate-pulse" style={{ color:'var(--t3)' }}>
-              Hesaplanıyor (~20s ilk seferinde)...
+              {t('energy.loading')}
             </p>
           )}
         </div>
@@ -221,10 +202,10 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
 
       {/* Alt sekmeler */}
       <div className="flex border-b" style={{ borderColor:'var(--b1)' }}>
-        {([['profile','🏎 Pilot Profili'],['laps','📊 Tur Analizi'],['soc','🔋 SoC Eğrisi']] as const).map(([t, label]) => (
-          <button key={t} onClick={() => setSubTab(t)}
+        {([['profile', t('energy.tab_profile')],['laps', t('energy.tab_laps')],['soc', t('energy.tab_soc')]] as const).map(([tabKey, label]) => (
+          <button key={tabKey} onClick={() => setSubTab(tabKey)}
             className="flex-1 py-2.5 text-[12px] font-semibold transition-all"
-            style={subTab===t
+            style={subTab===tabKey
               ? { background:'rgba(225,6,0,0.08)', color:'#E10600', borderBottom:'2px solid #E10600' }
               : { color:'var(--t3)', borderBottom:'2px solid transparent' }}>
             {label}
@@ -235,10 +216,10 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
       {isLoading && (
         <div className="p-10 text-center">
           <p className="text-[13px] mono animate-pulse" style={{ color:'var(--t3)' }}>
-            Enerji modeli hesaplanıyor...
+            {t('energy.loading')}
           </p>
           <p className="text-[11px] mono mt-2" style={{ color:'var(--t3)' }}>
-            İlk seferde ~20–30s, sonraki açılışlar &lt;1s
+            ~20–30s (first time), &lt;1s (cached)
           </p>
         </div>
       )}
@@ -257,13 +238,13 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                       <p className="text-[22px] font-black mono" style={{ color }}>{code}</p>
 
                       <ScoreBar
-                        label="⚡ Deploy Agresifliği"
+                        label={`⚡ ${t('energy.intensity_short')}`}
                         value={data.profile.aggression}
                         color={color}
                         description={aggrDesc(data.profile.aggression)}
                       />
                       <ScoreBar
-                        label="🔋 Harvest Verimliliği"
+                        label={`🔋 ${t('energy.regen_short')}`}
                         value={data.profile.harvest_eff}
                         color="#00D2BE"
                         description={harvDesc(data.profile.harvest_eff)}
@@ -273,10 +254,10 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                         {/* Deploy */}
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="text-[12px] mono" style={{ color:'var(--t2)' }}>Ort. Deploy/Tur</p>
+                            <p className="text-[12px] mono" style={{ color:'var(--t2)' }}>{t('energy.avg_deploy_lap')}</p>
                             <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-                              {data.profile.avg_deploy_kj < 400 ? '🟢 Tutucu' : data.profile.avg_deploy_kj < 700 ? '🟡 Dengeli' : '🔴 Agresif'}
-                              {' · İdeal: 500–750 kJ'}
+                              {data.profile.avg_deploy_kj < 400 ? t('energy.deploy_conservative') : data.profile.avg_deploy_kj < 700 ? t('energy.deploy_balanced') : t('energy.deploy_aggressive')}
+                              {' · '}{t('energy.deploy_ideal')}
                             </p>
                           </div>
                           <span className="text-[14px] font-black mono" style={{ color }}>{data.profile.avg_deploy_kj} kJ</span>
@@ -284,17 +265,17 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                         {/* Regen */}
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="text-[12px] mono" style={{ color:'var(--t2)' }}>Ort. Regen/Tur</p>
+                            <p className="text-[12px] mono" style={{ color:'var(--t2)' }}>{t('energy.avg_regen_lap')}</p>
                             <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-                              {data.profile.avg_regen_kj < 100 ? '🔴 Zayıf' : data.profile.avg_regen_kj < 200 ? '🟡 Ortalama' : '🟢 İyi'}
-                              {' · İdeal: 150–250 kJ'}
+                              {data.profile.avg_regen_kj < 100 ? t('energy.regen_weak') : data.profile.avg_regen_kj < 200 ? t('energy.regen_average') : t('energy.regen_good')}
+                              {' · '}{t('energy.regen_ideal')}
                             </p>
                           </div>
                           <span className="text-[14px] font-black mono" style={{ color:'#00D2BE' }}>{data.profile.avg_regen_kj} kJ</span>
                         </div>
                         {[
-                          ['Analiz Turu',    `${data.profile.total_laps_analyzed}`],
-                          ['X-mode Bölgesi', `${data.profile.x_mode_zones.length}`],
+                          [t('energy.analysis_laps'), `${data.profile.total_laps_analyzed}`],
+                          [t('energy.xmode_zones'),   `${data.profile.x_mode_zones.length}`],
                         ].map(([k, v]) => (
                           <div key={k} className="flex justify-between">
                             <span className="text-[12px] mono" style={{ color:'var(--t2)' }}>{k}</span>
@@ -312,11 +293,11 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                 <div className="rounded-xl p-4 border space-y-4"
                   style={{ borderColor:'var(--b1)', background:'var(--s2)' }}>
                   <p className="text-[12px] mono font-semibold" style={{ color:'var(--t2)' }}>
-                    KARŞILAŞTIRMA
+                    COMPARISON
                   </p>
                   {[
-                    { label:'Deploy Agresifliği', a:eA.profile.aggression, b:eB.profile.aggression, winText:'daha agresif' },
-                    { label:'Harvest Verimliliği', a:eA.profile.harvest_eff, b:eB.profile.harvest_eff, winText:'daha verimli' },
+                    { label: t('energy.deploy_short'), a:eA.profile.aggression, b:eB.profile.aggression, winKey:'can_catch' },
+                    { label: t('energy.regen_short'), a:eA.profile.harvest_eff, b:eB.profile.harvest_eff, winKey:'can_catch' },
                   ].map(row => {
                     const total = row.a + row.b || 1
                     const diff  = Math.abs(row.a - row.b)
@@ -328,7 +309,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                         <div className="flex justify-between mb-1.5">
                           <span className="text-[12px] mono" style={{ color:'var(--t2)' }}>{row.label}</span>
                           <span className="text-[12px] mono font-bold" style={{ color: isTie ? 'var(--t2)' : wc }}>
-                            {isTie ? 'Neredeyse eşit' : `${winner} ${row.winText}`}
+                            {isTie ? t('h2h.equal') : `${winner}`}
                           </span>
                         </div>
                         <div className="flex h-3 rounded-full overflow-hidden gap-0.5">
@@ -352,7 +333,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                     <button onClick={() => shareEnergy(`hotlap-${dA}-vs-${dB}-enerji`)}
                       className="flex items-center gap-2 px-4 py-2 text-[11px] border border-[#E10600]/40 text-[#E10600] rounded-lg hover:bg-[#E10600]/10 transition-all"
                     >
-                      <span>↗</span> Profili Paylaş
+                      <span>↗</span> {t('energy.share_profile')}
                     </button>
                   </div>
 
@@ -376,9 +357,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                 style={{ background:'rgba(255,215,0,0.05)', border:'1px solid rgba(255,215,0,0.15)' }}>
                 <span className="shrink-0 text-[13px]">⚠️</span>
                 <p className="text-[11px] mono leading-relaxed" style={{ color:'rgba(255,215,0,0.7)' }}>
-                  Gerçek SoC FIA tarafından gizlidir. Bu değerler throttle/brake/speed sinyallerinden
-                  fizik modeli ile üretilmiştir. <strong>Göreceli karşılaştırmalar güvenilir,
-                  mutlak değerler yaklaşıktır.</strong>
+                  {t('energy.disclaimer')} <strong>{t('energy.disclaimer_note')}</strong>
                 </p>
               </div>
             </div>
@@ -390,7 +369,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <p className="text-[12px] mono font-semibold" style={{ color:'var(--t2)' }}>
-                    {selectedLap === 'all' ? `TÜM TURLAR (${lapChartData.length})` : `TUR ${selectedLap}`}
+                    {selectedLap === 'all' ? t('energy.all_laps_label', { n: lapChartData.length }) : t('energy.lap_label', { n: selectedLap })}
                   </p>
                   {/* Tur seçici — sadece bu sekmede */}
                   {lapNumbers.length > 0 && (
@@ -398,8 +377,8 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                       onChange={e => setSelectedLap(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                       className="px-2.5 py-1.5 rounded-lg text-[12px] mono cursor-pointer"
                       style={{ background:'var(--s2)', border:'1px solid var(--b1)', color:'var(--t2)', outline:'none' }}>
-                      <option value="all">Tüm Yarış</option>
-                      {lapNumbers.map(l => <option key={l} value={l}>Tur {l}</option>)}
+                      <option value="all">{t('energy.all_race')}</option>
+                      {lapNumbers.map(l => <option key={l} value={l}>{t('energy.lap_option', { n: l })}</option>)}
                     </select>
                   )}
                 </div>
@@ -410,7 +389,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
               </div>
 
               {lapChartData.length === 0 ? (
-                <p className="text-[12px] mono text-center py-8" style={{ color:'var(--t3)' }}>Veri yok</p>
+                <p className="text-[12px] mono text-center py-8" style={{ color:'var(--t3)' }}>{t('energy.no_data')}</p>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={lapChartData} barGap={2} barCategoryGap="25%">
@@ -418,14 +397,14 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                     <XAxis dataKey="lap"
                       tick={{ fill:'rgba(240,244,255,0.55)', fontSize:11, fontFamily:'IBM Plex Mono,monospace' }}
                       tickLine={false} axisLine={{ stroke:'rgba(255,255,255,0.10)' }}
-                      label={{ value:'Tur', position:'insideBottom', offset:-2, fill:'rgba(240,244,255,0.4)', fontSize:11 }} />
+                      label={{ value: t('telemetry.lap', { n: '' }).trim(), position:'insideBottom', offset:-2, fill:'rgba(240,244,255,0.4)', fontSize:11 }} />
                     <YAxis
                       tick={{ fill:'rgba(240,244,255,0.55)', fontSize:11, fontFamily:'IBM Plex Mono,monospace' }}
                       tickLine={false} axisLine={false}
                       label={{ value:'kJ', angle:-90, position:'insideLeft', fill:'rgba(240,244,255,0.4)', fontSize:11 }} />
                     <Tooltip
                       contentStyle={{ background:'rgba(5,8,15,0.97)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, fontFamily:'IBM Plex Mono,monospace', fontSize:11 }}
-                      labelFormatter={v => `Tur ${v}`} />
+                      labelFormatter={v => t('energy.lap_option', { n: v })} />
                     <Bar dataKey={`${dA} Deploy`} fill="#E10600" opacity={0.9} radius={[2,2,0,0]} />
                     <Bar dataKey={`${dA} Regen`}  fill="#00D2BE" opacity={0.7} radius={[2,2,0,0]} />
                     {eB && <>
@@ -439,10 +418,10 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
               {/* Özet istatistik */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { label:'En Yüksek Deploy', val:`${Math.max(...lapChartData.map((l:any) => l[`${dA} Deploy`]||0)).toFixed(0)} kJ`, color:'#E10600' },
-                  { label:'En Yüksek Regen',  val:`${Math.max(...lapChartData.map((l:any) => l[`${dA} Regen`]||0)).toFixed(0)} kJ`,  color:'#00D2BE' },
-                  { label:'Ort. Deploy/Tur', val:`${eA.profile.avg_deploy_kj} kJ`, color:'var(--t2)' },
-                  { label:'Ort. Regen/Tur',  val:`${eA.profile.avg_regen_kj} kJ`,  color:'var(--t2)' },
+                  { label: t('energy.max_deploy'), val:`${Math.max(...lapChartData.map((l:any) => l[`${dA} Deploy`]||0)).toFixed(0)} kJ`, color:'#E10600' },
+                  { label: t('energy.max_regen'),  val:`${Math.max(...lapChartData.map((l:any) => l[`${dA} Regen`]||0)).toFixed(0)} kJ`,  color:'#00D2BE' },
+                  { label: t('energy.avg_deploy'), val:`${eA.profile.avg_deploy_kj} kJ`, color:'var(--t2)' },
+                  { label: t('energy.avg_regen'),  val:`${eA.profile.avg_regen_kj} kJ`,  color:'var(--t2)' },
                 ].map(s => (
                   <div key={s.label} className="rounded-xl p-3 border" style={{ borderColor:'var(--b1)', background:'var(--s2)' }}>
                     <p className="text-[10px] mono mb-1" style={{ color:'var(--t3)' }}>{s.label}</p>
@@ -460,7 +439,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
             <div className="px-5 py-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-[12px] mono font-semibold" style={{ color:'var(--t2)' }}>
-                  TAHMİNİ BATARYA · Tüm Yarış
+                  {t('energy.battery_title')}
                 </p>
                 <div className="flex gap-3 text-[11px] mono">
                   <span style={{ color:'#E10600' }}>■ {dA}</span>
@@ -471,7 +450,7 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
 
               {socChartA.length === 0 ? (
                 <p className="text-[12px] mono text-center py-8" style={{ color:'var(--t3)' }}>
-                  Veri yok — lütfen farklı tur seçin
+                  {t('energy.no_data')}
                 </p>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
@@ -488,11 +467,11 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
                         if (name === 'xmode') return null
                         const lapKey = name === `${dA} SoC` ? `${dA}_lap` : `${dB}_lap`
                         const lap = item?.payload?.[lapKey]
-                        return [`${v}%${lap ? ` · Tur ${lap}` : ''}`, name]
+                        return [`${v}%${lap ? ` · ${t('energy.lap_option', { n: lap })}` : ''}`, name]
                       }}
                       labelFormatter={() => ''} />
                     <ReferenceLine y={20} stroke="rgba(225,6,0,0.3)" strokeDasharray="3 3"
-                      label={{ value:'Kritik', position:'insideLeft', fill:'rgba(225,6,0,0.5)', fontSize:10 }} />
+                      label={{ value: t('energy.critical_label'), position:'insideLeft', fill:'rgba(225,6,0,0.5)', fontSize:10 }} />
                     <Line type="monotone" dataKey={`${dA} SoC`} stroke="#E10600" strokeWidth={2} dot={false} connectNulls />
                     {eB && <Line type="monotone" dataKey={`${dB} SoC`} stroke="#FF8700" strokeWidth={2} dot={false} connectNulls />}
                     <Line type="monotone" dataKey="xmode" stroke="rgba(255,215,0,0.5)"
@@ -509,14 +488,14 @@ export function EnergyAnalysis({ sessionId, sessionDrivers, primaryDriver, sessi
               <div className="rounded-xl p-4 border space-y-2"
                 style={{ borderColor:'var(--b1)', background:'var(--s2)' }}>
                 <p className="text-[12px] mono font-semibold mb-2" style={{ color:'var(--t2)' }}>
-                  📖 Bu grafik nasıl okunur?
+                  📖 {t('energy.how_to_read')}
                 </p>
                 <div className="space-y-2 text-[11px] leading-relaxed" style={{ color:'var(--t2)' }}>
-                  <p>🔴 <strong>Düşen çizgi</strong> → Pilot bataryadan enerji çekiyor (deploy), hızlanıyor</p>
-                  <p>🟢 <strong>Yükselen çizgi</strong> → Frenleme sırasında enerji toplanıyor (regen)</p>
-                  <p>⚠️ <strong>Kırmızı bölge (%20 altı)</strong> → Kritik seviye, performans düşer</p>
-                  <p>✨ <strong>Sarı dikey çizgiler</strong> → X-mode aktif olduğu tahmini anlar</p>
-                  <p>🔁 <strong>Tekrar yükselmeler</strong> → Pit stop veya tur başında enerji yenilendi</p>
+                  <p>{t('energy.read_deploy')}</p>
+                  <p>{t('energy.read_regen')}</p>
+                  <p>{t('energy.read_critical')}</p>
+                  <p>{t('energy.read_xmode')}</p>
+                  <p>{t('energy.read_refill')}</p>
                 </div>
               </div>
 

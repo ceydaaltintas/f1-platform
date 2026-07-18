@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Helmet } from 'react-helmet-async'
 import { client } from '../api/client'
 import { CommentFeed } from '../components/community/CommentFeed'
+import { useTranslation } from 'react-i18next'
 
 const MEDAL = ['🥇', '🥈', '🥉']
 
@@ -20,6 +21,7 @@ function teamColor(name: string): string {
 }
 
 export function RecapPage() {
+  const { t, i18n } = useTranslation()
   const { year, round } = useParams<{ year: string; round: string }>()
   const y = Number(year) || 2026
   const r = Number(round) || 1
@@ -42,9 +44,9 @@ export function RecapPage() {
 
   if (isError || !data) return (
     <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-      <p className="text-[14px]" style={{ color: 'var(--t3)' }}>Yarış özeti bulunamadı</p>
+      <p className="text-[14px]" style={{ color: 'var(--t3)' }}>{t('recap.not_found')}</p>
       <Link to={`/standings/${y}`} className="text-[13px] mt-2 inline-block" style={{ color: '#E10600' }}>
-        Şampiyona sayfasına dön
+        {t('recap.back_standings')}
       </Link>
     </div>
   )
@@ -62,19 +64,19 @@ export function RecapPage() {
   return (
     <>
       <Helmet>
-        <title>{`${data.race_name} ${y} Yarış Özeti · Hotlap`}</title>
-        <meta name="description" content={`${data.race_name} ${y} yarış özeti, sonuçlar ve analiz. ${podium[0]?.driver ?? ''} kazandı.`} />
+        <title>{`${data.race_name} ${y} · Hotlap`}</title>
+        <meta name="description" content={t('recap.meta_desc', { race: data.race_name, year: y, winner: podium[0]?.driver ?? '' })} />
         <link rel="canonical" href={`https://hotlap.live/recap/${y}/${r}`} />
         <meta property="og:type" content="article" />
         <meta property="og:site_name" content="Hotlap" />
-        <meta property="og:title" content={`${data.race_name} ${y} Yarış Özeti · Hotlap`} />
-        <meta property="og:description" content={`${data.race_name} ${y} yarış özeti, sonuçlar ve analiz. ${podium[0]?.driver ?? ''} kazandı.`} />
+        <meta property="og:title" content={`${data.race_name} ${y} · Hotlap`} />
+        <meta property="og:description" content={t('recap.meta_desc', { race: data.race_name, year: y, winner: podium[0]?.driver ?? '' })} />
         <meta property="og:url" content={`https://hotlap.live/recap/${y}/${r}`} />
         <meta property="og:image" content="https://hotlap.live/og-image.png" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@hotlapapp" />
-        <meta name="twitter:title" content={`${data.race_name} ${y} Yarış Özeti · Hotlap`} />
-        <meta name="twitter:description" content={`${data.race_name} ${y} yarış özeti, sonuçlar ve analiz. ${podium[0]?.driver ?? ''} kazandı.`} />
+        <meta name="twitter:title" content={`${data.race_name} ${y} · Hotlap`} />
+        <meta name="twitter:description" content={t('recap.meta_desc', { race: data.race_name, year: y, winner: podium[0]?.driver ?? '' })} />
       </Helmet>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -82,12 +84,12 @@ export function RecapPage() {
         {/* Header */}
         <div>
           <Link to={`/standings/${y}`} className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
-            ← {y} Sezonu
+            ← {t('standings_page.year_season', { year: y })}
           </Link>
           <div className="flex items-baseline gap-3 mt-2 flex-wrap">
             <span className="text-[10px] mono px-2 py-1 rounded"
               style={{ background: 'rgba(225,6,0,0.1)', color: '#E10600', border: '1px solid rgba(225,6,0,0.3)' }}>
-              TUR {data.round}
+              {t('recap.round_badge', { n: data.round })}
             </span>
             <h1 className="text-[28px] font-black text-white leading-tight">{data.race_name}</h1>
           </div>
@@ -99,7 +101,7 @@ export function RecapPage() {
         {/* Podyum */}
         <div className="card overflow-hidden">
           <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-            <p className="text-[13px] font-bold text-white">Podyum</p>
+            <p className="text-[13px] font-bold text-white">{t('recap.podium')}</p>
           </div>
           <div className="grid grid-cols-3 gap-0">
             {podium.map((p: any, i: number) => (
@@ -126,7 +128,7 @@ export function RecapPage() {
             <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--b1)' }}>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded"
                 style={{ background: 'rgba(225,6,0,0.15)', color: '#E10600' }}>AI</span>
-              <p className="text-[13px] font-bold text-white">Yarış Özeti</p>
+              <p className="text-[13px] font-bold text-white">{t('recap.ai_summary_title')}</p>
             </div>
             <div className="px-5 py-4">
               <p className="text-[14px] leading-relaxed" style={{ color: 'var(--t2)' }}>
@@ -139,12 +141,12 @@ export function RecapPage() {
         {/* Sonuçlar tablosu */}
         <div className="card overflow-hidden">
           <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-            <p className="text-[13px] font-bold text-white">Yarış Sonuçları</p>
+            <p className="text-[13px] font-bold text-white">{t('recap.results_title')}</p>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'IBM Plex Mono, monospace' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
-                {['P', 'PİLOT', 'TAKIM', 'GRİD', 'DEĞ.', 'PUAN'].map((h, i) => (
+                {[t('recap.col_pos'), t('recap.col_driver'), t('recap.col_team'), t('recap.col_grid'), t('recap.col_change'), t('recap.col_points')].map((h, i) => (
                   <th key={h} style={{
                     padding: '8px 10px', fontSize: 9, fontWeight: 600, letterSpacing: '0.1em',
                     color: 'rgba(240,244,255,0.25)',
@@ -191,7 +193,7 @@ export function RecapPage() {
           {/* Yükselenler */}
           {gainers.length > 0 && (
             <div className="card p-4">
-              <p className="text-[11px] mono font-semibold mb-3" style={{ color: '#00D2BE' }}>▲ EN ÇOK YÜKSELENLer</p>
+              <p className="text-[11px] mono font-semibold mb-3" style={{ color: '#00D2BE' }}>{t('recap.gainers')}</p>
               <div className="space-y-2">
                 {gainers.map((g: any) => (
                   <div key={g.code} className="flex items-center justify-between">
@@ -209,7 +211,7 @@ export function RecapPage() {
           {/* Düşenler */}
           {losers.length > 0 && (
             <div className="card p-4">
-              <p className="text-[11px] mono font-semibold mb-3" style={{ color: '#f87171' }}>▼ EN ÇOK DÜŞENLer</p>
+              <p className="text-[11px] mono font-semibold mb-3" style={{ color: '#f87171' }}>{t('recap.losers')}</p>
               <div className="space-y-2">
                 {losers.map((l: any) => (
                   <div key={l.code} className="flex items-center justify-between">
@@ -228,7 +230,7 @@ export function RecapPage() {
         {/* DNF'ler */}
         {dnfs.length > 0 && (
           <div className="card p-4">
-            <p className="text-[11px] mono font-semibold mb-3" style={{ color: 'var(--t3)' }}>TAMAMLAYAMAYANLAR</p>
+            <p className="text-[11px] mono font-semibold mb-3" style={{ color: 'var(--t3)' }}>{t('recap.dnf_title')}</p>
             <div className="flex flex-wrap gap-2">
               {dnfs.map((d: any) => (
                 <span key={d.code} className="text-[11px] mono px-2 py-1 rounded"
@@ -243,11 +245,11 @@ export function RecapPage() {
         {/* Yorumlar */}
         <div className="card overflow-hidden">
           <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--b1)' }}>
-            <p className="text-[13px] font-bold text-white">Yorumlar</p>
+            <p className="text-[13px] font-bold text-white">{t('recap.comments_title')}</p>
           </div>
           <div className="p-4">
             <p className="text-[12px] text-center py-4" style={{ color: 'var(--t3)' }}>
-              Yorum sistemi yakında aktif olacak
+              {t('recap.comments_soon')}
             </p>
           </div>
         </div>

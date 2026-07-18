@@ -4,6 +4,7 @@ import { client } from '../../api/client'
 import { formatLapTime, formatSectorTime } from '../../utils/format'
 import { HistoricalShareCard } from '../ui/HistoricalShareCard'
 import { useShareCard } from '../../hooks/useShareCard'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   circuitName?: string
@@ -15,6 +16,7 @@ const DEFAULT_DRIVERS = ['VER', 'HAM', 'LEC', 'NOR', 'PIA', 'RUS', 'SAI', 'ALO']
 const AVAILABLE_YEARS = [2024, 2025, 2026]
 
 export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver }: Props) {
+  const { t } = useTranslation()
   const driverOptions = sessionDrivers && sessionDrivers.length > 0 ? sessionDrivers : DEFAULT_DRIVERS
 
   const [driver, setDriver] = useState(selectedDriver ?? driverOptions[0])
@@ -47,13 +49,13 @@ export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver 
   return (
     <div className="card p-4">
       <p className="text-[10px] mono font-semibold tracking-widest mb-4" style={{ color: 'var(--t3)' }}>
-        TARİHSEL KARŞILAŞTIRMA
+        {t('hist_compare.title')}
       </p>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         {/* Pilot seçimi */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] mono font-semibold" style={{ color: 'var(--t3)' }}>PİLOT</span>
+          <span className="text-[10px] mono font-semibold" style={{ color: 'var(--t3)' }}>{t('hist_compare.driver_label')}</span>
           <select
             value={driver}
             onChange={e => setDriver(e.target.value)}
@@ -68,7 +70,7 @@ export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver 
 
         {/* Yıl seçimi */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] mono font-semibold" style={{ color: 'var(--t3)' }}>YIL</span>
+          <span className="text-[10px] mono font-semibold" style={{ color: 'var(--t3)' }}>YEAR</span>
           {AVAILABLE_YEARS.map(y => (
             <button key={y} onClick={() => toggleYear(y)}
               className="px-3 py-2 rounded-xl text-[12px] mono font-semibold cursor-pointer transition-all"
@@ -86,16 +88,16 @@ export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver 
           disabled={years.length === 0 || !circuit}
           className="px-4 py-2 rounded-xl text-[12px] mono font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background: 'rgba(225,6,0,0.08)', border: '1px solid rgba(225,6,0,0.30)', color: '#E10600' }}>
-          Karşılaştır
+          {t('hist_compare.compare_btn')}
         </button>
       </div>
 
       {!circuit && (
-        <div className="text-[12px]" style={{ color: 'var(--t3)' }}>Devre bilgisi yükleniyor...</div>
+        <div className="text-[12px]" style={{ color: 'var(--t3)' }}>{t('hist_compare.loading_circuit')}</div>
       )}
 
       {(isLoading || isFetching) && (
-        <div className="text-[12px]" style={{ color: 'var(--t3)' }}>Yükleniyor...</div>
+        <div className="text-[12px]" style={{ color: 'var(--t3)' }}>{t('hist_compare.loading')}</div>
       )}
 
       {data?.results && (
@@ -104,7 +106,7 @@ export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver 
             <button onClick={() => shareHistorical(`hotlap-${driver}-${circuit.replace(/\s+/g, '-')}-tarihsel`)}
               className="flex items-center gap-2 px-4 py-2 text-[11px] border border-[#E10600]/40 text-[#E10600] rounded-lg hover:bg-[#E10600]/10 transition-all"
             >
-              <span>↗</span> Karşılaştırmayı Paylaş
+              <span>↗</span> {t('hist_compare.share_btn')}
             </button>
           </div>
 
@@ -148,7 +150,7 @@ export function HistoricalCompare({ circuitName, sessionDrivers, selectedDriver 
                   {r.year === data.fastest_year && (
                     <span className="text-[9px] mono font-semibold rounded-lg px-1.5 py-0.5"
                       style={{ color: '#E10600', border: '1px solid rgba(225,6,0,0.30)' }}>
-                      EN HIZLI
+                      {t('leaderboard.col_best_lap')}
                     </span>
                   )}
                 </>

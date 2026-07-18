@@ -1,4 +1,8 @@
-export function F1Loader({ text = 'Yükleniyor...' }: { text?: string }) {
+import { useTranslation } from 'react-i18next'
+
+export function F1Loader({ text }: { text?: string }) {
+  const { t } = useTranslation()
+  const resolvedText = text ?? t('common.loading')
   const c = '#E10600'
 
   return (
@@ -86,7 +90,7 @@ export function F1Loader({ text = 'Yükleniyor...' }: { text?: string }) {
 
       {/* Yazı */}
       <p className="text-[12px] mono font-medium" style={{ color: 'var(--t3)' }}>
-        {text}
+        {resolvedText}
       </p>
 
       <style>{`

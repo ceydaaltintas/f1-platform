@@ -8,6 +8,7 @@ import { client } from '../../api/client'
 import { ErrorCard } from '../ui/ErrorCard'
 import { formatLapTime } from '../../utils/format'
 import { COMPOUND_COLORS } from '../../types/f1'
+import { useTranslation } from 'react-i18next'
 
 interface Stint {
   stint_number: number
@@ -30,10 +31,7 @@ interface Summary {
   fastest_lap: number | null
 }
 
-const COMPOUND_TR: Record<string, string> = {
-  SOFT: 'Yumuşak', MEDIUM: 'Orta', HARD: 'Sert',
-  INTERMEDIATE: 'Ara', WET: 'Islak', UNKNOWN: '?',
-}
+// Compound display names now use i18n via t('compounds.*') inside the component
 
 const RACE_TYPES = ['race', 'sprint']
 
@@ -44,6 +42,7 @@ interface Props {
 }
 
 export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props) {
+  const { t } = useTranslation()
   // Sadece yarış/sprint oturumlarında göster
   if (sessionType && !RACE_TYPES.includes(sessionType)) return null
 
@@ -61,7 +60,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
           {driverCode.slice(0,1)}
         </div>
         <p className="text-[11px] mono font-semibold tracking-widest" style={{ color:'var(--t3)' }}>
-          YARIŞ ÖZETİ YÜKLENİYOR...
+          {t('driver_summary.loading')}
         </p>
       </div>
       <div className="space-y-2">
@@ -72,8 +71,8 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
 
   if (isError) return (
     <ErrorCard compact
-      title="Yarış özeti yüklenemedi"
-      message="OpenF1'den stint verisi alınamadı."
+      title={t('driver_summary.error_title')}
+      message={t('driver_summary.error_msg')}
       onRetry={() => window.location.reload()}
     />
   )
@@ -92,9 +91,9 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
             {driverCode}
           </div>
           <div>
-            <p className="text-[13px] font-bold text-white leading-none">Yarış Özeti</p>
+            <p className="text-[13px] font-bold text-white leading-none">{t('driver_summary.title')}</p>
             <p className="text-[10px] mono mt-0.5" style={{ color:'var(--t3)' }}>
-              Pit stop stratejisi & stint analizi
+              {t('driver_summary.subtitle')}
             </p>
           </div>
         </div>
@@ -114,7 +113,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
               <p className="text-[14px] font-black mono" style={{ color:'#c084fc' }}>
                 {formatLapTime(data.fastest_lap)}
               </p>
-              <p className="text-[9px] mono" style={{ color:'rgba(192,84,252,0.7)' }}>EN HIZLI TUR</p>
+              <p className="text-[9px] mono" style={{ color:'rgba(192,84,252,0.7)' }}>{t('driver_summary.fastest_lap')}</p>
             </div>
           )}
         </div>
@@ -126,7 +125,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
         {totalLaps > 0 && (
           <div>
             <p className="text-[10px] mono font-semibold tracking-widest mb-2" style={{ color:'var(--t3)' }}>
-              YARIŞIN TAMAMI ({totalLaps} TUR)
+              {t('driver_summary.race_full', { n: totalLaps })}
             </p>
             <div className="flex h-8 rounded-xl overflow-hidden gap-px w-full">
               {data.stints.map((st, i) => {
@@ -140,7 +139,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                       background: color + '22',
                       borderTop: `3px solid ${color}`,
                     }}
-                    title={`${COMPOUND_TR[st.compound] ?? st.compound} · Tur ${st.lap_start}–${st.lap_end}`}>
+                    title={`${t(`compounds.${st.compound}`, st.compound) ?? st.compound} · Tur ${st.lap_start}–${st.lap_end}`}>
                     {pct > 8 && (
                       <span className="text-[9px] font-black mono" style={{ color }}>
                         {st.compound[0]}
@@ -157,7 +156,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                   <span key={i} className="text-[10px] mono px-2 py-0.5 rounded"
                     style={{ background:'rgba(255,135,0,0.1)', color:'#FF8700',
                              border:'1px solid rgba(255,135,0,0.2)' }}>
-                    🔧 Tur {pl}'de pit
+                    🔧 {t('driver_summary.pit_at_lap', { n: pl })}
                   </span>
                 ))}
               </div>
@@ -168,7 +167,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
         {/* ── Stint Detayları ───────────────────────────────────── */}
         <div>
           <p className="text-[10px] mono font-semibold tracking-widest mb-3" style={{ color:'var(--t3)' }}>
-            STINT DETAYLARI
+            {t('driver_summary.stint_details')}
           </p>
           <div className="space-y-2.5">
             {data.stints.map((st, i) => {
@@ -189,37 +188,37 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                           {st.compound[0]}
                         </span>
                         <span className="text-[7px] mono font-semibold" style={{ color: color + 'aa' }}>
-                          {COMPOUND_TR[st.compound]?.split('').slice(0,3).join('') ?? st.compound.slice(0,3)}
+                          {t(`compounds.${st.compound}`, st.compound)?.split('').slice(0,3).join('') ?? st.compound.slice(0,3)}
                         </span>
                       </div>
 
                       <div>
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-[13px] font-bold text-white">
-                            {COMPOUND_TR[st.compound] ?? st.compound}
+                            {t(`compounds.${st.compound}`, st.compound) ?? st.compound}
                           </p>
                           {st.tyre_age_start > 0 && (
                             <span className="text-[10px] mono px-1.5 py-0.5 rounded"
                               style={{ background: color + '15', color: color + 'cc' }}>
-                              {st.tyre_age_start} tur eski
+                              {t('driver_summary.tyre_age_old', { n: st.tyre_age_start })}
                             </span>
                           )}
                           {isFastest && (
                             <span className="text-[10px] mono px-1.5 py-0.5 rounded"
                               style={{ background:'rgba(192,84,252,0.12)', color:'#c084fc',
                                        border:'1px solid rgba(192,84,252,0.25)' }}>
-                              ⚡ En hızlı tur
+                              {t('driver_summary.fastest_lap')}
                             </span>
                           )}
                         </div>
                         <p className="text-[12px] mono" style={{ color:'var(--t2)' }}>
-                          Tur {st.lap_start} → {st.lap_end}
+                          {t('driver_summary.lap_range', { start: st.lap_start, end: st.lap_end })}
                           <span className="ml-2" style={{ color:'var(--t3)' }}>
-                            ({st.laps} tur)
+                            {t('driver_summary.laps_count', { n: st.laps })}
                           </span>
                           {i < data.stints.length - 1 && data.pit_laps[i] && (
                             <span className="ml-2 text-[#FF8700]">
-                              → Tur {data.pit_laps[i]}'de pit
+                              → {t('driver_summary.pit_at_lap', { n: data.pit_laps[i] })}
                             </span>
                           )}
                         </p>
@@ -230,7 +229,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                     <div className="text-right shrink-0">
                       {st.avg_lap_time && (
                         <div className="mb-1">
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>ORT. TUR</p>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>AVG LAP</p>
                           <p className="text-[14px] font-black mono text-white">
                             {formatLapTime(st.avg_lap_time)}
                           </p>
@@ -238,7 +237,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                       )}
                       {st.fastest_lap_time && (
                         <div>
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>EN HIZLI</p>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>FASTEST</p>
                           <p className="text-[12px] font-bold mono"
                             style={{ color: isFastest ? '#c084fc' : 'var(--t2)' }}>
                             {formatLapTime(st.fastest_lap_time)}
@@ -252,9 +251,9 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                   {st.avg_lap_time && st.fastest_lap_time && (
                     <div className="mt-2.5 pt-2.5 border-t" style={{ borderColor:'rgba(255,255,255,0.06)' }}>
                       <div className="flex items-center justify-between text-[10px] mono">
-                        <span style={{ color:'var(--t3)' }}>Lastik degradasyonu</span>
+                        <span style={{ color:'var(--t3)' }}>Tyre degradation</span>
                         <span style={{ color: st.avg_lap_time - st.fastest_lap_time > 1.5 ? '#f87171' : 'var(--t2)' }}>
-                          +{(st.avg_lap_time - st.fastest_lap_time).toFixed(2)}s ort. kayıp
+                          {t('driver_summary.avg_loss', { n: (st.avg_lap_time - st.fastest_lap_time).toFixed(2) })}
                         </span>
                       </div>
                       <div className="h-1 rounded-full mt-1 overflow-hidden"

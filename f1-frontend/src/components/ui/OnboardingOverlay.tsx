@@ -1,31 +1,33 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-const STEPS = [
-  {
-    title: 'Telemetriyi görsel olarak keşfet',
-    desc: 'Bir yarışı seç, pilotun o turdaki her pedal hareketini saniye saniye izle.',
-    action: 'Yarışlara bak →',
-    target: '/season/2026',
-  },
-  {
-    title: 'AI sana anlatır',
-    desc: 'Grafiğe tıkla — Claude AI o anı sade Türkçe veya teknik dille yorumlar.',
-    action: 'Deneme analizi aç →',
-    target: null,    // aynı sayfada göster
-  },
-  {
-    title: 'Yarışı canlı takip et',
-    desc: 'Araçların pist üzerindeki konumunu, aralıkları ve strateji tahminlerini gerçek zamanlı gör.',
-    action: 'Başla →',
-    target: '/',
-  },
-]
+import { useTranslation } from 'react-i18next'
 
 export function OnboardingOverlay() {
+  const { t } = useTranslation()
   const [step, setStep] = useState(0)
   const [visible, setVisible] = useState(false)
   const navigate = useNavigate()
+
+  const STEPS = [
+    {
+      title:  t('onboarding.step1_title'),
+      desc:   t('onboarding.step1_desc'),
+      action: t('onboarding.step1_action'),
+      target: '/season/2026',
+    },
+    {
+      title:  t('onboarding.step2_title'),
+      desc:   t('onboarding.step2_desc'),
+      action: t('onboarding.step2_action'),
+      target: null,
+    },
+    {
+      title:  t('onboarding.step3_title'),
+      desc:   t('onboarding.step3_desc'),
+      action: t('onboarding.step3_action'),
+      target: '/',
+    },
+  ]
 
   useEffect(() => {
     const seen = localStorage.getItem('hotlap_onboarded')
@@ -76,7 +78,7 @@ export function OnboardingOverlay() {
         </div>
 
         <p className="text-[10px] text-[#E10600]/60 tracking-widest mb-2">
-          ADIM {step + 1}/{STEPS.length}
+          {t('onboarding.step_indicator', { n: step + 1, total: STEPS.length })}
         </p>
         <h2 className="text-lg font-semibold text-white mb-3 leading-tight">
           {current.title}
@@ -87,7 +89,7 @@ export function OnboardingOverlay() {
 
         <div className="flex justify-between items-center">
           <button onClick={dismiss} className="text-[11px] text-[#2a2a2a] hover:text-[#444] transition-colors">
-            Atla
+            {t('onboarding.skip')}
           </button>
           <button
             onClick={next}

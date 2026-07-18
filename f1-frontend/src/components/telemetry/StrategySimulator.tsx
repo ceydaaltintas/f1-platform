@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
 import { COMPOUND_COLORS } from '../../types/f1'
 import { useUIStore } from '../../store/uiStore'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   sessionId: number
@@ -16,10 +17,7 @@ const C_FULL: Record<string, string> = {
   SOFT: '#FF3333', MEDIUM: '#FFD700', HARD: '#CCCCCC',
   INTERMEDIATE: '#39B54A', WET: '#0067FF',
 }
-const C_TR: Record<string, string> = {
-  SOFT: 'Yumuşak', MEDIUM: 'Orta', HARD: 'Sert',
-  INTERMEDIATE: 'Ara', WET: 'Islak',
-}
+// Compound labels are now retrieved via t('compounds.*') inside components
 const COMPOUNDS = ['SOFT', 'MEDIUM', 'HARD'] as const
 
 // ── Tam yarış stint görselleştirmesi ─────────────────────────────────────────
@@ -33,6 +31,7 @@ function FullRaceBar({
   currentLap: number
   currentCompound: string
 }) {
+  const { t } = useTranslation()
   // Tamamlanan kısım: tur 1'den (currentLap - 1)'e kadar
   const doneLaps = currentLap - 1
   const donePct  = (doneLaps / totalLaps) * 100
@@ -62,7 +61,7 @@ function FullRaceBar({
               borderTop: '2px solid rgba(255,255,255,0.15)',
               minWidth: 8,
             }}
-            title={`Tamamlanan: ${doneLaps} tur (1–${currentLap - 1})`}
+            title={`${t('strategy_sim.done_laps', { n: doneLaps })} (1–${currentLap - 1})`}
           >
             {donePct > 6 ? `${doneLaps}` : ''}
           </div>
@@ -95,7 +94,7 @@ function FullRaceBar({
             style={{ color: 'rgba(255,255,255,0.3)' }}>
             <span className="w-2 h-2 rounded-sm inline-block"
               style={{ background: 'rgba(255,255,255,0.15)' }} />
-            Tamamlanan {doneLaps} tur
+            {t('strategy_sim.done_laps', { n: doneLaps })}
           </span>
         )}
         {stints.map((s: any, i: number) => {
@@ -105,7 +104,7 @@ function FullRaceBar({
               style={{ color: col }}>
               <span className="w-2 h-2 rounded-sm inline-block"
                 style={{ background: col + '40', border: `1px solid ${col}60` }} />
-              {C_TR[s.compound] ?? s.compound} · {s.laps} tur
+              {t(`compounds.${s.compound}`, s.compound)} · {t('strategy_sim.tyre_age_laps', { n: s.laps })}
             </span>
           )
         })}
@@ -113,8 +112,8 @@ function FullRaceBar({
         <span className="ml-auto text-[10px] mono"
           style={{ color: grandTotal === totalLaps ? 'rgba(0,210,190,0.7)' : '#f87171' }}>
           {grandTotal === totalLaps
-            ? `✓ ${grandTotal}/${totalLaps} tur`
-            : `⚠ ${grandTotal}/${totalLaps} tur`}
+            ? t('strategy_sim.laps_check_ok', { done: grandTotal, total: totalLaps })
+            : t('strategy_sim.laps_check_warn', { done: grandTotal, total: totalLaps })}
         </span>
       </div>
     </div>
@@ -126,6 +125,7 @@ function FullRaceBar({
 export function StrategySimulator({
   sessionId, totalLaps = 58, currentLap = 20, driverCode = 'VER', refLapTime,
 }: Props) {
+  const { t } = useTranslation()
   const { insightMode } = useUIStore()
 
   const [lap,          setLap]          = useState(currentLap)
@@ -175,16 +175,16 @@ export function StrategySimulator({
         <div className="flex items-center gap-3">
           <span className="text-2xl">🏁</span>
           <div>
-            <p className="text-[14px] font-bold text-white">Pit Stop Stratejisi</p>
+            <p className="text-[14px] font-bold text-white">{t('strategy_sim.pit_strategy')}</p>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--t2)' }}>
-              Şu andan yarış sonuna kadar farklı pit zamanlamalarının toplam süreye etkisi
+              {t('strategy_sim.pit_strategy_desc')}
             </p>
           </div>
         </div>
         <button onClick={() => setExpanded(e => !e)}
           className="text-[11px] px-2.5 py-1.5 rounded-lg"
           style={{ background: 'var(--s2)', color: 'var(--t3)', border: '1px solid var(--b1)' }}>
-          {expanded ? '▲ Kapat' : '▼ Ayarlar'}
+          {expanded ? t('strategy_sim.collapse') : t('strategy_sim.expand')}
         </button>
       </div>
 
@@ -197,27 +197,27 @@ export function StrategySimulator({
           {/* Tur bilgisi */}
           <div className="flex items-center gap-4 flex-wrap">
             <div>
-              <p className="text-[10px] mono mb-0.5" style={{ color: 'var(--t3)' }}>MEVCUT TUR</p>
+              <p className="text-[10px] mono mb-0.5" style={{ color: 'var(--t3)' }}>{t('strategy.current_lap')}</p>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-[26px] font-black mono text-white">{lap}</span>
                 <span className="text-[14px] mono" style={{ color: 'var(--t3)' }}>/ {totalLaps}</span>
                 <span className="text-[11px] mono ml-1" style={{ color: 'var(--t3)' }}>
-                  ({remaining} tur kaldı)
+                  {t('strategy_sim.laps_remaining', { n: remaining })}
                 </span>
               </div>
             </div>
             <div className="w-px h-10 self-stretch" style={{ background: 'var(--b1)' }} />
             <div>
-              <p className="text-[10px] mono mb-0.5" style={{ color: 'var(--t3)' }}>MEVCUT LASTİK</p>
+              <p className="text-[10px] mono mb-0.5" style={{ color: 'var(--t3)' }}>{t('strategy.current_tyre')}</p>
               <span className="text-[18px] font-black mono" style={{ color: compColor }}>
-                {compound[0]} <span className="text-[13px]">{C_TR[compound]}</span>
+                {compound[0]} <span className="text-[13px]">{t(`compounds.${compound}`, compound)}</span>
               </span>
             </div>
             <div className="w-px h-10 self-stretch" style={{ background: 'var(--b1)' }} />
             <div>
-              <p className="text-[10px] mono mb-0.5" style={{ color: 'var(--t3)' }}>LASTİK YAŞI</p>
-              <span className="text-[18px] font-black mono text-white">{tyreAge}
-                <span className="text-[12px] font-normal ml-1" style={{ color: 'var(--t3)' }}>tur</span>
+              <p className="text-[10px] mono mb-0.5" style={{ color: 'var(--t3)' }}>{t('strategy.tyre_age')}</p>
+              <span className="text-[18px] font-black mono text-white">
+                {t('strategy_sim.tyre_age_laps', { n: tyreAge })}
               </span>
             </div>
             <div className="w-px h-10 self-stretch" style={{ background: 'var(--b1)' }} />
@@ -236,9 +236,9 @@ export function StrategySimulator({
           <div>
             <div className="flex justify-between mb-1">
               <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>
-                Hangi turda simüle edilsin?
+                {t('strategy_sim.simulate_laps_hint')}
               </p>
-              <span className="text-[11px] mono font-bold text-white">Tur {lap}</span>
+              <span className="text-[11px] mono font-bold text-white">{t('strategy_sim.lap_label', { n: lap })}</span>
             </div>
             <input type="range"
               min={1} max={totalLaps - 3} value={lap}
@@ -246,8 +246,8 @@ export function StrategySimulator({
               className="w-full cursor-pointer"
               style={{ accentColor: '#E10600' }} />
             <div className="flex justify-between text-[9px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
-              <span>Tur 1</span>
-              <span>Tur {totalLaps}</span>
+              <span>{t('strategy_sim.lap_1')}</span>
+              <span>{t('strategy_sim.lap_total', { n: totalLaps })}</span>
             </div>
           </div>
         </div>
@@ -260,7 +260,7 @@ export function StrategySimulator({
             {/* Lastik */}
             <div>
               <p className="text-[11px] mono mb-2 font-semibold" style={{ color: 'var(--t3)' }}>
-                Mevcut lastik hamuru
+                {t('strategy_sim.tyre_compound')}
               </p>
               <div className="flex gap-2">
                 {COMPOUNDS.map(c => {
@@ -274,7 +274,7 @@ export function StrategySimulator({
                         color: compound === c ? col : 'var(--t3)',
                       }}>
                       {c[0]}<br />
-                      <span className="text-[9px] opacity-70">{C_TR[c]}</span>
+                      <span className="text-[9px] opacity-70">{t(`compounds.${c}`, c)}</span>
                     </button>
                   )
                 })}
@@ -286,12 +286,12 @@ export function StrategySimulator({
               <div>
                 <div className="flex justify-between mb-1">
                   <p className="text-[11px] mono font-semibold" style={{ color: 'var(--t3)' }}>
-                    Lastik Yaşı
+                    {t('strategy_sim.tyre_age_setting')}
                   </p>
-                  <span className="text-[12px] mono font-bold text-white">{tyreAge} tur</span>
+                  <span className="text-[12px] mono font-bold text-white">{t('strategy_sim.tyre_age_laps', { n: tyreAge })}</span>
                 </div>
                 <p className="text-[9px] mb-1" style={{ color: 'var(--t3)' }}>
-                  Bu lastiği kaç turdur kullanıyorsun?
+                  {t('strategy_sim.tyre_age_question')}
                 </p>
                 <input type="range" min={0} max={40} value={tyreAge}
                   onChange={e => setTyreAge(Number(e.target.value))}
@@ -301,10 +301,10 @@ export function StrategySimulator({
               {/* Ref. pace */}
               <div>
                 <p className="text-[11px] mono mb-1 font-semibold" style={{ color: 'var(--t3)' }}>
-                  Referans Tur Süresi (s)
+                  {t('strategy_sim.ref_pace')}
                 </p>
                 <p className="text-[9px] mb-1.5" style={{ color: 'var(--t3)' }}>
-                  Temiz havada ortalama tur süresi
+                  {t('strategy_sim.ref_pace_desc')}
                 </p>
                 <input type="number" min={60} max={150} step={0.1}
                   value={baseLapTime}
@@ -322,12 +322,12 @@ export function StrategySimulator({
             {/* Özel pit turu */}
             <div>
               <p className="text-[11px] mono mb-1 font-semibold" style={{ color: 'var(--t3)' }}>
-                Özel Pit Turu <span className="font-normal opacity-60">(opsiyonel)</span>
+                {t('strategy_sim.custom_pit')} <span className="font-normal opacity-60">{t('strategy_sim.custom_pit_optional')}</span>
               </p>
               <input type="number" min={lap + 1} max={totalLaps - 2}
                 value={alternatePit}
                 onChange={e => setAlternatePit(e.target.value ? Number(e.target.value) : '')}
-                placeholder={`${lap + 1} – ${totalLaps - 2} arası`}
+                placeholder={`${lap + 1} – ${totalLaps - 2}`}
                 style={{
                   width: '100%', background: 'var(--s1)',
                   border: '1px solid rgba(255,255,255,0.08)',
@@ -345,14 +345,14 @@ export function StrategySimulator({
           disabled={sim.isFetching}
           className="w-full py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
           style={{ background: '#FF8700', color: '#05080f' }}>
-          {sim.isFetching ? '⚙️  Hesaplanıyor...' : '🏎  Pit Stop Senaryolarını Hesapla'}
+          {sim.isFetching ? t('strategy_sim.simulating_btn') : t('strategy_sim.simulate_btn')}
         </button>
 
         {/* ── Sonuçlar ────────────────────────────────────────── */}
         {scenarios.length > 0 && (
           <div className="space-y-3">
             <p className="text-[11px] mono" style={{ color: 'var(--t3)' }}>
-              Baz senaryoya göre toplam süre farkı · Bar = negatif (🟢 daha hızlı) veya pozitif (🔴 daha yavaş)
+              {t('strategy_sim.results_hint')}
             </p>
 
             {scenarios.map((s: any, i: number) => {
@@ -377,13 +377,13 @@ export function StrategySimulator({
                       {isBest && (
                         <span className="text-[10px] mono font-bold px-2 py-0.5 rounded-full"
                           style={{ background: '#00D2BE18', color: '#00D2BE', border: '1px solid #00D2BE30' }}>
-                          ★ EN İYİ
+                          {t('strategy_sim.best_badge')}
                         </span>
                       )}
                       {isBase && (
                         <span className="text-[10px] mono px-2 py-0.5 rounded-full"
                           style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--t2)' }}>
-                          BAZ
+                          {t('strategy_sim.base_badge')}
                         </span>
                       )}
                       <span className="text-[13px] font-bold text-white">{s.label}</span>
@@ -405,8 +405,8 @@ export function StrategySimulator({
                         </div>
                         <p className="text-[10px] mono" style={{ color: barColor }}>
                           {faster
-                            ? `Baz senaryodan ${Math.abs(delta).toFixed(1)}s daha hızlı`
-                            : `Baz senaryodan ${delta.toFixed(1)}s daha yavaş`}
+                            ? t('strategy_sim.faster', { n: Math.abs(delta).toFixed(1) })
+                            : t('strategy_sim.slower', { n: delta.toFixed(1) })}
                         </p>
                       </div>
                     )}
@@ -434,11 +434,8 @@ export function StrategySimulator({
             {/* Açıklama */}
             <div className="rounded-xl px-4 py-3"
               style={{ background: 'rgba(255,135,0,0.05)', border: '1px solid rgba(255,135,0,0.12)' }}>
-              <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(255,135,0,0.75)' }}>
-                💡 <strong>Gri kısım</strong> = tamamlanan turlar.
-                Renkli kısımlar = kalan stintler (lastik hamuru × tur sayısı).
-                Tüm stintlerin toplamı yarış tur sayısına eşit olmalı (✓ işareti ile doğrulanır).
-              </p>
+              <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(255,135,0,0.75)' }}
+                dangerouslySetInnerHTML={{ __html: t('strategy_sim.explanation') }} />
             </div>
           </div>
         )}
@@ -446,7 +443,7 @@ export function StrategySimulator({
         {sim.isError && (
           <div className="p-4 rounded-xl text-center"
             style={{ background: 'rgba(225,6,0,0.08)', border: '1px solid rgba(225,6,0,0.2)' }}>
-            <p className="text-[12px]" style={{ color: '#f87171' }}>⚠ Simülasyon başarısız.</p>
+            <p className="text-[12px]" style={{ color: '#f87171' }}>{t('strategy_sim.error_msg')}</p>
           </div>
         )}
       </div>

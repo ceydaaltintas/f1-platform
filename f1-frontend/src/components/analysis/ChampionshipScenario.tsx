@@ -8,6 +8,7 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { client, seasonApi } from '../../api/client'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 // F1 2025+ puan sistemi
 const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
@@ -22,6 +23,7 @@ interface Driver {
 interface Props { year: number }
 
 export function ChampionshipScenario({ year }: Props) {
+  const { t } = useTranslation()
   const [showAll, setShowAll] = useState(false)
 
   const drivers = useQuery({
@@ -44,7 +46,7 @@ export function ChampionshipScenario({ year }: Props) {
   const leader   = driversData[0]
   const display  = showAll ? driversData : driversData.slice(0, 8)
 
-  // Her pilot için senaryolar hesapla
+  // Scenarios for each driver
   const scenarios = useMemo(() => {
     if (!leader || !driversData.length) return []
     return driversData.map(d => {
@@ -63,33 +65,33 @@ export function ChampionshipScenario({ year }: Props) {
 
   if (drivers.isLoading || rounds.isLoading) return (
     <div className="card p-5 text-center">
-      <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>Yükleniyor...</p>
+      <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>{t('scenario.loading')}</p>
     </div>
   )
 
   if (!driversData.length) return (
     <div className="card p-5 text-center">
-      <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>Şampiyona verisi yok.</p>
+      <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>{t('scenario.no_data')}</p>
     </div>
   )
 
   return (
     <div className="card overflow-hidden">
-      {/* Başlık */}
+      {/* Title */}
       <div className="flex items-center justify-between px-5 py-4 border-b"
         style={{ borderColor:'var(--b1)' }}>
         <div className="flex items-center gap-3">
           <span className="text-xl">🏆</span>
           <div>
-            <p className="text-[14px] font-bold text-white">{year} Şampiyona Senaryoları</p>
+            <p className="text-[14px] font-bold text-white">{t('scenario.title', { year })}</p>
             <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>
-              {remainingRaces} yarış kaldı · Max {maxRemaining} puan alınabilir
+              {t('scenario.subtitle', { remaining: remainingRaces, max: maxRemaining })}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Lider kartı */}
+      {/* Leader card */}
       {leader && (
         <div className="px-5 py-4 border-b"
           style={{ borderColor:'var(--b1)', background:'rgba(255,215,0,0.04)' }}>
@@ -99,25 +101,25 @@ export function ChampionshipScenario({ year }: Props) {
                 <p className="text-[36px] font-black mono" style={{ color:'#FFD700' }}>
                   {leader.code}
                 </p>
-                <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>LİDER</p>
+                <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>{t('scenario.leader_label')}</p>
               </div>
               <div>
                 <p className="text-[28px] font-black mono text-white leading-none">
-                  {leader.points} <span className="text-[14px] font-normal" style={{ color:'var(--t3)' }}>puan</span>
+                  {leader.points} <span className="text-[14px] font-normal" style={{ color:'var(--t3)' }}>{t('scenario.points_unit')}</span>
                 </p>
                 <p className="text-[12px] mt-1" style={{ color:'var(--t2)' }}>
-                  Kalan max: {leader.points + maxRemaining} puan
+                  {t('scenario.max_remaining', { pts: leader.points + maxRemaining })}
                 </p>
               </div>
             </div>
             {remainingRaces === 0 ? (
               <div className="px-4 py-2 rounded-xl text-center"
                 style={{ background:'rgba(255,215,0,0.15)', border:'1px solid rgba(255,215,0,0.3)' }}>
-                <p className="text-[16px] font-black" style={{ color:'#FFD700' }}>🏆 ŞAMPİYON</p>
+                <p className="text-[16px] font-black" style={{ color:'#FFD700' }}>{t('scenario.champion')}</p>
               </div>
             ) : (
               <div className="text-right">
-                <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>2. sıraya fark</p>
+                <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>{t('scenario.gap_to_second')}</p>
                 <p className="text-[24px] font-black mono" style={{ color:'#E10600' }}>
                   +{(leader.points - (driversData[1]?.points ?? 0))}
                   <span className="text-[12px]"> pts</span>
@@ -128,12 +130,19 @@ export function ChampionshipScenario({ year }: Props) {
         </div>
       )}
 
-      {/* Tablo */}
+      {/* Table */}
       <div className="overflow-x-auto">
         <table style={{ width:'100%', borderCollapse:'collapse', fontFamily:'IBM Plex Mono,monospace' }}>
           <thead>
             <tr style={{ background:'rgba(255,255,255,0.02)', borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
-              {['P','Pilot','Puan','Lidere Fark','Max Alınabilir','Şampiyonluk İhtimali'].map(h => (
+              {[
+                t('scenario.col_pos'),
+                t('scenario.col_driver'),
+                t('scenario.col_points'),
+                t('scenario.col_gap'),
+                t('scenario.col_max'),
+                t('scenario.col_chance'),
+              ].map(h => (
                 <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontSize:9,
                   fontWeight:600, letterSpacing:'0.1em', color:'rgba(240,244,255,0.25)',
                   whiteSpace:'nowrap' }}>{h}</th>
@@ -172,15 +181,17 @@ export function ChampionshipScenario({ year }: Props) {
                   <td style={{ padding:'10px 12px' }}>
                     {isLeader ? (
                       <span style={{ fontSize:11, color:'#FFD700', fontWeight:700 }}>
-                        🥇 Lider konumunda
+                        {t('scenario.leading')}
                       </span>
                     ) : sc?.canCatch ? (
                       <span style={{ fontSize:11, color:'#FF8700', fontWeight:600 }}>
-                        ⚡ Matematiksel şans var ({sc.maxPossible - leader!.points >= 0 ? `max ${sc.maxPossible - leader!.points} fark` : 'lider olabilir'})
+                        {sc.maxPossible - leader!.points >= 0
+                          ? t('scenario.can_catch', { gap: sc.maxPossible - leader!.points })
+                          : t('scenario.can_catch_lead')}
                       </span>
                     ) : (
                       <span style={{ fontSize:11, color:'rgba(240,244,255,0.25)' }}>
-                        ✗ Matematiksel olarak imkânsız
+                        {t('scenario.impossible')}
                       </span>
                     )}
                   </td>
@@ -196,15 +207,14 @@ export function ChampionshipScenario({ year }: Props) {
           <button onClick={() => setShowAll(p => !p)}
             className="text-[12px] mono hover:text-white transition-colors"
             style={{ color:'var(--t3)' }}>
-            {showAll ? '▲ Daha az göster' : `▼ Tüm ${driversData.length} pilot`}
+            {showAll ? t('scenario.show_less') : t('scenario.show_all', { n: driversData.length })}
           </button>
         </div>
       )}
 
       <div className="px-5 py-3 border-t" style={{ borderColor:'var(--b1)' }}>
         <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-          Her yarışta max {MAX_PER_RACE} puan (P1: {POINTS[0]} + En hızlı tur: {FASTEST_LAP}) ·
-          P2–P10 arası puanlar: {POINTS.slice(1).join('/')}
+          {t('scenario.footnote', { max: MAX_PER_RACE, p1: POINTS[0], fl: FASTEST_LAP, rest: POINTS.slice(1).join('/') })}
         </p>
       </div>
     </div>

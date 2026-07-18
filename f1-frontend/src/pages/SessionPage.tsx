@@ -20,22 +20,24 @@ import { TyreDegradation } from '../components/analysis/TyreDegradation'
 import { TeammatePace } from '../components/analysis/TeammatePace'
 import { EnergyAnalysis } from '../components/analysis/EnergyAnalysis'
 import { CHANNELS, COMPOUND_COLORS, SESSION_LABELS, type TelemetryPoint, type SessionType } from '../types/f1'
+import { useTranslation } from 'react-i18next'
 
 // ── Topluluk paneli (yorum + anket sekmeli) ───────────────────────────────────
 function CommunityPanel({ sessionId, isLoggedIn }: { sessionId: number; isLoggedIn: boolean }) {
+  const { t } = useTranslation()
   const [tab, setTab] = React.useState<'comments' | 'polls'>('comments')
   return (
     <div className="card overflow-hidden flex flex-col">
       {/* Sekmeler */}
       <div className="flex border-b" style={{ borderColor: 'var(--b1)' }}>
-        {(['comments', 'polls'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
+        {(['comments', 'polls'] as const).map(tabKey => (
+          <button key={tabKey} onClick={() => setTab(tabKey)}
             className="flex-1 py-3 text-[12px] font-semibold transition-all"
-            style={tab === t
+            style={tab === tabKey
               ? { background: 'rgba(225,6,0,0.08)', color: '#E10600',
                   borderBottom: '2px solid #E10600' }
               : { color: 'var(--t3)', borderBottom: '2px solid transparent' }}>
-            {t === 'comments' ? '💬 Yorumlar' : '📊 Anketler'}
+            {tabKey === 'comments' ? t('session_page.comments_tab') : t('session_page.polls_tab')}
           </button>
         ))}
       </div>
@@ -60,6 +62,7 @@ const LAP_OPTIONS = ['fastest','1','2','3','4','5','10','15','20','30','40','50'
 
 /** Telemetri grafiği altında tahmini batarya doluluk şeridi */
 function SocMiniStrip({ sessionId, driverCode }: { sessionId: number; driverCode: string }) {
+  const { t } = useTranslation()
   const { data } = useQuery({
     queryKey: ['energy', sessionId, driverCode],
     queryFn:  () => client.get(`/sessions/${sessionId}/energy_analysis/${driverCode}`).then(r => r.data),
@@ -77,10 +80,10 @@ function SocMiniStrip({ sessionId, driverCode }: { sessionId: number; driverCode
     <div className="card px-4 py-3">
       <div className="flex items-center justify-between mb-2">
         <p className="text-[11px] mono font-semibold" style={{ color: 'var(--t2)' }}>
-          ⚡ TAHMİNİ BATARYA DOLULUK
+          {t('session_page.battery_title')}
         </p>
         <p className="text-[10px] mono" style={{ color: 'var(--t3)' }}>
-          Fizik modeli · yaklaşık değer
+          {t('session_page.battery_hint')}
         </p>
       </div>
       {/* Bar grafik — index bazlı x ekseni */}
@@ -100,22 +103,23 @@ function SocMiniStrip({ sessionId, driverCode }: { sessionId: number; driverCode
       </div>
       <div className="flex justify-between mt-1.5 text-[10px] mono" style={{ color: 'var(--t3)' }}>
         <div className="flex gap-3">
-          <span style={{ color: '#00D2BE' }}>■ Dolu</span>
-          <span style={{ color: '#FF8700' }}>■ Düşük</span>
-          <span style={{ color: '#E10600' }}>■ Kritik</span>
-          <span style={{ color: 'rgba(255,255,255,0.6)' }}>■ X-mode</span>
+          <span style={{ color: '#00D2BE' }}>{t('session_page.battery_full')}</span>
+          <span style={{ color: '#FF8700' }}>{t('session_page.battery_low')}</span>
+          <span style={{ color: '#E10600' }}>{t('session_page.battery_critical')}</span>
+          <span style={{ color: 'rgba(255,255,255,0.6)' }}>{t('session_page.battery_xmode')}</span>
         </div>
-        <span>Yarış boyunca →</span>
+        <span>{t('session_page.battery_race')}</span>
       </div>
     </div>
   )
 }
 
+// SESSION_TABS keys only — labels provided via t() at render time
 const SESSION_TABS = [
-  { id: 'telemetry', label: 'Telemetri', emoji: '📈' },
-  { id: 'analysis',  label: 'Analiz',    emoji: '📋' },
-  { id: 'standings', label: 'Sıralama',  emoji: '🏆' },
-  { id: 'strategy',  label: 'Strateji',  emoji: '🔧' },
+  { id: 'telemetry', labelKey: 'session_page.tab_telemetry', emoji: '📈' },
+  { id: 'analysis',  labelKey: 'session_page.tab_analysis',  emoji: '📋' },
+  { id: 'standings', labelKey: 'session_page.tab_standings', emoji: '🏆' },
+  { id: 'strategy',  labelKey: 'session_page.tab_strategy',  emoji: '🔧' },
 ] as const
 
 type SessionTab = typeof SESSION_TABS[number]['id']
@@ -141,6 +145,7 @@ function StatTile({
 }
 
 export function SessionPage() {
+  const { t } = useTranslation()
   const { sessionId } = useParams<{ sessionId: string }>()
   const sid = Number(sessionId)
   const isLoggedIn = !!localStorage.getItem('access_token')
@@ -306,12 +311,12 @@ export function SessionPage() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)', overflowX: 'clip' }}>
       <Helmet>
-        <title>{`${telA.data ? primaryDriver + ' Telemetri — ' : ''}Oturum #${sid} · Hotlap`}</title>
-        <meta name="description" content={`Formula 1 oturum telemetri analizi — sektör süreleri, lastik stratejisi ve hız karşılaştırması. Hotlap.live`} />
+        <title>{`${telA.data ? primaryDriver + ' Telemetri — ' : ''}${t('common.session', { id: sid })} · Hotlap`}</title>
+        <meta name="description" content={t('session_page.meta_desc')} />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Hotlap" />
-        <meta property="og:title" content={`${telA.data ? primaryDriver + ' Telemetri — ' : ''}Oturum #${sid} · Hotlap`} />
-        <meta property="og:description" content="Formula 1 oturum telemetri analizi — sektör süreleri, lastik stratejisi ve hız karşılaştırması." />
+        <meta property="og:title" content={`${telA.data ? primaryDriver + ' Telemetri — ' : ''}${t('common.session', { id: sid })} · Hotlap`} />
+        <meta property="og:description" content={t('session_page.meta_desc')} />
         <meta property="og:image" content="https://hotlap.live/og-image.png" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@hotlapapp" />
@@ -324,7 +329,7 @@ export function SessionPage() {
         <div className="max-w-7xl mx-auto px-6 py-3">
           {/* Breadcrumb — sadece desktop'ta göster */}
           <div className="hidden sm:flex items-center gap-2 text-[11px] mono mb-1" style={{ color:'var(--t3)' }}>
-            <Link to="/" className="hover:text-white/60 transition-colors">Ana Sayfa</Link>
+            <Link to="/" className="hover:text-white/60 transition-colors">{t('session_page.home')}</Link>
             <span>/</span>
             <Link to={`/season/${sessionInfo.data?.round?.season_year ?? new Date().getFullYear()}`}
               className="hover:text-white/60 transition-colors">
@@ -376,7 +381,7 @@ export function SessionPage() {
                   style={insightMode === m
                     ? { background: '#E10600', color: 'white' }
                     : { color: 'var(--t2)' }}>
-                  {m === 'beginner' ? '🟢 Sade' : '⚡ Uzman'}
+                  {m === 'beginner' ? t('session_page.mode_simple') : t('session_page.mode_expert')}
                 </button>
               ))}
             </div>
@@ -388,16 +393,16 @@ export function SessionPage() {
       <div className="border-b sticky top-14 z-30"
         style={{ background:'rgba(5,8,15,0.97)', backdropFilter:'blur(12px)', borderColor:'var(--b1)' }}>
         <div className="max-w-7xl mx-auto px-2 sm:px-6 flex overflow-x-auto" style={{ scrollbarWidth:'none' }}>
-          {SESSION_TABS.map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)}
+          {SESSION_TABS.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="flex items-center gap-2 px-4 py-3 text-[13px] font-semibold transition-all border-b-2 shrink-0"
               style={{
-                color: activeTab===t.id ? 'white' : 'rgba(240,244,255,0.3)',
-                borderBottomColor: activeTab===t.id ? '#E10600' : 'transparent',
-                background: activeTab===t.id ? 'rgba(225,6,0,0.05)' : 'transparent',
+                color: activeTab===tab.id ? 'white' : 'rgba(240,244,255,0.3)',
+                borderBottomColor: activeTab===tab.id ? '#E10600' : 'transparent',
+                background: activeTab===tab.id ? 'rgba(225,6,0,0.05)' : 'transparent',
               }}>
-              <span>{t.emoji}</span>
-              <span>{t.label}</span>
+              <span>{tab.emoji}</span>
+              <span>{t(tab.labelKey)}</span>
             </button>
           ))}
         </div>
@@ -409,7 +414,7 @@ export function SessionPage() {
         <div className="card p-4">
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-[10px] mono font-semibold tracking-widest shrink-0"
-              style={{ color:'var(--t3)' }}>PILOT & TUR</p>
+              style={{ color:'var(--t3)' }}>{t('session_page.pilot_lap')}</p>
 
             {/* Driver A */}
             <div className="flex items-center gap-2">
@@ -439,9 +444,9 @@ export function SessionPage() {
               className="px-3 py-2 rounded-xl text-[12px] mono cursor-pointer"
               style={{ background:'var(--s2)', border:'1px solid var(--b1)', color:'var(--t2)',
                        outline:'none' }}>
-              <option value="fastest">⚡ En Hızlı</option>
+              <option value="fastest">{t('session_page.lap_fastest')}</option>
               {['1','2','3','4','5','10','15','20','30','40','50'].map(l => (
-                <option key={l} value={l}>Tur {l}</option>
+                <option key={l} value={l}>{t('session_page.lap_n', { n: l })}</option>
               ))}
             </select>
 
@@ -452,7 +457,7 @@ export function SessionPage() {
                 ? { background:'rgba(255,135,0,0.12)', border:'1px solid rgba(255,135,0,0.35)',
                     color:'#FF8700' }
                 : { background:'var(--s2)', border:'1px solid var(--b1)', color:'var(--t2)' }}>
-              {compareMode ? '✕ Karşılaştırmayı Kapat' : '+ Karşılaştır'}
+              {compareMode ? t('session_page.compare_close') : t('session_page.compare_open')}
             </button>
 
             {compareMode && (
@@ -483,9 +488,9 @@ export function SessionPage() {
                   className="px-3 py-2 rounded-xl text-[12px] mono cursor-pointer"
                   style={{ background:'var(--s2)', border:'1px solid rgba(255,135,0,0.2)',
                            color:'var(--t2)', outline:'none' }}>
-                  <option value="fastest">⚡ En Hızlı</option>
+                  <option value="fastest">{t('session_page.lap_fastest')}</option>
                   {['1','2','3','4','5','10','15','20','30','40','50'].map(l => (
-                    <option key={l} value={l}>Tur {l}</option>
+                    <option key={l} value={l}>{t('session_page.lap_n', { n: l })}</option>
                   ))}
                 </select>
               </>
@@ -508,7 +513,7 @@ export function SessionPage() {
             </button>
           ))}
           <span className="hidden sm:inline text-[11px] ml-2" style={{ color:'var(--t3)' }}>
-            ← Grafiğe tıkla → AI yorum
+            {t('session_page.channel_hint')}
           </span>
         </div>
 
@@ -518,12 +523,12 @@ export function SessionPage() {
         {activeTab === 'telemetry' && <>
           {telA.isLoading ? (
             <div className="card h-52 flex items-center justify-center">
-              <F1Loader text={`${primaryDriver} yükleniyor...`} />
+              <F1Loader text={t('session_page.loading_driver', { driver: primaryDriver })} />
             </div>
           ) : telA.isError ? (
             <ErrorCard compact
-              title="Telemetri yüklenemedi"
-              message="OpenF1'den veri alınamadı. Pilot kodu doğru mu?"
+              title={t('session_page.error_telemetry')}
+              message={t('session_page.error_telemetry_msg')}
               onRetry={() => telA.refetch()}
             />
           ) : telA.data ? (<>
@@ -552,16 +557,16 @@ export function SessionPage() {
           {/* Anlık değerler */}
           {sp ? (
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 animate-fade-up">
-              <StatTile label="HIZ"   value={sp.speed != null ? String(sp.speed) : '—'} unit="km/sa" color={(sp.speed??0)>280?'#E10600':undefined} />
-              <StatTile label="GAZ"   value={sp.throttle != null ? `${sp.throttle}%` : '—'} color={(sp.throttle??0)>90?'#00D2BE':undefined} />
-              <StatTile label="FREN"  value={sp.brake != null ? `${sp.brake}%` : '—'} color={(sp.brake??0)>50?'#FF8700':undefined} />
-              <StatTile label="VİTES" value={sp.gear != null ? String(sp.gear) : '—'} />
-              <StatTile label="DRS"   value={(sp.drs??0)>0?'AÇIK':'KAPALI'} color={(sp.drs??0)>0?'#00D2BE':undefined} />
-              <StatTile label="RPM"   value={sp.rpm != null ? sp.rpm.toLocaleString() : '—'} />
+              <StatTile label={t('session_page.stat_speed')}   value={sp.speed != null ? String(sp.speed) : '—'} unit="km/h" color={(sp.speed??0)>280?'#E10600':undefined} />
+              <StatTile label={t('session_page.stat_throttle')} value={sp.throttle != null ? `${sp.throttle}%` : '—'} color={(sp.throttle??0)>90?'#00D2BE':undefined} />
+              <StatTile label={t('session_page.stat_brake')}    value={sp.brake != null ? `${sp.brake}%` : '—'} color={(sp.brake??0)>50?'#FF8700':undefined} />
+              <StatTile label={t('session_page.stat_gear')}     value={sp.gear != null ? String(sp.gear) : '—'} />
+              <StatTile label={t('session_page.stat_drs')}      value={(sp.drs??0)>0 ? t('telemetry.drs_open') : t('telemetry.drs_closed')} color={(sp.drs??0)>0?'#00D2BE':undefined} />
+              <StatTile label="RPM"                              value={sp.rpm != null ? sp.rpm.toLocaleString() : '—'} />
             </div>
           ) : lap && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-              <StatTile label="TUR SÜRESİ" value={formatLapTime(lap.duration)} color="#E10600" />
+              <StatTile label={t('session_page.stat_lap_time')} value={formatLapTime(lap.duration)} color="#E10600" />
               <StatTile label="S1" value={formatLapTime(lap.sector1)} />
               <StatTile label="S2" value={formatLapTime(lap.sector2)} />
               <StatTile label="S3" value={formatLapTime(lap.sector3)} />
@@ -576,7 +581,7 @@ export function SessionPage() {
                   onClick={() => shareAnalysis(`hotlap-${primaryDriver}-vs-${secondaryDriver}`)}
                   className="flex items-center gap-2 px-4 py-2 text-[11px] border border-[#E10600]/40 text-[#E10600] rounded-lg hover:bg-[#E10600]/10 transition-all"
                 >
-                  <span>↗</span> Analizi Paylaş
+                  <span>↗</span> {t('session_page.share_analysis')}
                 </button>
               </div>
 
@@ -633,11 +638,11 @@ export function SessionPage() {
           {/* Pist haritası */}
           <div className="card overflow-hidden">
             <div className="px-4 py-3 border-b" style={{ borderColor:'var(--b1)' }}>
-              <p className="text-[11px] mono font-semibold tracking-widest" style={{ color:'var(--t3)' }}>PİST HARİTASI</p>
+              <p className="text-[11px] mono font-semibold tracking-widest" style={{ color:'var(--t3)' }}>{t('session_page.track_map')}</p>
             </div>
             {trackMap.isLoading ? (
               <div className="flex items-center justify-center h-48">
-                <F1Loader text="Pist yükleniyor..." />
+                <F1Loader text={t('session_page.track_loading')} />
               </div>
             ) : (
               <TrackMap
@@ -675,7 +680,7 @@ export function SessionPage() {
           {/* Stintler */}
           {(stints.data?.stints?.length ?? 0) > 0 && (
             <div className="card p-4">
-              <p className="text-[11px] mono font-semibold tracking-widest mb-4" style={{ color:'var(--t3)' }}>LASTİK STİNTLERİ</p>
+              <p className="text-[11px] mono font-semibold tracking-widest mb-4" style={{ color:'var(--t3)' }}>{t('session_page.tyre_stints')}</p>
               <div className="space-y-2.5 overflow-x-auto">
                 {Object.entries(
                   (stints.data!.stints as any[]).reduce<Record<string,any[]>>((acc,s) => {

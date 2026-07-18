@@ -32,9 +32,9 @@ export function LoginPage() {
       } else if (Array.isArray(d) && d.length > 0) {
         // Pydantic doğrulama hataları (örn. "Şifre en az 8 karakter olmalı")
         const msg = String(d[0]?.msg ?? '').replace(/^Value error,\s*/, '')
-        setError(msg || 'Girdiğiniz bilgileri kontrol edin')
+        setError(msg || t('auth.error_check'))
       } else {
-        setError(tab === 'login' ? 'E-posta veya şifre hatalı' : 'Kayıt sırasında bir hata oluştu')
+        setError(tab === 'login' ? t('auth.error_login') : t('auth.error_register'))
       }
     } finally { setLoading(false) }
   }
@@ -70,7 +70,7 @@ export function LoginPage() {
             </span>
           </Link>
           <p className="text-[13px]" style={{ color:'var(--t2)' }}>
-            {tab==='login' ? 'Hesabına giriş yap' : 'Yeni hesap oluştur'}
+            {tab==='login' ? t('auth.login_subtitle') : t('auth.register_subtitle')}
           </p>
         </div>
 
@@ -138,13 +138,13 @@ export function LoginPage() {
           </button>
 
           <p className="text-center text-[11px]" style={{ color:'var(--t3)' }}>
-            AI yorumları için giriş zorunlu değil
+            {t('auth.ai_no_login')}
           </p>
         </div>
 
         <p className="text-center text-[12px]">
           <Link to="/" className="hover:text-white transition-colors" style={{ color:'var(--t3)' }}>
-            ← Ana sayfaya dön
+            {t('auth.back_home')}
           </Link>
         </p>
       </div>

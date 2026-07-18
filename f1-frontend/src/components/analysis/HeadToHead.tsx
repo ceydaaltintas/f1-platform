@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '../../api/client'
+import { useTranslation } from 'react-i18next'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -43,6 +44,7 @@ async function fetchSeasonComparison(year: number, code1: string, code2: string)
 }
 
 export function HeadToHead() {
+  const { t } = useTranslation()
   const [d1, setD1]         = useState('VER')
   const [d2, setD2]         = useState('NOR')
   const [subTab, setSubTab] = useState<'seasons' | 'circuits'>('seasons')
@@ -98,19 +100,19 @@ export function HeadToHead() {
 
   return (
     <div className="card overflow-hidden">
-      {/* Başlık + pilot seçimi */}
+      {/* Header + driver selector */}
       <div className="px-5 py-4 border-b" style={{ borderColor:'var(--b1)' }}>
         <div className="flex items-center gap-3 mb-4">
           <span className="text-xl">⚔️</span>
           <div>
-            <p className="text-[14px] font-bold text-white">Head-to-Head Karşılaştırma</p>
+            <p className="text-[14px] font-bold text-white">{t('h2h.title')}</p>
             <p className="text-[11px] mono mt-0.5" style={{ color:'var(--t3)' }}>
-              Son {YEARS_RANGE.length} sezonda puan rekabeti ve pist başarısı
+              {t('h2h.subtitle', { n: YEARS_RANGE.length })}
             </p>
           </div>
         </div>
 
-        {/* Dropdown pilot seçici */}
+        {/* Dropdown pilot selector */}
         <div className="flex items-center gap-3 flex-wrap">
           <select value={d1} onChange={e => setD1(e.target.value)}
             className="px-3 py-2.5 rounded-xl text-[16px] font-black mono cursor-pointer"
@@ -136,21 +138,21 @@ export function HeadToHead() {
 
           {driversQ.isLoading && (
             <p className="text-[11px] mono animate-pulse" style={{ color:'var(--t3)' }}>
-              Pilot listesi yükleniyor...
+              {t('h2h.loading_drivers')}
             </p>
           )}
         </div>
       </div>
 
-      {/* Alt sekmeler */}
+      {/* Sub tabs */}
       <div className="flex border-b" style={{ borderColor:'var(--b1)' }}>
         {([
-          ['seasons',  '📅 Sezon Bazında'],
-          ['circuits', '🏎 Pist Bazında'],
-        ] as const).map(([t, label]) => (
-          <button key={t} onClick={() => setSubTab(t)}
+          ['seasons',  t('h2h.tab_seasons')],
+          ['circuits', t('h2h.tab_circuits')],
+        ] as const).map(([tabKey, label]) => (
+          <button key={tabKey} onClick={() => setSubTab(tabKey)}
             className="flex-1 py-2.5 text-[12px] font-semibold transition-all"
-            style={subTab===t
+            style={subTab===tabKey
               ? { background:'rgba(225,6,0,0.08)', color:'#E10600', borderBottom:'2px solid #E10600' }
               : { color:'var(--t3)', borderBottom:'2px solid transparent' }}>
             {label}
@@ -158,38 +160,38 @@ export function HeadToHead() {
         ))}
       </div>
 
-      {/* ── SEZON BAZINDA ───────────────────────────────────── */}
+      {/* ── BY SEASON ───────────────────────────────────── */}
       {subTab === 'seasons' && (
         comparison.isLoading ? (
           <div className="p-8 text-center">
-            <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>Yükleniyor...</p>
+            <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>{t('h2h.loading')}</p>
           </div>
         ) : !seasons.length ? (
           <div className="p-8 text-center">
             <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
-              Bu yıl aralığında ortak sezon bulunamadı.
+              {t('h2h.no_common_season')}
             </p>
           </div>
         ) : (
           <>
-            {/* Skor */}
+            {/* Score */}
             <div className="grid grid-cols-3 border-b" style={{ borderColor:'var(--b1)' }}>
               <div className="px-5 py-4 text-center border-r" style={{ borderColor:'var(--b1)' }}>
                 <p className="text-[32px] font-black mono" style={{ color:'#E10600' }}>{d1}</p>
                 <div className="flex justify-center gap-4 mt-2">
                   <div><p className="text-[20px] font-black mono text-white">{stats.d1wins}</p>
-                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>SEZON</p></div>
+                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t('h2h.season_label')}</p></div>
                   <div><p className="text-[20px] font-black mono text-white">{stats.d1raceWins}</p>
-                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>GALİBİYET</p></div>
+                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t('h2h.wins_label')}</p></div>
                 </div>
               </div>
               <div className="px-5 py-4 text-center flex flex-col items-center justify-center">
-                <p className="text-[11px] mono mb-1" style={{ color:'var(--t3)' }}>{seasons.length} SEZON</p>
+                <p className="text-[11px] mono mb-1" style={{ color:'var(--t3)' }}>{t('h2h.seasons_count', { n: seasons.length })}</p>
                 {stats.d1wins !== stats.d2wins ? (
                   <>
                     <p className="text-[13px] font-black"
                       style={{ color: stats.d1wins > stats.d2wins ? '#E10600':'#FF8700' }}>
-                      {stats.d1wins > stats.d2wins ? d1 : d2} üstün
+                      {t('h2h.superior', { driver: stats.d1wins > stats.d2wins ? d1 : d2 })}
                     </p>
                     <p className="text-[26px] font-black mono text-white mt-1">
                       {Math.max(stats.d1wins,stats.d2wins)}–{Math.min(stats.d1wins,stats.d2wins)}
@@ -203,14 +205,14 @@ export function HeadToHead() {
                 <p className="text-[32px] font-black mono" style={{ color:'#FF8700' }}>{d2}</p>
                 <div className="flex justify-center gap-4 mt-2">
                   <div><p className="text-[20px] font-black mono text-white">{stats.d2wins}</p>
-                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>SEZON</p></div>
+                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t('h2h.season_label')}</p></div>
                   <div><p className="text-[20px] font-black mono text-white">{stats.d2raceWins}</p>
-                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>GALİBİYET</p></div>
+                       <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t('h2h.wins_label')}</p></div>
                 </div>
               </div>
             </div>
 
-            {/* Grafik */}
+            {/* Chart */}
             <div className="px-5 py-5">
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} barGap={4}>
@@ -230,7 +232,7 @@ export function HeadToHead() {
               </ResponsiveContainer>
             </div>
 
-            {/* Sezon listesi */}
+            {/* Season list */}
             <div className="px-5 pb-5 space-y-2">
               {[...seasons].reverse().map(s => {
                 const wColor = s.winner==='p1'?'#E10600':s.winner==='p2'?'#FF8700':undefined
@@ -254,7 +256,7 @@ export function HeadToHead() {
                         {s.winner==='p1'?d1:d2} +{Math.abs(s.p1.points-s.p2.points)} pts
                       </span>
                     ) : (
-                      <span className="text-[10px] mono" style={{ color:'var(--t3)' }}>Eşit</span>
+                      <span className="text-[10px] mono" style={{ color:'var(--t3)' }}>{t('h2h.equal')}</span>
                     )}
                   </div>
                 )
@@ -264,18 +266,18 @@ export function HeadToHead() {
         )
       )}
 
-      {/* ── PİST BAZINDA ────────────────────────────────────── */}
+      {/* ── BY CIRCUIT ────────────────────────────────────── */}
       {subTab === 'circuits' && (
         circuits.isLoading ? (
           <div className="p-8 text-center">
             <p className="text-[12px] mono animate-pulse" style={{ color:'var(--t3)' }}>
-              Pist verileri yükleniyor (birkaç saniye sürebilir)...
+              {t('h2h.circuits_loading')}
             </p>
           </div>
         ) : !circuitData.length ? (
           <div className="p-8 text-center">
             <p className="text-[12px] mono" style={{ color:'var(--t3)' }}>
-              Bu iki pilot için ortak yarış bulunamadı.
+              {t('h2h.no_common_circuit')}
             </p>
           </div>
         ) : (
@@ -283,11 +285,22 @@ export function HeadToHead() {
             <table style={{ width:'100%', borderCollapse:'collapse', fontFamily:'IBM Plex Mono,monospace' }}>
               <thead>
                 <tr style={{ background:'rgba(255,255,255,0.02)', borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
-                  {['Pist','Yarış','',d1+' Galip','',d2+' Galip','',d1+' Podyum','',d2+' Podyum'].map((h,i) => (
+                  {[
+                    t('h2h.col_circuit'),
+                    t('h2h.col_races'),
+                    '',
+                    t('h2h.col_wins', { driver: d1 }),
+                    '',
+                    t('h2h.col_wins', { driver: d2 }),
+                    '',
+                    t('h2h.col_podiums', { driver: d1 }),
+                    '',
+                    t('h2h.col_podiums', { driver: d2 }),
+                  ].map((h,i) => (
                     <th key={i} style={{ padding:'8px 10px', textAlign: i===0?'left':'center',
                       fontSize:9, fontWeight:600, letterSpacing:'0.1em',
-                      color: h===d1+' Galip'||h===d1+' Podyum' ? '#E10600'
-                           : h===d2+' Galip'||h===d2+' Podyum' ? '#FF8700'
+                      color: h===t('h2h.col_wins', { driver: d1 })||h===t('h2h.col_podiums', { driver: d1 }) ? '#E10600'
+                           : h===t('h2h.col_wins', { driver: d2 })||h===t('h2h.col_podiums', { driver: d2 }) ? '#FF8700'
                            : 'rgba(240,244,255,0.25)',
                       whiteSpace:'nowrap' }}>{h}</th>
                   ))}
@@ -345,7 +358,7 @@ export function HeadToHead() {
             </table>
             <div className="px-5 py-3 border-t" style={{ borderColor:'var(--b1)' }}>
               <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
-                2022–{CURRENT_YEAR} arası yarışlar · Galip = daha yüksek bitiş pozisyonu · Bar = galip oranı
+                {t('h2h.footnote', { year: CURRENT_YEAR })}
               </p>
             </div>
           </div>

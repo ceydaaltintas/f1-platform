@@ -21,18 +21,19 @@ const LIVE_COMMUNITY_REFRESH = 12_000
 
 // ── Topluluk paneli (yorum + anket sekmeli) ───────────────────────────────────
 function LiveCommunityPanel({ sessionId, isLoggedIn }: { sessionId: number; isLoggedIn: boolean }) {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<'comments' | 'polls'>('comments')
   return (
     <div className="card overflow-hidden flex flex-col">
       <div className="flex border-b" style={{ borderColor: 'var(--b1)' }}>
-        {(['comments', 'polls'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
+        {(['comments', 'polls'] as const).map(tabKey => (
+          <button key={tabKey} onClick={() => setTab(tabKey)}
             className="flex-1 py-3 text-[12px] font-semibold transition-all"
-            style={tab === t
+            style={tab === tabKey
               ? { background: 'rgba(225,6,0,0.08)', color: '#E10600',
                   borderBottom: '2px solid #E10600' }
               : { color: 'var(--t3)', borderBottom: '2px solid transparent' }}>
-            {t === 'comments' ? '💬 Yorumlar' : '📊 Anketler'}
+            {tabKey === 'comments' ? t('session_page.comments_tab') : t('session_page.polls_tab')}
           </button>
         ))}
       </div>
@@ -58,13 +59,14 @@ const TEAM_COLOR: Record<string, string> = {
   BOR: '#C92D4B',
 }
 
-const FLAG_STYLE: Record<string, { color: string; label: string; emoji: string }> = {
-  GREEN:     { color: '#00C851', label: 'YEŞİL BAYRAK',                       emoji: '🟢' },
-  YELLOW:    { color: '#FFD700', label: 'SARI BAYRAK',                         emoji: '🟡' },
-  RED:       { color: '#E10600', label: 'KIRMIZI BAYRAK — YARIŞI DURDURULDU', emoji: '🔴' },
-  SC:        { color: '#FF8700', label: 'SAFETY CAR',                          emoji: '🚗' },
-  VSC:       { color: '#FF8700', label: 'VIRTUAL SAFETY CAR',                  emoji: '🔶' },
-  CHEQUERED: { color: '#ffffff', label: 'DAMALIBAYRAK — YARIŞI BİTTİ',        emoji: '🏁' },
+// FLAG_STYLE labels are now resolved dynamically in LivePage via t()
+const FLAG_STYLE_BASE: Record<string, { color: string; labelKey: string; emoji: string }> = {
+  GREEN:     { color: '#00C851', labelKey: 'live.flag_green',      emoji: '🟢' },
+  YELLOW:    { color: '#FFD700', labelKey: 'live.flag_yellow',     emoji: '🟡' },
+  RED:       { color: '#E10600', labelKey: 'live.flag_red',        emoji: '🔴' },
+  SC:        { color: '#FF8700', labelKey: '',                      emoji: '🚗' },
+  VSC:       { color: '#FF8700', labelKey: '',                      emoji: '🔶' },
+  CHEQUERED: { color: '#ffffff', labelKey: 'live.flag_chequered',  emoji: '🏁' },
 }
 
 function windDir(deg?: number): string {
@@ -163,7 +165,7 @@ export function LivePage() {
   const radioClips: any[] = radio.data?.clips ?? []
   const messages: any[] = rcMessages.data?.messages ?? []
   const latestFlag = [...messages].reverse().find(m => m.flag && m.flag !== 'NONE')
-  const flagStyle  = latestFlag ? FLAG_STYLE[latestFlag.flag] : null
+  const flagStyle  = latestFlag ? FLAG_STYLE_BASE[latestFlag.flag] : null
   const entries: any[] = timing.data?.entries ?? []
   const raceFinished: boolean = !!timing.data?.race_finished
   const sessionType: string | undefined = timing.data?.session_type
@@ -245,7 +247,7 @@ export function LivePage() {
               style={{ background: flagStyle.color + '18', border: `1px solid ${flagStyle.color}40` }}>
               <span>{flagStyle.emoji}</span>
               <span className="text-[12px] font-bold mono" style={{ color: flagStyle.color }}>
-                {flagStyle.label}
+                {flagStyle.labelKey ? t(flagStyle.labelKey) : (latestFlag?.flag ?? '')}
               </span>
             </div>
           )}
@@ -278,7 +280,7 @@ export function LivePage() {
                   : 'var(--t2)'
                 return (
                   <span key={i} className="text-[11px] mono shrink-0" style={{ color }}>
-                    {m.flag && m.flag !== 'NONE' ? `${FLAG_STYLE[m.flag]?.emoji ?? '●'} ` : '● '}
+                    {m.flag && m.flag !== 'NONE' ? `${FLAG_STYLE_BASE[m.flag]?.emoji ?? '●'} ` : '● '}
                     {m.message}
                     <span className="mx-4" style={{ color: 'var(--t3)' }}>·</span>
                   </span>
@@ -650,7 +652,7 @@ export function LivePage() {
                 ) : messages.slice(0, 15).map((m: any, i: number) => {
                   const c = m.flag==='RED'?'#E10600':m.flag==='SC'||m.flag==='VSC'?'#FF8700':
                     m.flag==='GREEN'?'#00C851':m.flag==='YELLOW'?'#FFD700':'var(--t2)'
-                  const emoji = m.flag && FLAG_STYLE[m.flag] ? FLAG_STYLE[m.flag].emoji : '●'
+                  const emoji = m.flag && FLAG_STYLE_BASE[m.flag] ? FLAG_STYLE_BASE[m.flag].emoji : '●'
                   return (
                     <div key={i} className="flex items-start gap-2">
                       <span className="shrink-0 mt-0.5 text-sm">{emoji}</span>
