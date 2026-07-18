@@ -156,9 +156,13 @@ async def season_results(year: int):
 # ─── Yarış Özeti ─────────────────────────────────────────────────────────────
 
 @router.get("/seasons/{year}/rounds/{round_number}/recap")
-async def race_recap(year: int, round_number: int):
+async def race_recap(
+    year: int,
+    round_number: int,
+    language: str = Query("tr", pattern="^(tr|en)$"),
+):
     """Yarış sonrası AI özeti: sonuçlar, öne çıkan anlar, strateji analizi."""
-    ck = cache_key("race_recap_v5", year, round_number)
+    ck = cache_key("race_recap_v5", year, round_number, language)
     cached = await cache_get(ck)
     if cached and cached.get("podium"):
         return cached
@@ -239,25 +243,46 @@ async def race_recap(year: int, round_number: int):
                 return name if name else code
 
             dnf_names = ", ".join(_driver_label(d) for d in dnfs)
-            gainer_str = (
-                f"{_driver_label(gainers[0])} (+{gainers[0]['change']} pozisyon)"
-                if gainers else ""
-            )
-            prompt = (
-                f"{race_name} ({circuit}) yarış özeti yaz. "
-                f"Kazanan: {podium[0]['driver']} ({podium[0]['team']}), "
-                f"2.: {podium[1]['driver']}, 3.: {podium[2]['driver']}. "
-                f"{'DNF: ' + dnf_names + '. ' if dnfs else ''}"
-                f"{'En çok pozisyon kazanan: ' + gainer_str + '. ' if gainer_str else ''}"
-                f"4-5 cümlelik kısa Türkçe yarış özeti yaz. Yarışın hikayesini, kritik anları ve strateji kararlarını anlat."
-            )
-            system = (
-                "Sen deneyimli bir F1 gazetecisisin. Yarış sonrası kısa, akıcı ve bilgilendirici özet yazarsın. "
-                "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi. "
-                "Önemli: F1'de 'retired' terimi 'yarıştan çekildi' demektir, 'emekliye ayrıldı' değil. DNF = yarışı tamamlayamadı. "
-                "Pilot kodlarını (COL, VER, NOR gibi) asla doğrudan kullanma — her zaman tam ismi yaz."
-            )
-            recap_ck = cache_key("race_recap_ai_v4", year, round_number)
+            en = language == "en"
+            if en:
+                gainer_str = (
+                    f"{_driver_label(gainers[0])} (+{gainers[0]['change']} positions)"
+                    if gainers else ""
+                )
+                prompt = (
+                    f"Write a race summary for {race_name} ({circuit}). "
+                    f"Winner: {podium[0]['driver']} ({podium[0]['team']}), "
+                    f"2nd: {podium[1]['driver']}, 3rd: {podium[2]['driver']}. "
+                    f"{'DNF: ' + dnf_names + '. ' if dnfs else ''}"
+                    f"{'Biggest mover: ' + gainer_str + '. ' if gainer_str else ''}"
+                    f"Write a short 4-5 sentence race summary in English. Cover the race story, key moments and strategy decisions."
+                )
+                system = (
+                    "You are an experienced F1 journalist. Write concise, engaging post-race summaries. "
+                    "Plain English, 4-5 sentences. Balance excitement with technical insight. "
+                    "Important: 'retired' means the driver withdrew from the race. DNF = did not finish. "
+                    "Never use driver codes (COL, VER, NOR etc.) — always use full names."
+                )
+            else:
+                gainer_str = (
+                    f"{_driver_label(gainers[0])} (+{gainers[0]['change']} pozisyon)"
+                    if gainers else ""
+                )
+                prompt = (
+                    f"{race_name} ({circuit}) yarış özeti yaz. "
+                    f"Kazanan: {podium[0]['driver']} ({podium[0]['team']}), "
+                    f"2.: {podium[1]['driver']}, 3.: {podium[2]['driver']}. "
+                    f"{'DNF: ' + dnf_names + '. ' if dnfs else ''}"
+                    f"{'En çok pozisyon kazanan: ' + gainer_str + '. ' if gainer_str else ''}"
+                    f"4-5 cümlelik kısa Türkçe yarış özeti yaz. Yarışın hikayesini, kritik anları ve strateji kararlarını anlat."
+                )
+                system = (
+                    "Sen deneyimli bir F1 gazetecisisin. Yarış sonrası kısa, akıcı ve bilgilendirici özet yazarsın. "
+                    "Sade Türkçe, 4-5 cümle. Heyecan ve teknik detay dengesi. "
+                    "Önemli: F1'de 'retired' terimi 'yarıştan çekildi' demektir, 'emekliye ayrıldı' değil. DNF = yarışı tamamlayamadı. "
+                    "Pilot kodlarını (COL, VER, NOR gibi) asla doğrudan kullanma — her zaman tam ismi yaz."
+                )
+            recap_ck = cache_key("race_recap_ai_v4", year, round_number, language)
             recap_text = await cache_get(recap_ck)
             if not recap_text:
                 if claude_ai._groq_ok():

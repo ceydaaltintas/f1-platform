@@ -22,13 +22,14 @@ function teamColor(name: string): string {
 
 export function RecapPage() {
   const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
   const { year, round } = useParams<{ year: string; round: string }>()
   const y = Number(year) || 2026
   const r = Number(round) || 1
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['race-recap', y, r],
-    queryFn: () => client.get(`/seasons/${y}/rounds/${r}/recap`).then(res => res.data),
+    queryKey: ['race-recap', y, r, lang],
+    queryFn: () => client.get(`/seasons/${y}/rounds/${r}/recap`, { params: { language: lang } }).then(res => res.data),
     staleTime: 300_000,
   })
 
