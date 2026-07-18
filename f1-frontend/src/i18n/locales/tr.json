@@ -8,7 +8,9 @@
     "rules": "Kurallar"
   },
   "home": {
-    "hero_title": "Yarışı veriyle takip et",
+    "hero_title_pre": "Yarışı",
+    "hero_title_red": "veri",
+    "hero_title_post": "yle takip et",
     "hero_desc": "Gerçek zamanlı telemetri, AI destekli yorum, canlı pist haritası.",
     "active_season": "AKTİF SEZON",
     "next_race": "SONRAKİ YARIŞ",

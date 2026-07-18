@@ -8,7 +8,9 @@
     "rules": "Rules"
   },
   "home": {
-    "hero_title": "Follow the race with data",
+    "hero_title_pre": "Follow the race with",
+    "hero_title_red": "data",
+    "hero_title_post": "",
     "hero_desc": "Real-time telemetry, AI-powered insights, live track map.",
     "active_season": "ACTIVE SEASON",
     "next_race": "NEXT RACE",

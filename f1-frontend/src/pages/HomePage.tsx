@@ -331,14 +331,9 @@ export function HomePage() {
               </p>
 
               <h1 className="text-4xl sm:text-5xl font-black leading-tight mb-5">
-                {(() => {
-                  const words = t('home.hero_title').split(' ')
-                  const last = words.pop()
-                  return <>
-                    <span className="text-white">{words.join(' ')} </span>
-                    <span className="grad-red">{last}</span>
-                  </>
-                })()}
+                <span className="text-white">{t('home.hero_title_pre')} </span>
+                <span className="grad-red">{t('home.hero_title_red')}</span>
+                <span className="text-white">{t('home.hero_title_post')}</span>
               </h1>
 
               <p className="text-[16px] leading-relaxed mb-8" style={{ color: 'var(--t2)', maxWidth: 420 }}>
