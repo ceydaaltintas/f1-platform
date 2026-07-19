@@ -77,21 +77,35 @@ CIRCUIT_SPRINT_LAPS: dict[str, int] = {
 }
 
 
-# Bir pilotun aralık verisi, en güncel veriden 90s'den fazla eskiyse DNF/emekli kabul edilir
-RETIRED_THRESHOLD_SECONDS = 90
+# Bir pilotun aralık verisi, en güncel veriden bu kadar eskiyse DNF/emekli kabul edilir.
+# 150s: Safety Car / VSC altında interval güncellemeleri seyrekleştiğinden 90s yetmiyordu.
+RETIRED_THRESHOLD_SECONDS = 150
 
 
 def _inactive_driver_numbers(latest_iv: dict[int, dict], drivers: list[dict],
-                             threshold: int = RETIRED_THRESHOLD_SECONDS) -> set:
+                             threshold: int = RETIRED_THRESHOLD_SECONDS,
+                             leader_dn: int | None = None) -> set:
     """DNF/emekli pilotların driver_number'larını döner.
 
     Yarış sonunda tüm pilotların interval akışı durur — bu yüzden eşik,
     en güncel interval timestamp'ine (live_ts) göre relatiftir.
+
+    Lider (P1) pilotunun gap_to_leader değeri null/0 olduğundan OpenF1
+    onun interval'ini daha seyrek günceller — yanlış DNF işaretlememek
+    için lider her zaman aktif sayılır.
     """
     dates = [iv.get("date") for iv in latest_iv.values() if iv.get("date")]
     live_ts = max(dates) if dates else None
 
-    def _is_retired(iv_date: str | None) -> bool:
+    def _is_retired(iv_date: str | None, dn: int) -> bool:
+        # Lider her zaman aktif — interval güncellemesi seyrek gelebilir
+        if leader_dn is not None and dn == leader_dn:
+            return False
+        # gap_to_leader null veya 0 → bu sürücü lider, inactive sayma
+        iv = latest_iv.get(dn, {})
+        gap = iv.get("gap_to_leader")
+        if gap is None or gap == 0 or str(gap).strip() in ("0", "0.0", ""):
+            return False
         if not live_ts or not iv_date:
             return False
         try:
@@ -101,8 +115,11 @@ def _inactive_driver_numbers(latest_iv: dict[int, dict], drivers: list[dict],
         except ValueError:
             return False
 
-    inactive = {dn for dn, iv in latest_iv.items() if _is_retired(iv.get("date"))}
+    inactive = {dn for dn, iv in latest_iv.items() if _is_retired(iv.get("date"), dn)}
     inactive |= {d.get("driver_number") for d in drivers if d.get("driver_number") not in latest_iv}
+    # Lideri kesinlikle dışarıda tut
+    if leader_dn is not None:
+        inactive.discard(leader_dn)
     return inactive
 
 
@@ -1168,22 +1185,27 @@ async def get_live_timing(session_id: int, db: AsyncSession = Depends(get_db)):
             if dn not in latest_iv or (iv.get("date","") > latest_iv[dn].get("date","")):
                 latest_iv[dn] = iv
 
-        # DNF/DNS pilotlar — yarış bittiyse eşiği yükselt (finiş sırası 1-2 dk sürer,
-        # gerçek DNF'ler çok daha eski interval verisine sahip)
-        threshold = 600 if race_finished else RETIRED_THRESHOLD_SECONDS
-        inactive_dns = _inactive_driver_numbers(latest_iv, drivers, threshold)
-        await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
-
-        active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
-        retired_ivs = [iv for iv in latest_iv.values() if iv.get("driver_number") in inactive_dns]
-
-        # Positions verisinden son pozisyon (lapped pilotları doğru sıralamak için)
+        # Positions verisinden son pozisyon (lapped pilotları ve lider tespiti için)
         latest_pos_by_dn: dict[int, int] = {}
         for p in sorted(positions, key=lambda x: x.get("date") or ""):
             dn = p.get("driver_number")
             pos = p.get("position")
             if dn is not None and pos is not None:
                 latest_pos_by_dn[dn] = pos
+
+        # P1 lider — interval verisi seyrek gelebilir, asla DNF sayılmaz
+        leader_dn: int | None = next(
+            (dn for dn, pos in latest_pos_by_dn.items() if pos == 1), None
+        )
+
+        # DNF/DNS pilotlar — yarış bittiyse eşiği yükselt (finiş sırası 1-2 dk sürer,
+        # gerçek DNF'ler çok daha eski interval verisine sahip)
+        threshold = 600 if race_finished else RETIRED_THRESHOLD_SECONDS
+        inactive_dns = _inactive_driver_numbers(latest_iv, drivers, threshold, leader_dn=leader_dn)
+        await cache_set(cache_key("inactive_drivers", session_key), list(inactive_dns), ttl_seconds=30)
+
+        active_ivs  = [iv for iv in latest_iv.values() if iv.get("driver_number") not in inactive_dns]
+        retired_ivs = [iv for iv in latest_iv.values() if iv.get("driver_number") in inactive_dns]
 
         def _sort_key(iv: dict) -> tuple:
             gap = _gap_val(iv.get("gap_to_leader"))
@@ -1505,7 +1527,10 @@ async def live_simulate(
 
     # DNF/DNS pilotlar — bu endpoint'in kendi interval verisinden hesaplanır
     # (get_live_timing'in cache'lediği inactive_drivers'a bağımlı olmadan)
-    inactive_dns = _inactive_driver_numbers(latest_iv_sim, drivers)
+    leader_dn_sim: int | None = next(
+        (dn for dn, iv in latest_iv_sim.items() if not iv.get("gap_to_leader")), None
+    )
+    inactive_dns = _inactive_driver_numbers(latest_iv_sim, drivers, leader_dn=leader_dn_sim)
 
     # Hedef pilot DNF/emekli ise simülasyon anlamsız — bilgi mesajı dön
     if target_num in inactive_dns:
