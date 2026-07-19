@@ -60,13 +60,18 @@ const TEAM_COLOR: Record<string, string> = {
 }
 
 // FLAG_STYLE labels are now resolved dynamically in LivePage via t()
+// OpenF1 flag values: "SAFETY CAR", "VIRTUAL SAFETY CAR", "GREEN", "YELLOW", "DOUBLE YELLOW", "RED", "CHEQUERED", "CLEAR"
 const FLAG_STYLE_BASE: Record<string, { color: string; labelKey: string; emoji: string }> = {
-  GREEN:     { color: '#00C851', labelKey: 'live.flag_green',      emoji: '🟢' },
-  YELLOW:    { color: '#FFD700', labelKey: 'live.flag_yellow',     emoji: '🟡' },
-  RED:       { color: '#E10600', labelKey: 'live.flag_red',        emoji: '🔴' },
-  SC:        { color: '#FF8700', labelKey: '',                      emoji: '🚗' },
-  VSC:       { color: '#FF8700', labelKey: '',                      emoji: '🔶' },
-  CHEQUERED: { color: '#ffffff', labelKey: 'live.flag_chequered',  emoji: '🏁' },
+  GREEN:                  { color: '#00C851', labelKey: 'live.flag_green',      emoji: '🟢' },
+  CLEAR:                  { color: '#00C851', labelKey: 'live.flag_green',      emoji: '🟢' },
+  YELLOW:                 { color: '#FFD700', labelKey: 'live.flag_yellow',     emoji: '🟡' },
+  'DOUBLE YELLOW':        { color: '#FFD700', labelKey: 'live.flag_yellow',     emoji: '🟡' },
+  RED:                    { color: '#E10600', labelKey: 'live.flag_red',        emoji: '🔴' },
+  'SAFETY CAR':           { color: '#FF8700', labelKey: 'live.flag_sc',         emoji: '🚗' },
+  SC:                     { color: '#FF8700', labelKey: 'live.flag_sc',         emoji: '🚗' },
+  'VIRTUAL SAFETY CAR':   { color: '#FF8700', labelKey: 'live.flag_vsc',        emoji: '🔶' },
+  VSC:                    { color: '#FF8700', labelKey: 'live.flag_vsc',        emoji: '🔶' },
+  CHEQUERED:              { color: '#ffffff', labelKey: 'live.flag_chequered',  emoji: '🏁' },
 }
 
 function windDir(deg?: number): string {
@@ -274,11 +279,7 @@ export function LivePage() {
           <div className="ticker-wrap">
             <div className="ticker-inner ticker-slow gap-8 px-6 py-2">
               {[...messages.slice(0,15), ...messages.slice(0,15)].map((m: any, i: number) => {
-                const color = m.flag === 'RED' ? '#E10600'
-                  : m.flag === 'SC' || m.flag === 'VSC' ? '#FF8700'
-                  : m.flag === 'GREEN' ? '#00C851'
-                  : m.flag === 'YELLOW' ? '#FFD700'
-                  : 'var(--t2)'
+                const color = FLAG_STYLE_BASE[m.flag]?.color ?? 'var(--t2)'
                 return (
                   <span key={i} className="text-[11px] mono shrink-0" style={{ color }}>
                     {m.flag && m.flag !== 'NONE' ? `${FLAG_STYLE_BASE[m.flag]?.emoji ?? '●'} ` : '● '}
@@ -651,9 +652,8 @@ export function LivePage() {
                     Mesaj yok
                   </p>
                 ) : messages.slice(0, 15).map((m: any, i: number) => {
-                  const c = m.flag==='RED'?'#E10600':m.flag==='SC'||m.flag==='VSC'?'#FF8700':
-                    m.flag==='GREEN'?'#00C851':m.flag==='YELLOW'?'#FFD700':'var(--t2)'
-                  const emoji = m.flag && FLAG_STYLE_BASE[m.flag] ? FLAG_STYLE_BASE[m.flag].emoji : '●'
+                  const c = FLAG_STYLE_BASE[m.flag]?.color ?? 'var(--t2)'
+                  const emoji = FLAG_STYLE_BASE[m.flag]?.emoji ?? '●'
                   return (
                     <div key={i} className="flex items-start gap-2">
                       <span className="shrink-0 mt-0.5 text-sm">{emoji}</span>

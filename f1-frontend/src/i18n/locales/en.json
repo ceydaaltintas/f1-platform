@@ -144,6 +144,8 @@
     "flag_green": "GREEN FLAG",
     "flag_yellow": "YELLOW FLAG",
     "flag_red": "RED FLAG — RACE STOPPED",
+    "flag_sc": "🚗 SAFETY CAR",
+    "flag_vsc": "🔶 VIRTUAL SAFETY CAR",
     "flag_chequered": "CHEQUERED FLAG — RACE FINISHED",
     "race_finished": "RACE FINISHED",
     "loading_data": "Loading data...",

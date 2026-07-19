@@ -144,6 +144,8 @@
     "flag_green": "YEŞİL BAYRAK",
     "flag_yellow": "SARI BAYRAK",
     "flag_red": "KIRMIZI BAYRAK — YARIŞI DURDURULDU",
+    "flag_sc": "🚗 GÜVENLİK ARACI",
+    "flag_vsc": "🔶 SANAL GÜVENLİK ARACI",
     "flag_chequered": "DAMALIBAYRAK — YARIŞI BİTTİ",
     "race_finished": "YARIŞ BİTTİ",
     "loading_data": "Veri yükleniyor...",
