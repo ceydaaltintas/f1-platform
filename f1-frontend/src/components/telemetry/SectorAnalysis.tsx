@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { client } from '../../api/client'
 import { formatSectorTime } from '../../utils/format'
 
@@ -11,17 +12,17 @@ interface Props {
   mode?: string
 }
 
-function SectorBar({ label, timeA, timeB, driverA, driverB, colorA, colorB, delta }: any) {
+function SectorBar({ label, timeA, timeB, driverA, driverB, colorA, colorB, delta, t }: any) {
   const total = (timeA ?? 0) + (timeB ?? 0) || 1
   const fasterA = delta !== null && delta <= 0
 
   return (
     <div className="mb-4">
       <div className="flex justify-between mb-1.5">
-        <span className="text-[12px] mono" style={{ color: 'var(--t2)' }}>SEKTÖR {label}</span>
+        <span className="text-[12px] mono" style={{ color: 'var(--t2)' }}>{t('sector.sector_n', { n: label })}</span>
         {delta !== null && (
           <span className="text-[12px] mono font-bold" style={{ color: fasterA ? colorA : colorB }}>
-            {fasterA ? driverA : driverB} {Math.abs(delta).toFixed(3)}s daha hızlı
+            {t('sector.faster_driver', { driver: fasterA ? driverA : driverB, delta: Math.abs(delta).toFixed(3) })}
           </span>
         )}
       </div>
@@ -42,11 +43,14 @@ export function SectorAnalysis({
   colorA = '#E10600', colorB = '#FF8700',
   mode = 'beginner',
 }: Props) {
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language?.startsWith('tr') ? 'tr' : 'en'
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['sectors', sessionId, driverA, driverB, mode],
+    queryKey: ['sectors', sessionId, driverA, driverB, mode, lang],
     queryFn: () =>
       client.get(`/sessions/${sessionId}/sector-analysis`, {
-        params: { drivers: `${driverA},${driverB}`, lap: 'fastest', mode }
+        params: { drivers: `${driverA},${driverB}`, lap: 'fastest', mode, language: lang }
       }).then(r => r.data),
     enabled: !!(sessionId && driverA && driverB),
     staleTime: 5 * 60 * 1000,
@@ -54,7 +58,7 @@ export function SectorAnalysis({
 
   if (isLoading) return (
     <div className="card p-4">
-      <p className="text-[11px] mono font-semibold tracking-widest mb-3" style={{ color: 'var(--t3)' }}>SEKTÖR ANALİZİ</p>
+      <p className="text-[11px] mono font-semibold tracking-widest mb-3" style={{ color: 'var(--t3)' }}>{t('sector.title')}</p>
       {[1,2,3].map(i => <div key={i} className="h-10 rounded mb-3 animate-pulse" style={{ background: 'var(--s2)' }}/>)}
     </div>
   )
@@ -64,9 +68,9 @@ export function SectorAnalysis({
   return (
     <div className="card p-4">
       <div className="flex justify-between items-center mb-4">
-        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>SEKTÖR ANALİZİ</p>
+        <p className="text-[11px] mono font-semibold tracking-widest" style={{ color: 'var(--t3)' }}>{t('sector.title')}</p>
         <span className="text-[12px] mono font-semibold" style={{ color: data.faster_overall === driverA ? colorA : colorB }}>
-          {data.faster_overall} genel olarak daha hızlı
+          {t('sector.overall_faster', { driver: data.faster_overall })}
           {' '}({data.total_gap > 0 ? '+' : ''}{formatSectorTime(Math.abs(data.total_gap))}s)
         </span>
       </div>
@@ -82,6 +86,7 @@ export function SectorAnalysis({
           colorA={colorA}
           colorB={colorB}
           delta={s.delta}
+          t={t}
         />
       ))}
 

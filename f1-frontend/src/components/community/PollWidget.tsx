@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { client, getCurrentUserId } from '../../api/client'
 import { useCommunityStore, type Poll } from '../../store/communityStore'
 
 function useCountdown(closesAt: string | null): string {
+  const { t } = useTranslation()
   const [label, setLabel] = useState('')
   useEffect(() => {
     if (!closesAt) return
     const tick = () => {
       const diff = new Date(closesAt).getTime() - Date.now()
-      if (diff <= 0) { setLabel('Kapandı'); return }
+      if (diff <= 0) { setLabel(t('community.expired')); return }
       const m = Math.floor(diff / 60_000)
       const s = Math.floor((diff % 60_000) / 1000)
       setLabel(`${m}:${s.toString().padStart(2, '0')}`)
@@ -18,13 +20,14 @@ function useCountdown(closesAt: string | null): string {
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [closesAt])
+  }, [closesAt, t])
   return label
 }
 
 function PollCard({ poll, sessionId, userId, onDeleted }: {
   poll: Poll; sessionId: number; userId: string | null; onDeleted: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const countdown   = useCountdown(poll.closes_at)
   const queryClient = useQueryClient()
 
@@ -55,7 +58,7 @@ function PollCard({ poll, sessionId, userId, onDeleted }: {
         {isClosed ? (
           <span className="text-[10px] mono font-semibold px-2 py-0.5 rounded shrink-0"
             style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--t3)', border: '1px solid var(--b1)' }}>
-            KAPANDI
+            {t('community.closed')}
           </span>
         ) : countdown ? (
           <span className="text-[11px] mono font-bold shrink-0" style={{ color: '#FF8700' }}>
@@ -127,7 +130,7 @@ function PollCard({ poll, sessionId, userId, onDeleted }: {
         <div className="flex items-center gap-3">
           {!hasVoted && !isClosed && (
             <span className="text-[10px]" style={{ color: 'var(--t3)' }}>
-              Seç ve oy ver
+              {t('community.vote_prompt')}
             </span>
           )}
           {isOwn && (
@@ -135,7 +138,7 @@ function PollCard({ poll, sessionId, userId, onDeleted }: {
               disabled={deleteMutation.isPending}
               className="text-[11px] transition-colors hover:text-[#f87171] disabled:opacity-50"
               style={{ color: 'var(--t3)' }}>
-              {deleteMutation.isPending ? '⏳' : 'Sil'}
+              {deleteMutation.isPending ? '⏳' : t('community.delete')}
             </button>
           )}
         </div>
@@ -147,6 +150,7 @@ function PollCard({ poll, sessionId, userId, onDeleted }: {
 function PollCreateForm({ sessionId, onCreated }: {
   sessionId: number; onCreated: (p: Poll) => void
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [question, setQuestion] = useState('')
   const [options, setOptions] = useState(['', ''])
@@ -166,7 +170,7 @@ function PollCreateForm({ sessionId, onCreated }: {
       const msg = e.response?.data?.detail
       if (typeof msg === 'string') setError(msg)
       else if (Array.isArray(msg) && msg[0]?.msg) setError(String(msg[0].msg))
-      else setError('Anket oluşturulamadı')
+      else setError(t('community.create_error'))
     },
     onSettled: () => { submittingRef.current = false },
   })
@@ -202,24 +206,24 @@ function PollCreateForm({ sessionId, onCreated }: {
         (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.1)'
         ;(e.target as HTMLElement).style.color = 'var(--t2)'
       }}>
-      + Anket Oluştur
+      {t('community.create_poll')}
     </button>
   )
 
   return (
     <div className="rounded-xl border p-4 space-y-3"
       style={{ background: 'var(--s2)', borderColor: 'rgba(225,6,0,0.2)' }}>
-      <p className="text-[12px] font-semibold text-white">Yeni Anket</p>
+      <p className="text-[12px] font-semibold text-white">{t('community.new_poll')}</p>
 
       <input value={question} onChange={e => setQuestion(e.target.value)}
-        placeholder="Soru yaz..." maxLength={300} style={inputStyle}
+        placeholder={t('community.question_placeholder')} maxLength={300} style={inputStyle}
         onFocus={e => e.target.style.borderColor = 'rgba(225,6,0,0.4)'}
         onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
 
       {options.map((opt, i) => (
         <input key={i} value={opt}
           onChange={e => { const n = [...options]; n[i] = e.target.value; setOptions(n) }}
-          placeholder={`Seçenek ${i + 1}`} maxLength={80} style={inputStyle}
+          placeholder={t('community.option_placeholder', { n: i + 1 })} maxLength={80} style={inputStyle}
           onFocus={e => e.target.style.borderColor = 'rgba(225,6,0,0.4)'}
           onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
       ))}
@@ -230,13 +234,13 @@ function PollCreateForm({ sessionId, onCreated }: {
           style={{ color: 'var(--t3)' }}
           onMouseEnter={e => (e.target as HTMLElement).style.color = 'white'}
           onMouseLeave={e => (e.target as HTMLElement).style.color = 'var(--t3)'}>
-          + Seçenek Ekle
+          {t('community.add_option')}
         </button>
       )}
 
       <div className="flex items-center gap-3 pt-1">
         <label className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--t2)' }}>
-          Süre:
+          {t('community.duration')}
           <select value={minutes} onChange={e => setMinutes(Number(e.target.value))}
             style={{ ...inputStyle, width: 'auto', padding: '6px 10px', fontSize: 12 }}>
             {[1, 2, 5, 10, 30].map(m => <option key={m} value={m}>{m} dk</option>)}
@@ -246,13 +250,13 @@ function PollCreateForm({ sessionId, onCreated }: {
         <div className="flex gap-2 ml-auto">
           <button onClick={() => setOpen(false)}
             className="px-3 py-1.5 rounded-lg text-[12px] transition-colors"
-            style={{ color: 'var(--t3)' }}>İptal</button>
+            style={{ color: 'var(--t3)' }}>{t('community.cancel')}</button>
           <button
             onClick={handleSubmit}
             disabled={question.trim().length < 5 || options.filter(o => o.trim()).length < 2 || mutation.isPending}
             className="px-4 py-1.5 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             style={{ background: 'rgba(225,6,0,0.15)', border: '1px solid rgba(225,6,0,0.3)', color: '#E10600' }}>
-            {mutation.isPending ? '⏳' : 'Oluştur'}
+            {mutation.isPending ? '⏳' : t('community.create')}
           </button>
         </div>
       </div>
@@ -265,6 +269,7 @@ function PollCreateForm({ sessionId, onCreated }: {
 interface Props { sessionId: number; userId: string | null; isAuthenticated: boolean; refetchInterval?: number }
 
 export function PollWidget({ sessionId, userId, isAuthenticated, refetchInterval }: Props) {
+  const { t } = useTranslation()
   const { polls, setInitialPolls, addPoll, removePoll } = useCommunityStore()
   const queryClient = useQueryClient()
 
@@ -285,9 +290,9 @@ export function PollWidget({ sessionId, userId, isAuthenticated, refetchInterval
         <div className="flex items-center gap-2.5">
           <span className="text-base">📊</span>
           <div>
-            <p className="text-[13px] font-bold text-white leading-none">Canlı Anketler</p>
+            <p className="text-[13px] font-bold text-white leading-none">{t('community.polls')}</p>
             <p className="text-[10px] mono mt-0.5" style={{ color: 'var(--t3)' }}>
-              {polls.length > 0 ? `${polls.length} aktif anket` : 'Anket yok'}
+              {polls.length > 0 ? t('community.active_polls', { n: polls.length }) : t('community.no_polls')}
             </p>
           </div>
         </div>
@@ -301,7 +306,7 @@ export function PollWidget({ sessionId, userId, isAuthenticated, refetchInterval
           <div className="flex flex-col items-center justify-center py-10 gap-2">
             <span className="text-3xl opacity-30">📊</span>
             <p className="text-[12px]" style={{ color: 'var(--t3)' }}>
-              {isAuthenticated ? 'İlk anketi oluştur!' : 'Henüz anket yok'}
+              {isAuthenticated ? t('community.first_poll') : t('community.no_polls')}
             </p>
           </div>
         ) : (

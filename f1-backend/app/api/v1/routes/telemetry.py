@@ -508,6 +508,7 @@ async def sector_analysis(
     drivers: str = Query(..., description="Virgülle ayrılmış 2 pilot: VER,NOR"),
     lap: str = Query("fastest"),
     mode: str = Query("beginner", pattern="^(beginner|expert)$"),
+    language: str = Query("tr"),
     db: AsyncSession = Depends(get_db),
 ):
     """İki pilotun sektör zamanlarını karşılaştırır."""
@@ -515,7 +516,7 @@ async def sector_analysis(
     if len(codes) != 2:
         raise HTTPException(400, "Tam 2 pilot kodu girin")
 
-    cache_k = cache_key("sector-analysis-v2", session_id, codes[0], codes[1], lap, mode)
+    cache_k = cache_key("sector-analysis-v2", session_id, codes[0], codes[1], lap, mode, language)
     cached = await cache_get(cache_k)
     if cached:
         return cached
@@ -566,7 +567,7 @@ async def sector_analysis(
     ai_summary = ""
     try:
         ai_summary = await claude_ai.explain_sectors(
-            a, b, sectors, ra.get("compound"), rb.get("compound"), mode,
+            a, b, sectors, ra.get("compound"), rb.get("compound"), mode, language,
         )
     except Exception as e:
         logger.warning("Sektör AI yorumu başarısız: %s", e)

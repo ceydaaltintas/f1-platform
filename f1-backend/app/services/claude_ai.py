@@ -743,10 +743,11 @@ async def explain_sectors(
     driver_a: str, driver_b: str,
     sectors: list[dict], compound_a: str | None, compound_b: str | None,
     mode: str = "beginner",
+    language: str = "tr",
 ) -> str:
     """Sektör bazlı zaman farklarının olası nedenlerini yorumlar."""
     cache_k = _cache_key({
-        "fn": "sector_explain", "mode": mode,
+        "fn": "sector_explain", "mode": mode, "lang": language,
         "a": driver_a, "b": driver_b, "sectors": sectors,
         "ca": compound_a, "cb": compound_b,
     })
@@ -754,27 +755,59 @@ async def explain_sectors(
     if cached:
         return cached["text"]
 
-    lines = []
-    for s in sectors:
-        d = s.get("delta")
-        ta, tb = s.get(f"time_{driver_a}"), s.get(f"time_{driver_b}")
-        faster = s.get("faster")
-        gap = abs(d) if d is not None else None
-        lines.append(
-            f"Sektör {s['sector']}: {driver_a}={ta}s, {driver_b}={tb}s — "
-            f"{faster} {gap:.3f}s daha hızlı" if gap is not None else
-            f"Sektör {s['sector']}: veri yok"
+    if language == "en":
+        lines = []
+        for s in sectors:
+            d = s.get("delta")
+            ta, tb = s.get(f"time_{driver_a}"), s.get(f"time_{driver_b}")
+            faster = s.get("faster")
+            gap = abs(d) if d is not None else None
+            lines.append(
+                f"Sector {s['sector']}: {driver_a}={ta}s, {driver_b}={tb}s — "
+                f"{faster} {gap:.3f}s faster" if gap is not None else
+                f"Sector {s['sector']}: no data"
+            )
+        system = BEGINNER_SYS_EN if mode == "beginner" else EXPERT_SYS_EN
+        content = (
+            f"Sector-by-sector lap time comparison between {driver_a} (tyre: {compound_a or '?'}) "
+            f"and {driver_b} (tyre: {compound_b or '?'}):\n"
+            + "\n".join(lines)
+            + "\nExplain what driving behaviours on track could account for these sector differences "
+              "(e.g. braking point, corner exit, straight-line speed, tyre condition). Reply in English."
         )
-
-    system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
-    content = (
-        f"{driver_a} (lastik: {compound_a or '?'}) ile {driver_b} (lastik: {compound_b or '?'}) "
-        f"arasındaki sektör bazlı tur zamanı karşılaştırması:\n"
-        + "\n".join(lines)
-        + "\nBu sektör farklarının pist üzerinde hangi sürüş davranışlarından "
-          "kaynaklanmış olabileceğini yorumla (örn. frenleme noktası, viraj çıkışı, "
-          "düzeklik hattı, lastik durumu)."
-    )
+        fallback_text = (
+            f"Biggest gap in Sector {max(sectors, key=lambda s: abs(s.get('delta') or 0))['sector']} — "
+            f"{max(sectors, key=lambda s: abs(s.get('delta') or 0)).get('faster')} "
+            f"{abs(max(sectors, key=lambda s: abs(s.get('delta') or 0)).get('delta') or 0):.3f}s ahead. "
+            f"This typically comes from differences in braking point, corner exit speed, or tyre condition."
+        )
+    else:
+        lines = []
+        for s in sectors:
+            d = s.get("delta")
+            ta, tb = s.get(f"time_{driver_a}"), s.get(f"time_{driver_b}")
+            faster = s.get("faster")
+            gap = abs(d) if d is not None else None
+            lines.append(
+                f"Sektör {s['sector']}: {driver_a}={ta}s, {driver_b}={tb}s — "
+                f"{faster} {gap:.3f}s daha hızlı" if gap is not None else
+                f"Sektör {s['sector']}: veri yok"
+            )
+        system = BEGINNER_SYS if mode == "beginner" else EXPERT_SYS
+        content = (
+            f"{driver_a} (lastik: {compound_a or '?'}) ile {driver_b} (lastik: {compound_b or '?'}) "
+            f"arasındaki sektör bazlı tur zamanı karşılaştırması:\n"
+            + "\n".join(lines)
+            + "\nBu sektör farklarının pist üzerinde hangi sürüş davranışlarından "
+              "kaynaklanmış olabileceğini yorumla (örn. frenleme noktası, viraj çıkışı, "
+              "düzeklik hattı, lastik durumu)."
+        )
+        biggest = max(sectors, key=lambda s: abs(s.get("delta") or 0))
+        fallback_text = (
+            f"En büyük fark Sektör {biggest['sector']}'de — {biggest.get('faster')} "
+            f"{abs(biggest.get('delta') or 0):.3f}s önde. Bu genellikle frenleme noktası, "
+            f"viraj çıkış hızı veya lastik durumundaki farklardan kaynaklanır."
+        )
 
     text = ""
     if _groq_ok():
@@ -788,12 +821,7 @@ async def explain_sectors(
         except Exception as e:
             logger.warning("Anthropic sector explain başarısız: %s", e)
     if not text:
-        biggest = max(sectors, key=lambda s: abs(s.get("delta") or 0))
-        text = (
-            f"En büyük fark Sektör {biggest['sector']}'de — {biggest.get('faster')} "
-            f"{abs(biggest.get('delta') or 0):.3f}s önde. Bu genellikle frenleme noktası, "
-            f"viraj çıkış hızı veya lastik durumundaki farklardan kaynaklanır."
-        )
+        text = fallback_text
     else:
         text = _clean_ai_text(text)
 
