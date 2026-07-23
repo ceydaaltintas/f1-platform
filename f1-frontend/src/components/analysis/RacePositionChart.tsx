@@ -1,8 +1,3 @@
-/**
- * Yarış Pozisyon Grafiği
- * Tüm sürücülerin kümülatif tur süresinden hesaplanan tahmini pozisyon eğrisi.
- * Karşılaştırma modunda ikinci sürücü de gösterilir.
- */
 import { useQuery } from '@tanstack/react-query'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -11,6 +6,12 @@ import {
 import { client } from '../../api/client'
 import { F1Loader } from '../ui/F1Loader'
 import { useTranslation } from 'react-i18next'
+
+interface PositionEntry {
+  driver_code: string
+  lap_number: number
+  position: number
+}
 
 interface LapEntry {
   driver_code: string
@@ -31,7 +32,7 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-xl border px-4 py-3 text-[12px] mono"
-      style={{ background: 'rgba(5,8,15,0.97)', border: '1px solid rgba(255,255,255,0.12)',
+      style={{ background: 'rgba(5,8,15,0.97)', border: '1px solid rgba(255,255,255,0.1)',
                boxShadow: '0 8px 32px rgba(0,0,0,0.6)', minWidth: 150 }}>
       <p className="font-bold text-white mb-2">Lap {label}</p>
       {payload.map((p: any, i: number) => (
@@ -47,7 +48,14 @@ function CustomTooltip({ active, payload, label }: any) {
 export function RacePositionChart({ sessionId, primaryDriver, compareDriver, sessionType }: Props) {
   const { t } = useTranslation()
 
-  const { data, isLoading } = useQuery<LapEntry[]>({
+  const posQ = useQuery<PositionEntry[]>({
+    queryKey: ['session-positions', sessionId],
+    queryFn: () => client.get(`/sessions/${sessionId}/positions`).then(r => r.data),
+    staleTime: Infinity,
+    retry: 0,
+  })
+
+  const lapsQ = useQuery<LapEntry[]>({
     queryKey: ['session-all-laps', sessionId],
     queryFn: () => client.get(`/sessions/${sessionId}/laps`).then(r => r.data),
     staleTime: Infinity,
@@ -55,47 +63,30 @@ export function RacePositionChart({ sessionId, primaryDriver, compareDriver, ses
   })
 
   if (!['race', 'sprint'].includes(sessionType ?? '')) return null
-  if (isLoading) return (
+  if (posQ.isLoading) return (
     <div className="card p-8 flex justify-center items-center h-48">
       <F1Loader text={t('race_position.loading')} />
     </div>
   )
-  if (!data?.length) return null
 
-  // Sürücü başına kümülatif tur süresi hesapla → sıralamadan pozisyon bul
-  const cumTimes: Record<string, number> = {}
-  const lapPositions: Record<string, number[]> = {}
+  const positions = posQ.data ?? []
+  const laps = lapsQ.data ?? []
 
-  const allLapNums = [...new Set(data.map(l => l.lap_number))].sort((a, b) => a - b)
-  const maxLap = allLapNums[allLapNums.length - 1] ?? 0
+  if (!positions.length) return null
 
-  for (const lapNum of allLapNums) {
-    const thisLaps = data.filter(l => l.lap_number === lapNum)
+  const allLapNums = [...new Set(positions.map(p => p.lap_number))].sort((a, b) => a - b)
 
-    // Bu turda varolan sürücülerin kümülatif sürelerini güncelle
-    for (const lap of thisLaps) {
-      if (lap.lap_time && lap.driver_code) {
-        cumTimes[lap.driver_code] = (cumTimes[lap.driver_code] ?? 0) + lap.lap_time
-      }
+  const chartData = allLapNums.map(lapNum => {
+    const primary = positions.find(p => p.driver_code === primaryDriver && p.lap_number === lapNum)
+    const compare = compareDriver
+      ? positions.find(p => p.driver_code === compareDriver && p.lap_number === lapNum)
+      : undefined
+    return {
+      lap: lapNum,
+      [primaryDriver]: primary?.position ?? null,
+      ...(compareDriver ? { [compareDriver]: compare?.position ?? null } : {}),
     }
-
-    // Şu ana kadar tur geçmiş tüm sürücüleri sırala
-    const ranked = Object.entries(cumTimes)
-      .sort(([, a], [, b]) => a - b)
-      .map(([code], idx) => ({ code, pos: idx + 1 }))
-
-    for (const { code, pos } of ranked) {
-      if (!lapPositions[code]) lapPositions[code] = []
-      lapPositions[code].push(pos)
-    }
-  }
-
-  // Grafik verisi: her tur için primary + compare pozisyonu
-  const chartData = allLapNums.map((lapNum, idx) => ({
-    lap: lapNum,
-    [primaryDriver]: lapPositions[primaryDriver]?.[idx] ?? null,
-    ...(compareDriver ? { [compareDriver]: lapPositions[compareDriver]?.[idx] ?? null } : {}),
-  })).filter(d => d[primaryDriver] != null)
+  }).filter(d => d[primaryDriver] != null)
 
   if (!chartData.length) return null
 
@@ -107,8 +98,7 @@ export function RacePositionChart({ sessionId, primaryDriver, compareDriver, ses
   )
   const yDomain = [1, Math.max(maxPos + 2, 10)]
 
-  // Pit stop turlarını işaretle
-  const pitLaps = data
+  const pitLaps = laps
     .filter(l => l.driver_code === primaryDriver && (l.is_pit_out_lap || l.is_pit_in_lap))
     .map(l => l.lap_number)
 
@@ -160,7 +150,6 @@ export function RacePositionChart({ sessionId, primaryDriver, compareDriver, ses
           />
           <Tooltip content={<CustomTooltip />} />
 
-          {/* Pit stop işaretçileri */}
           {pitLaps.map(lap => (
             <ReferenceLine key={lap} x={lap} stroke="rgba(255,255,255,0.12)"
               strokeDasharray="3 3" label={undefined} />

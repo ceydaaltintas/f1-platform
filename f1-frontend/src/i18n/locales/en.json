@@ -825,7 +825,7 @@
   },
   "race_position": {
     "title": "RACE POSITION",
-    "subtitle": "Estimated from cumulative lap times",
+    "subtitle": "Real position data from FIA timing",
     "pit_note": "│ = pit stop lap",
     "loading": "Calculating positions..."
   },

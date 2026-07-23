@@ -163,6 +163,97 @@ async def get_driver_laps(
     return result.scalars().all()
 
 
+@router.get("/sessions/{session_id}/positions", response_model=list[dict])
+async def get_session_positions(session_id: int, db: AsyncSession = Depends(get_db)):
+    """Her sürücünün tur bazında gerçek yarış pozisyonunu döner (OpenF1 /position)."""
+    cache_k = cache_key("session_positions", session_id)
+    cached = await cache_get(cache_k)
+    if cached:
+        return cached
+
+    session_res = await db.execute(select(Session).where(Session.id == session_id))
+    session = session_res.scalar_one_or_none()
+    if session is None or not session.session_key:
+        return []
+
+    # Pozisyon verisi (timestamp bazlı)
+    positions = await openf1.fetch_positions(session.session_key)
+    if not positions:
+        return []
+
+    # Sürücü numarası → kod haritası
+    of1_drivers = await db_cache.get_session_drivers(session)
+    dn_to_code: dict[int, str] = {
+        d["driver_number"]: (d.get("name_acronym") or "").upper()
+        for d in of1_drivers
+        if d.get("driver_number")
+    }
+
+    # Sürücü başına tüm pozisyon örnekleri: {driver_number: [(date, position), ...]}
+    from collections import defaultdict
+    driver_pos: dict[int, list[tuple[str, int]]] = defaultdict(list)
+    for p in positions:
+        dn = p.get("driver_number")
+        date = p.get("date")
+        pos = p.get("position")
+        if dn and date and pos is not None:
+            driver_pos[dn].append((date, int(pos)))
+
+    # Her sürücünün pozisyonlarını tarihe göre sırala
+    for dn in driver_pos:
+        driver_pos[dn].sort(key=lambda x: x[0])
+
+    # Lap verisi (date_start ile) — her sürücü için
+    sem = asyncio.Semaphore(5)
+
+    async def _get_driver_laps(dn: int) -> list[dict]:
+        async with sem:
+            raw = await db_cache.get_laps(session, dn, db)
+        return raw
+
+    all_driver_nums = list(driver_pos.keys())
+    lap_results = await asyncio.gather(*[_get_driver_laps(dn) for dn in all_driver_nums])
+
+    result_rows: list[dict] = []
+    for dn, raw_laps in zip(all_driver_nums, lap_results):
+        code = dn_to_code.get(dn, str(dn))
+        pos_samples = driver_pos[dn]
+        if not pos_samples:
+            continue
+
+        for lap in raw_laps:
+            lap_num = lap.get("lap_number")
+            date_start = lap.get("date_start")
+            lap_dur = lap.get("lap_duration")
+            if not lap_num or not date_start or not lap_dur:
+                continue
+
+            # Lap sonu timestamp'i yaklaşık hesapla
+            from datetime import datetime, timezone, timedelta
+            try:
+                lap_start_dt = datetime.fromisoformat(date_start.replace("Z", "+00:00"))
+                lap_end_dt = lap_start_dt + timedelta(seconds=float(lap_dur))
+                lap_end_str = lap_end_dt.isoformat()
+            except Exception:
+                continue
+
+            # O ana kadar bilinen son pozisyonu bul
+            pos = None
+            for date_str, p in pos_samples:
+                if date_str <= lap_end_str:
+                    pos = p
+                else:
+                    break
+
+            if pos is not None:
+                result_rows.append({"driver_code": code, "lap_number": lap_num, "position": pos})
+
+    result_rows.sort(key=lambda x: (x["lap_number"], x["position"]))
+    if result_rows:
+        await cache_set(cache_k, result_rows, ttl_seconds=86_400)
+    return result_rows
+
+
 @router.get("/sessions/{session_id}/pit_stops", response_model=list[PitStopOut])
 async def get_pit_stops(session_id: int, db: AsyncSession = Depends(get_db)):
     cache_k = cache_key("pit_stops", session_id)

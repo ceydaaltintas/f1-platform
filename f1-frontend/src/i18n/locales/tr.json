@@ -825,7 +825,7 @@
   },
   "race_position": {
     "title": "YARIŞ POZİSYONU",
-    "subtitle": "Kümülatif tur süresinden tahmini",
+    "subtitle": "FIA timing'den gerçek pozisyon verisi",
     "pit_note": "│ = pit stop tur",
     "loading": "Pozisyon hesaplanıyor..."
   },
