@@ -41,7 +41,7 @@ export function formatGap(gap: number | string | null | undefined, isLeader = fa
 
   const num = typeof gap === 'number' ? gap : parseFloat(s.replace('+', ''))
   if (isNaN(num)) return s
-  if (num === 0) return 'LDR'
+  if (num === 0) return isLeader ? 'LDR' : '—'
 
   const abs  = Math.abs(num)
   const sign = num < 0 ? '-' : '+'

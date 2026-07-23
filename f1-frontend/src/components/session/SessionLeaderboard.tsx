@@ -179,7 +179,7 @@ export function SessionLeaderboard({ sessionId, selectedDriver, onDriverSelect, 
               <div>
                 <span className="text-[12px] mono"
                   style={{ color: i===0 ? 'var(--t3)' : e.status === 'Retired' || e.status === 'Did not start' ? '#f87171' : 'var(--t2)' }}>
-                  {e.gap_str || (i===0 ? 'LDR' : '—')}
+                  {i===0 ? 'LDR' : (e.gap_str && e.gap_str !== 'LDR' ? e.gap_str : '—')}
                 </span>
                 {!isDynamic && e.status && e.status !== 'Finished' && (
                   <p className="text-[9px] mono truncate" style={{ color:'#f87171' }}>{e.status}</p>

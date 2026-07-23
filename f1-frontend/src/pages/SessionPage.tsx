@@ -19,6 +19,10 @@ import { RaceReplay } from '../components/session/RaceReplay'
 import { TyreDegradation } from '../components/analysis/TyreDegradation'
 import { TeammatePace } from '../components/analysis/TeammatePace'
 import { EnergyAnalysis } from '../components/analysis/EnergyAnalysis'
+import { RacePositionChart } from '../components/analysis/RacePositionChart'
+import { LapTimeSparkline } from '../components/analysis/LapTimeSparkline'
+import { PaceGapTimeline } from '../components/analysis/PaceGapTimeline'
+import { SectorPerformanceCard } from '../components/analysis/SectorPerformanceCard'
 import { CHANNELS, COMPOUND_COLORS, SESSION_LABELS, type TelemetryPoint, type SessionType } from '../types/f1'
 import { useTranslation } from 'react-i18next'
 
@@ -164,6 +168,13 @@ export function SessionPage() {
   const [lapA, setLapA] = useState('fastest')
   const [lapB, setLapB] = useState('fastest')
   const [activeTab, setActiveTab] = useState<SessionTab>('telemetry')
+  const [showScrollTop, setShowScrollTop] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 400)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     if (sid) connectCommunity(sid)
@@ -616,27 +627,116 @@ export function SessionPage() {
 
         {/* ── 📋 ANALİZ ────────────────────────────────────── */}
         {activeTab === 'analysis' && <>
-          <CircuitGuide
-            raceName={sessionInfo.data?.round?.name ?? null}
-            raceDate={sessionInfo.data?.round?.race_date ?? null}
-          />
-          <LapSummaryCard
-            lap={telA.data?.lap ?? null}
-            keyMoments={telA.data?.key_moments ?? []}
-            mode={insightMode}
-            driverCode={primaryDriver}
-            compareLap={compareMode ? (telB.data?.lap ?? null) : null}
-            compareDriver={compareMode ? secondaryDriver : undefined}
-            tyreCompound={stintInfo.compound ?? telA.data?.lap?.compound ?? null}
-            tyreAge={tyreAge}
-          />
-          <DriverRaceSummary
-            sessionId={sid}
-            driverCode={primaryDriver}
-            sessionType={sessionInfo.data?.type}
-          />
+          {/* ── Analysis sub-nav ─────────────────────────── */}
+          {(() => {
+            const isRaceLike = ['race','sprint'].includes(sessionInfo.data?.type ?? '')
+            const navItems = [
+              { id: 'analysis-circuit',   label: t('session_page.nav_circuit')   },
+              { id: 'analysis-lap',       label: t('session_page.nav_lap')       },
+              { id: 'analysis-laptime',   label: t('session_page.nav_laptime')  },
+              ...(isRaceLike ? [{ id: 'analysis-race',     label: t('session_page.nav_race')     }] : []),
+              ...(isRaceLike ? [{ id: 'analysis-position', label: t('session_page.nav_position') }] : []),
+              { id: 'analysis-sector',    label: t('session_page.nav_sector') },
+              { id: 'analysis-track',     label: t('session_page.nav_track')     },
+              ...(isRaceLike && sessionDrivers.length >= 2 ? [{ id: 'analysis-energy', label: t('session_page.nav_energy') }] : []),
+              { id: 'analysis-teammate',  label: t('session_page.nav_teammate')  },
+              { id: 'analysis-pacegap',   label: t('session_page.nav_pacegap') },
+              { id: 'analysis-tyredeg',   label: t('session_page.nav_tyredeg')   },
+              ...(isRaceLike ? [{ id: 'analysis-replay', label: t('session_page.nav_replay') }] : []),
+            ]
+            const scrollTo = (id: string) => {
+              const el = document.getElementById(id)
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.scrollY - 130
+                window.scrollTo({ top: y, behavior: 'smooth' })
+              }
+            }
+            return (
+              <div className="relative">
+                {/* Mobilde sağ gradient — daha fazla item olduğunu gösterir */}
+                <div className="sm:hidden absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10"
+                  style={{ background: 'linear-gradient(to right, transparent, var(--bg))' }} />
+                {/* Mobil (<640px): yatay scroll | Geniş: alt satıra geç */}
+                <div
+                  className="flex gap-1.5 py-1 overflow-x-auto sm:overflow-visible sm:flex-wrap"
+                  style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+                >
+                  {navItems.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => scrollTo(item.id)}
+                      className="text-[10px] mono font-semibold px-2.5 py-1 rounded-full transition-all whitespace-nowrap shrink-0"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--b1)', color: 'var(--t3)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,0.1)'; e.currentTarget.style.color='var(--text)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.05)'; e.currentTarget.style.color='var(--t3)' }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          <div id="analysis-circuit" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '100ms', animationFillMode: 'both' }}>
+            <CircuitGuide
+              raceName={sessionInfo.data?.round?.name ?? null}
+              raceDate={sessionInfo.data?.round?.race_date ?? null}
+            />
+          </div>
+          <div id="analysis-laptime" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '130ms', animationFillMode: 'both' }}>
+            <LapTimeSparkline
+              sessionId={sid}
+              primaryDriver={primaryDriver}
+              compareDriver={secondaryDriver}
+              compareMode={compareMode}
+            />
+          </div>
+
+          <div id="analysis-lap" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '160ms', animationFillMode: 'both' }}>
+            <LapSummaryCard
+              lap={telA.data?.lap ?? null}
+              keyMoments={telA.data?.key_moments ?? []}
+              mode={insightMode}
+              driverCode={primaryDriver}
+              compareLap={compareMode ? (telB.data?.lap ?? null) : null}
+              compareDriver={compareMode ? secondaryDriver : undefined}
+              tyreCompound={stintInfo.compound ?? telA.data?.lap?.compound ?? null}
+              tyreAge={tyreAge}
+            />
+          </div>
+          <div id="analysis-race" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '220ms', animationFillMode: 'both' }}>
+            <DriverRaceSummary
+              sessionId={sid}
+              driverCode={primaryDriver}
+              sessionType={sessionInfo.data?.type}
+            />
+          </div>
+
+          {/* Yarış Pozisyon Grafiği — sadece yarış/sprint */}
+          {['race','sprint'].includes(sessionInfo.data?.type ?? '') && (
+            <div id="analysis-position" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '250ms', animationFillMode: 'both' }}>
+              <RacePositionChart
+                sessionId={sid}
+                primaryDriver={primaryDriver}
+                compareDriver={compareMode ? secondaryDriver : undefined}
+                sessionType={sessionInfo.data?.type}
+              />
+            </div>
+          )}
+
+          {/* Sektör Performansı */}
+          <div id="analysis-sector" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '265ms', animationFillMode: 'both' }}>
+            <SectorPerformanceCard
+              sessionId={sid}
+              primaryDriver={primaryDriver}
+              compareDriver={compareMode ? secondaryDriver : undefined}
+              compareMode={compareMode}
+            />
+          </div>
+
           {/* Pist haritası */}
-          <div className="card overflow-hidden">
+          <div id="analysis-track" className="card overflow-hidden animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '280ms', animationFillMode: 'both' }}>
             <div className="px-4 py-3 border-b" style={{ borderColor:'var(--b1)' }}>
               <p className="text-[11px] mono font-semibold tracking-widest" style={{ color:'var(--t3)' }}>{t('session_page.track_map')}</p>
             </div>
@@ -659,52 +759,41 @@ export function SessionPage() {
           </div>
           {/* 2026 Enerji Analizi — sadece yarış / sprint */}
           {sessionDrivers.length >= 2 && ['race','sprint'].includes(sessionInfo.data?.type ?? '') && (
-            <EnergyAnalysis sessionId={sid} sessionDrivers={sessionDrivers} primaryDriver={primaryDriver} sessionName={`${roundName} · ${sessionLabel}`} />
+            <div id="analysis-energy" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '340ms', animationFillMode: 'both' }}>
+              <EnergyAnalysis sessionId={sid} sessionDrivers={sessionDrivers} primaryDriver={primaryDriver} sessionName={`${roundName} · ${sessionLabel}`} />
+            </div>
           )}
 
           {/* Takım Arkadaşı Pace */}
-          <TeammatePace sessionId={sid} />
+          <div id="analysis-teammate" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '400ms', animationFillMode: 'both' }}>
+            <TeammatePace sessionId={sid} />
+          </div>
+
+          {/* Pace Farkı Zaman Çizelgesi */}
+          <div id="analysis-pacegap" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '430ms', animationFillMode: 'both' }}>
+            <PaceGapTimeline
+              sessionId={sid}
+              sessionDrivers={sessionDrivers}
+              primaryDriver={primaryDriver}
+            />
+          </div>
 
           {/* Lastik Degradasyon */}
-          <TyreDegradation sessionId={sid} />
+          <div id="analysis-tyredeg" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '460ms', animationFillMode: 'both' }}>
+            <TyreDegradation sessionId={sid} />
+          </div>
 
           {/* Replay — sadece yarış/sprint oturumlarında */}
           {['race','sprint'].includes(sessionInfo.data?.type ?? '') && (
-            <RaceReplay
-              sessionId={sid}
-              trackPoints={trackMap.data?.points ?? []}
-              sessionDrivers={sessionDrivers}
-            />
-          )}
-
-          {/* Stintler */}
-          {(stints.data?.stints?.length ?? 0) > 0 && (
-            <div className="card p-4">
-              <p className="text-[11px] mono font-semibold tracking-widest mb-4" style={{ color:'var(--t3)' }}>{t('session_page.tyre_stints')}</p>
-              <div className="space-y-2.5 overflow-x-auto">
-                {Object.entries(
-                  (stints.data!.stints as any[]).reduce<Record<string,any[]>>((acc,s) => {
-                    const c = s.driver_code||'?'; if(!acc[c])acc[c]=[]; acc[c].push(s); return acc
-                  }, {})
-                ).map(([code, ds]) => (
-                  <div key={code} className="flex items-center gap-3 min-w-0">
-                    <span className="w-10 shrink-0 text-[13px] font-black mono text-white">{code}</span>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {ds.map((s:any,i:number) => {
-                        const laps=(s.lap_end||0)-(s.lap_start||0)+1
-                        const cmp=(s.compound||'UNKNOWN').toUpperCase()
-                        const col=COMPOUND_COLORS[cmp]??'#888'
-                        return <div key={i} className="rounded-lg text-[10px] mono font-bold text-center py-1.5"
-                          style={{minWidth:`${Math.max(laps*2.5,28)}px`,background:col+'20',border:`1px solid ${col}40`,color:col}}
-                          title={`${cmp}·T${s.lap_start}–${s.lap_end}`}>{cmp[0]}</div>
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] mono mt-3" style={{ color:'var(--t3)' }}>S·M·H·I·W</p>
+            <div id="analysis-replay" className="animate-fade-up" style={{ scrollMarginTop: '120px', animationDelay: '520ms', animationFillMode: 'both' }}>
+              <RaceReplay
+                sessionId={sid}
+                trackPoints={trackMap.data?.points ?? []}
+                sessionDrivers={sessionDrivers}
+              />
             </div>
           )}
+
         </>}
 
         {/* ── 🏆 SIRALAMA ──────────────────────────────────── */}
@@ -731,6 +820,25 @@ export function SessionPage() {
         )}
 
       </div>
+
+      {/* ── Scroll to top butonu ─────────────────────────── */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all"
+          style={{
+            background: 'rgba(5,8,15,0.92)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            color: 'rgba(240,244,255,0.8)',
+            fontSize: 16,
+          }}
+          aria-label="Scroll to top"
+        >
+          ↑
+        </button>
+      )}
 
       <style>{`
         @keyframes bounce-dot {

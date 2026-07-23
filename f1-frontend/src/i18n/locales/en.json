@@ -280,6 +280,15 @@
     "next_badge": "● NEXT"
   },
   "session_page": {
+    "qf_winner": "WINNER",
+    "qf_fastest_lap": "FASTEST LAP",
+    "qf_gap": "GAP P1→P2",
+    "qf_pole": "POLE",
+    "qf_pole_time": "POLE TIME",
+    "qf_fastest": "FASTEST",
+    "qf_gap_p2": "GAP P1→P2",
+    "qf_runners": "RUNNERS",
+    "qf_classified": "classified",
     "home": "Home",
     "comments_tab": "💬 Comments",
     "polls_tab": "📊 Polls",
@@ -310,6 +319,18 @@
     "track_map": "TRACK MAP",
     "track_loading": "Loading track...",
     "tyre_stints": "TYRE STINTS",
+    "nav_circuit": "Circuit Guide",
+    "nav_lap": "Lap Analysis",
+    "nav_laptime": "Lap Timeline",
+    "nav_race": "Race Summary",
+    "nav_position": "Race Position",
+    "nav_sector": "Sector Performance",
+    "nav_track": "Track Map",
+    "nav_energy": "Energy Management",
+    "nav_teammate": "Pace Comparison",
+    "nav_pacegap": "Pace Gap",
+    "nav_tyredeg": "Tyre Degradation",
+    "nav_replay": "Race Replay",
     "mode_simple": "🟢 Simple",
     "mode_expert": "⚡ Expert",
     "coming_soon": "Soon",
@@ -592,7 +613,10 @@
     "stint_details": "STINT DETAILS",
     "tyre_age_old": "{{n}} laps old",
     "lap_range": "Lap {{start}} → {{end}}",
-    "laps_count": "({{n}} laps)"
+    "laps_count": "({{n}} laps)",
+    "avg_lap": "AVG LAP",
+    "fastest": "FASTEST",
+    "tyre_deg_label": "Tyre degradation"
   },
   "tyre_deg": {
     "loading": "Loading tyre data...",
@@ -638,7 +662,8 @@
     "col_gap": "GAP",
     "laps_analyzed": "Laps analyzed",
     "pace_ranking": "PACE RANKING — ALL DRIVERS",
-    "leader": "leader"
+    "leader": "leader",
+    "subtitle_race_note": "Outliers removed (5% low, 15% high) · Fastest lap is real best"
   },
   "energy": {
     "title": "2026 Energy Management",
@@ -792,5 +817,30 @@
     "waiting": "Waiting for radio message...",
     "sec_ago": "{{n}}s ago",
     "min_ago": "{{n}}m ago"
+  },
+  "lap_sparkline": {
+    "title": "LAP TIME EVOLUTION",
+    "subtitle": "Lap time per lap · pit laps hidden",
+    "pit_note": "│ = pit stop lap"
+  },
+  "race_position": {
+    "title": "RACE POSITION",
+    "subtitle": "Estimated from cumulative lap times",
+    "pit_note": "│ = pit stop lap",
+    "loading": "Calculating positions..."
+  },
+  "sector_perf": {
+    "title": "SECTOR PERFORMANCE",
+    "subtitle": "Best sector times · longer bar = faster",
+    "theoretical": "THEORETICAL BEST",
+    "avg": "avg"
+  },
+  "pace_gap": {
+    "title": "PACE GAP TIMELINE",
+    "subtitle": "Lap-by-lap time gap · pit laps excluded",
+    "lap": "Lap {{n}}",
+    "faster": "faster",
+    "slower": "slower",
+    "faster_by": "faster by"
   }
 }

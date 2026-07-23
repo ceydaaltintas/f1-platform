@@ -280,6 +280,15 @@
     "next_badge": "● SIRADAKİ"
   },
   "session_page": {
+    "qf_winner": "KAZANAN",
+    "qf_fastest_lap": "EN HIZLI TUR",
+    "qf_gap": "FARK P1→P2",
+    "qf_pole": "POLE",
+    "qf_pole_time": "POLE ZAMANI",
+    "qf_fastest": "EN HIZLI",
+    "qf_gap_p2": "FARK P1→P2",
+    "qf_runners": "PİLOT SAYISI",
+    "qf_classified": "sınıflandırıldı",
     "home": "Ana Sayfa",
     "comments_tab": "💬 Yorumlar",
     "polls_tab": "📊 Anketler",
@@ -310,6 +319,18 @@
     "track_map": "PİST HARİTASI",
     "track_loading": "Pist yükleniyor...",
     "tyre_stints": "LASTİK STİNTLERİ",
+    "nav_circuit": "Devre Rehberi",
+    "nav_lap": "Tur Analizi",
+    "nav_laptime": "Tur Çizelgesi",
+    "nav_race": "Yarış Özeti",
+    "nav_position": "Yarış Pozisyonu",
+    "nav_sector": "Sektör Performansı",
+    "nav_track": "Pist Haritası",
+    "nav_energy": "Enerji Yönetimi",
+    "nav_teammate": "Pace Karşılaştırması",
+    "nav_pacegap": "Pace Farkı",
+    "nav_tyredeg": "Lastik Degradasyonu",
+    "nav_replay": "Yarış Replay",
     "mode_simple": "🟢 Sade",
     "mode_expert": "⚡ Uzman",
     "coming_soon": "Yakında",
@@ -592,7 +613,10 @@
     "stint_details": "STİNT DETAYLARI",
     "tyre_age_old": "{{n}} tur eski",
     "lap_range": "Tur {{start}} → {{end}}",
-    "laps_count": "({{n}} tur)"
+    "laps_count": "({{n}} tur)",
+    "avg_lap": "ORT. TUR",
+    "fastest": "EN HIZLI",
+    "tyre_deg_label": "Lastik degradasyonu"
   },
   "tyre_deg": {
     "loading": "Lastik verisi yükleniyor...",
@@ -638,7 +662,8 @@
     "col_gap": "FARK",
     "laps_analyzed": "Analiz edilen tur",
     "pace_ranking": "PACE SIRALAMASI — TÜM PİLOTLAR",
-    "leader": "lider"
+    "leader": "lider",
+    "subtitle_race_note": "Aykırı değerler temizlendi (alt %5, üst %15) · En hızlı tur gerçek değerdir"
   },
   "energy": {
     "title": "2026 Enerji Yönetimi",
@@ -792,5 +817,30 @@
     "waiting": "Radyo mesajı bekleniyor...",
     "sec_ago": "{{n}}sn önce",
     "min_ago": "{{n}}dk önce"
+  },
+  "lap_sparkline": {
+    "title": "TUR SÜRESİ EVRİMİ",
+    "subtitle": "Tur başına süre · pit stop turlar gizli",
+    "pit_note": "│ = pit stop tur"
+  },
+  "race_position": {
+    "title": "YARIŞ POZİSYONU",
+    "subtitle": "Kümülatif tur süresinden tahmini",
+    "pit_note": "│ = pit stop tur",
+    "loading": "Pozisyon hesaplanıyor..."
+  },
+  "sector_perf": {
+    "title": "SEKTÖR PERFORMANSI",
+    "subtitle": "En iyi sektör süreleri · uzun bar = hızlı",
+    "theoretical": "TEORİK EN İYİ",
+    "avg": "ort"
+  },
+  "pace_gap": {
+    "title": "PACE FARKI ÇİZELGESİ",
+    "subtitle": "Tur başına süre farkı · pit out turlar hariç",
+    "lap": "Tur {{n}}",
+    "faster": "daha hızlı",
+    "slower": "daha yavaş",
+    "faster_by": "daha hızlı:"
   }
 }

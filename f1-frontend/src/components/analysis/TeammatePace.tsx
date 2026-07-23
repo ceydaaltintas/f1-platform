@@ -225,7 +225,7 @@ export function TeammatePace({ sessionId }: Props) {
             <p className="text-[10px] mono" style={{ color:'var(--t3)' }}>
               {isQuali
                 ? t('teammate_pace.subtitle_quali')
-                : 'Outliers removed (5% low, 15% high) · Fastest lap is real best'}
+                : t('teammate_pace.subtitle_race_note')}
             </p>
           </div>
         </>

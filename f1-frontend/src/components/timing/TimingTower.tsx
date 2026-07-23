@@ -16,12 +16,13 @@ interface Props {
 }
 
 // Formatlar: "+1.234" ya da "+1 LAP"
-function formatGap(gap: string | number | null): string {
-  if (gap === null || gap === undefined) return 'LDR'
+function formatGap(gap: string | number | null, isLeader = false): string {
+  if (isLeader) return 'LDR'
+  if (gap === null || gap === undefined) return '—'
   if (typeof gap === 'string' && gap.includes('LAP')) return gap
   const n = Number(gap)
   if (isNaN(n)) return String(gap)
-  return n === 0 ? 'LDR' : `+${n.toFixed(3)}`
+  return n === 0 ? '—' : `+${n.toFixed(3)}`
 }
 
 function formatInterval(iv: string | number | null): string {
@@ -150,7 +151,7 @@ export function TimingTower({ intervals, drivers, currentLap, totalLaps }: Props
               <span className="text-[10px] font-mono text-right" style={{
                 color: isLeader ? '#E10600' : '#888'
               }}>
-                {formatGap(iv.gap_to_leader)}
+                {formatGap(iv.gap_to_leader, isLeader)}
               </span>
 
               {/* Interval */}

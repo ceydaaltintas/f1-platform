@@ -229,7 +229,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                     <div className="text-right shrink-0">
                       {st.avg_lap_time && (
                         <div className="mb-1">
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>AVG LAP</p>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t('driver_summary.avg_lap')}</p>
                           <p className="text-[14px] font-black mono text-white">
                             {formatLapTime(st.avg_lap_time)}
                           </p>
@@ -237,7 +237,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                       )}
                       {st.fastest_lap_time && (
                         <div>
-                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>FASTEST</p>
+                          <p className="text-[9px] mono" style={{ color:'var(--t3)' }}>{t('driver_summary.fastest')}</p>
                           <p className="text-[12px] font-bold mono"
                             style={{ color: isFastest ? '#c084fc' : 'var(--t2)' }}>
                             {formatLapTime(st.fastest_lap_time)}
@@ -251,7 +251,7 @@ export function DriverRaceSummary({ sessionId, driverCode, sessionType }: Props)
                   {st.avg_lap_time && st.fastest_lap_time && (
                     <div className="mt-2.5 pt-2.5 border-t" style={{ borderColor:'rgba(255,255,255,0.06)' }}>
                       <div className="flex items-center justify-between text-[10px] mono">
-                        <span style={{ color:'var(--t3)' }}>Tyre degradation</span>
+                        <span style={{ color:'var(--t3)' }}>{t('driver_summary.tyre_deg_label')}</span>
                         <span style={{ color: st.avg_lap_time - st.fastest_lap_time > 1.5 ? '#f87171' : 'var(--t2)' }}>
                           {t('driver_summary.avg_loss', { n: (st.avg_lap_time - st.fastest_lap_time).toFixed(2) })}
                         </span>
