@@ -279,7 +279,7 @@ async def _groq_interpret(content: str, system: str) -> str:
     client = AsyncGroq(api_key=settings.groq_api_key)
     resp = await client.chat.completions.create(
         # 70b model — 8b-instant'tan çok daha akıcı Türkçe üretiyor
-        model="llama-3.3-70b-versatile",
+        model="llama-3.1-70b-versatile",
         max_tokens=1024,
         # Düşük temperature — yüksek değerlerde model bazen yabancı dilden
         # kelime/karakter sızdırıyor (örn. "tốcaklık", "jeszcze")
