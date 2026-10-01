@@ -177,6 +177,7 @@ const FLAG: Record<string, string> = {
   Spain:'🇪🇸', Austria:'🇦🇹', 'Great Britain':'🇬🇧', Hungary:'🇭🇺',
   Belgium:'🇧🇪', Netherlands:'🇳🇱', Italy:'🇮🇹', Azerbaijan:'🇦🇿',
   Singapore:'🇸🇬', Mexico:'🇲🇽', Brazil:'🇧🇷', Qatar:'🇶🇦', 'Abu Dhabi':'🇦🇪',
+  UK:'🇬🇧', Malaysia:'🇲🇾', UAE:'🇦🇪',
 }
 
 export function HomePage() {

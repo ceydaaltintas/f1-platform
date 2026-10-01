@@ -59,12 +59,16 @@ export function OnboardingOverlay() {
   return (
     <div
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(5,8,20,0.80)', backdropFilter: 'blur(6px)' }}
       onClick={dismiss}
     >
       <div
-        className="w-full max-w-md mx-4 mb-8 md:mb-0 bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl p-6"
-        style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+        className="w-full max-w-md mx-4 mb-8 md:mb-0 rounded-2xl p-6"
+        style={{
+          background: 'var(--s2)',
+          border: '1px solid var(--b2)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+        }}
         onClick={e => e.stopPropagation()}
       >
         {/* Adım göstergesi */}
@@ -72,28 +76,37 @@ export function OnboardingOverlay() {
           {STEPS.map((_, i) => (
             <div key={i}
               className="h-0.5 flex-1 rounded-full transition-colors duration-300"
-              style={{ background: i <= step ? '#E10600' : '#1a1a1a' }}
+              style={{ background: i <= step ? '#E10600' : 'var(--b2)' }}
             />
           ))}
         </div>
 
-        <p className="text-[10px] text-[#E10600]/60 tracking-widest mb-2">
+        <p className="mono text-[10px] tracking-widest mb-2" style={{ color: 'rgba(225,6,0,0.7)' }}>
           {t('onboarding.step_indicator', { n: step + 1, total: STEPS.length })}
         </p>
-        <h2 className="text-lg font-semibold text-white mb-3 leading-tight">
+        <h2 className="text-[18px] font-bold text-white mb-3 leading-tight">
           {current.title}
         </h2>
-        <p className="text-[13px] text-[#555] leading-relaxed mb-6">
+        <p className="text-[14px] leading-relaxed mb-6" style={{ color: 'var(--t2)' }}>
           {current.desc}
         </p>
 
         <div className="flex justify-between items-center">
-          <button onClick={dismiss} className="text-[11px] text-[#2a2a2a] hover:text-[#444] transition-colors">
+          <button
+            onClick={dismiss}
+            className="text-[13px] transition-colors"
+            style={{ color: 'var(--t3)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--t2)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--t3)')}
+          >
             {t('onboarding.skip')}
           </button>
           <button
             onClick={next}
-            className="px-5 py-2 text-[11px] bg-[#E10600] text-white rounded-lg font-semibold tracking-wide hover:bg-[#c00500] transition-colors"
+            className="px-5 py-2 text-[13px] font-semibold rounded-xl transition-all"
+            style={{ background: '#E10600', color: 'white' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#c00500')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#E10600')}
           >
             {current.action}
           </button>

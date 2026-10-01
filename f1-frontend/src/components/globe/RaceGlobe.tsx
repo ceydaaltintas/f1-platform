@@ -20,6 +20,7 @@ const CIRCUIT_COORDS: Record<string, [number, number]> = {
   'Chinese Grand Prix':            [ 31.34, 121.22],
   'Japanese Grand Prix':           [ 34.84, 136.54],
   'Bahrain Grand Prix':            [ 26.03,  50.51],
+  'Bahrain Grand Prix in Malaysia': [  2.76, 101.74],
   'Saudi Arabian Grand Prix':      [ 21.63,  39.10],
   'Miami Grand Prix':              [ 25.96, -80.24],
   'Canadian Grand Prix':           [ 45.50, -73.52],

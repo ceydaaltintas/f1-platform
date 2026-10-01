@@ -13,7 +13,7 @@ const FLAG: Record<string, string> = {
   Spain:'🇪🇸', Austria:'🇦🇹', 'Great Britain':'🇬🇧', Hungary:'🇭🇺',
   Belgium:'🇧🇪', Netherlands:'🇳🇱', Italy:'🇮🇹', Azerbaijan:'🇦🇿',
   Singapore:'🇸🇬', Mexico:'🇲🇽', Brazil:'🇧🇷', Qatar:'🇶🇦', 'Abu Dhabi':'🇦🇪',
-  UK:'🇬🇧',
+  UK:'🇬🇧', Malaysia:'🇲🇾', UAE:'🇦🇪',
 }
 
 function formatDate(d: string|null, locale = 'tr-TR') {
@@ -97,24 +97,32 @@ function RoundCard({ round, index, highlight }: { round: Round; index: number; h
           {round.sessions.map(s => {
             const isFinished = s.status === 'finished'
             const isActive   = s.status === 'active'
-            return (
-              <Link
-                key={s.id}
-                to={isActive ? `/live/${s.id}` : `/session/${s.id}`}
-                className="text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
-                style={{
-                  background: isActive ? 'rgba(225,6,0,0.12)' : isFinished
-                    ? 'rgba(255,255,255,0.04)' : 'transparent',
-                  borderColor: isActive ? 'rgba(225,6,0,0.5)' : isFinished
-                    ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)',
-                  color: isActive ? '#E10600' : isFinished
-                    ? 'rgba(240,244,255,0.6)' : 'rgba(240,244,255,0.25)',
-                }}>
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />
-                )}
+            const isUpcoming = !isFinished && !isActive
+            const sharedStyle = {
+              background: isActive ? 'rgba(225,6,0,0.12)' : isFinished
+                ? 'rgba(255,255,255,0.04)' : 'transparent',
+              borderColor: isActive ? 'rgba(225,6,0,0.5)' : isFinished
+                ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+              color: isActive ? '#E10600' : isFinished
+                ? 'var(--t2)' : 'rgba(240,244,255,0.28)',
+              cursor: isUpcoming ? 'default' : 'pointer',
+            }
+            const sharedClass = "text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
+            const content = (
+              <>
+                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />}
                 {SESSION_LABELS[s.type as SessionType] ?? s.type}
                 {isActive && <span className="text-[9px] font-bold ml-0.5">{t('season_page.live_in_session')}</span>}
+              </>
+            )
+            return isUpcoming ? (
+              <span key={s.id} className={sharedClass} style={sharedStyle}>
+                {content}
+              </span>
+            ) : (
+              <Link key={s.id} to={isActive ? `/live/${s.id}` : `/session/${s.id}`}
+                className={sharedClass} style={sharedStyle}>
+                {content}
               </Link>
             )
           })}
