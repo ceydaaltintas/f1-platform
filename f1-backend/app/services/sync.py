@@ -277,8 +277,10 @@ async def sync_sessions_for_round(round_: Round, year: int, db: AsyncSession) ->
         else:
             existing.session_key = session_key
             existing.session_date = session_date
-            # Aktif oturumu ezme; sadece upcoming/finished arasında güncelle
-            if existing.status != "active":
+            # Aktif oturumu ezme — ama tarih geçmişse "active" takılıp kalmasın
+            if existing.status == "active" and resolved_status == "finished":
+                existing.status = "finished"
+            elif existing.status != "active":
                 existing.status = resolved_status
             session_obj = existing
 
