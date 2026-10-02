@@ -98,6 +98,27 @@ async def sync_season_endpoint(year: int, db: AsyncSession = Depends(get_db)):
     return {"message": f"{year} sezonu senkronize edildi", "stats": result}
 
 
+@router.post("/seasons/{year}/rounds/{round_number}/reset_meeting", status_code=200)
+async def reset_round_meeting_key(year: int, round_number: int, db: AsyncSession = Depends(get_db)):
+    """Round'un meeting_key'ini sıfırlar ve session'ları temizler (yanlış eşleşme düzeltmek için)."""
+    from app.models.f1 import Session as SessionModel
+    season = (await db.execute(select(Season).where(Season.year == year))).scalar_one_or_none()
+    if season is None:
+        raise HTTPException(404, f"{year} sezonu bulunamadı")
+    rnd = (await db.execute(
+        select(Round).where(Round.season_id == season.id, Round.round_number == round_number)
+    )).scalar_one_or_none()
+    if rnd is None:
+        raise HTTPException(404, f"Round {round_number} bulunamadı")
+    old_key = rnd.meeting_key
+    rnd.meeting_key = None
+    await db.execute(
+        __import__("sqlalchemy", fromlist=["delete"]).delete(SessionModel).where(SessionModel.round_id == rnd.id)
+    )
+    await db.commit()
+    return {"round": round_number, "old_meeting_key": old_key, "status": "reset"}
+
+
 @router.post("/seasons/{year}/rounds/{round_number}/sync_sessions", status_code=202)
 async def sync_round_sessions_endpoint(year: int, round_number: int, db: AsyncSession = Depends(get_db)):
     """
