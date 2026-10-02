@@ -196,27 +196,54 @@ async def sync_sessions_for_round(round_: Round, year: int, db: AsyncSession) ->
 
     # Meeting key bulunamazsa OpenF1'den bul
     if round_.meeting_key is None:
+        from datetime import timedelta
         meetings = await openf1.fetch_meetings(year)
+
+        # Tüm meeting'lerin tarihlerini parse et
+        def _meeting_date(m: dict):
+            ds = m.get("date_start", "")[:10]
+            try:
+                return date.fromisoformat(ds)
+            except (ValueError, AttributeError):
+                return None
+
+        # Tarih yakınlığı: round race_date ±14 gün içindeki meeting'ler
+        def _date_ok(m: dict) -> bool:
+            if round_.race_date is None:
+                return True
+            md = _meeting_date(m)
+            return md is not None and abs((md - round_.race_date).days) <= 14
+
+        found = None
+        # 1. meeting_number eşleşmesi
         for m in meetings:
-            # Önce meeting_number ile dene (bazı yıllarda dolu olur)
-            if m.get("meeting_number") and m.get("meeting_number") == round_.round_number:
-                round_.meeting_key = m["meeting_key"]
-                await db.flush()
+            if m.get("meeting_number") and m.get("meeting_number") == round_.round_number and _date_ok(m):
+                found = m
                 break
-            # meeting_name eşleştirmesi (2026 gibi meeting_number boş olan yıllar için)
-            m_name = (m.get("meeting_name") or "").lower().strip()
-            r_name = (round_.name or "").lower().strip()
-            if m_name and r_name and (m_name in r_name or r_name in m_name):
-                round_.meeting_key = m["meeting_key"]
-                await db.flush()
-                break
-            # circuit_short_name ↔ locality eşleştirmesi (fallback)
-            m_circuit = (m.get("circuit_short_name") or "").lower().strip()
+
+        # 2. circuit_short_name ↔ locality (tarih filtreli)
+        if found is None:
             r_locality = (round_.locality or "").lower().strip()
-            if m_circuit and r_locality and m_circuit in r_locality:
-                round_.meeting_key = m["meeting_key"]
-                await db.flush()
-                break
+            for m in meetings:
+                m_circuit = (m.get("circuit_short_name") or "").lower().strip()
+                if m_circuit and r_locality and m_circuit in r_locality and _date_ok(m):
+                    found = m
+                    break
+
+        # 3. İsim eşleşmesi — yalnızca tarih filtreli meeting'ler arasında
+        if found is None:
+            r_name = (round_.name or "").lower().strip()
+            for m in meetings:
+                if not _date_ok(m):
+                    continue
+                m_name = (m.get("meeting_name") or "").lower().strip()
+                if m_name and r_name and (m_name in r_name or r_name in m_name):
+                    found = m
+                    break
+
+        if found is not None:
+            round_.meeting_key = found["meeting_key"]
+            await db.flush()
 
     if round_.meeting_key is None:
         logger.warning("Round %d için meeting_key bulunamadı, session sync atlanıyor", round_.round_number)
