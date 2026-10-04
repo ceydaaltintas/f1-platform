@@ -1076,6 +1076,14 @@ async def get_driver_summary(
     return result
 
 
+@router.post("/{session_id}/leaderboard/invalidate")
+async def invalidate_leaderboard_cache(session_id: int):
+    """Leaderboard cache'ini temizler (yarış sonrası yeniden çekmek için)."""
+    from app.core.redis_client import cache_delete_pattern
+    await cache_delete_pattern(f"leaderboard:{session_id}:*")
+    return {"status": "invalidated", "session_id": session_id}
+
+
 @router.get("/{session_id}/leaderboard")
 async def get_leaderboard(
     session_id: int,
