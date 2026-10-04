@@ -245,13 +245,14 @@ async def get_next_round(year: int, db: AsyncSession = Depends(get_db)):
 
     today = date.today()
 
-    # Önce "upcoming" işaretli ama tarihi geçmiş round'ları düzelt (Celery beat
-    # geciktiyse veya çalışmadıysa DB stale kalabilir)
+    # Önce "upcoming" işaretli ama tarihi geçmiş round'ları düzelt.
+    # race_date + 1 gün buffer: yağmur/red flag yüzünden ertesi güne sarkabilir.
+    from datetime import timedelta
     stale_result = await db.execute(
         select(Round).where(
             Round.season_id == season.id,
             Round.round_status == "upcoming",
-            Round.race_date < today,
+            Round.race_date < today - timedelta(days=1),
         )
     )
     stale_rounds = stale_result.scalars().all()

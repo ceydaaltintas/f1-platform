@@ -261,18 +261,35 @@ async def sync_sessions_for_round(round_: Round, year: int, db: AsyncSession) ->
 
         session_key = raw.get("session_key")
         date_start_str = raw.get("date_start")
+        date_end_str = raw.get("date_end")
         session_date = None
+        date_end = None
         if date_start_str:
             try:
                 from datetime import datetime, timezone
                 session_date = datetime.fromisoformat(date_start_str.replace("Z", "+00:00"))
             except (ValueError, AttributeError):
                 pass
+        if date_end_str:
+            try:
+                from datetime import datetime, timezone
+                date_end = datetime.fromisoformat(date_end_str.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                pass
 
-        # Tarihe göre gerçek durum: gelecekte ise upcoming, geçtiyse finished
+        # OpenF1'in date_end'i varsa ve geçmişte → finished (yağmur/red flag gecikmelerini doğru yakalar)
+        # date_end yoksa henüz bitmemiş demektir → upcoming/active
         from datetime import datetime, timezone
         now_utc = datetime.now(timezone.utc)
-        resolved_status = "finished" if (session_date and session_date < now_utc) else "upcoming"
+        if date_end and date_end < now_utc:
+            resolved_status = "finished"
+        elif session_date and session_date > now_utc:
+            resolved_status = "upcoming"
+        elif date_end is None and session_date and session_date < now_utc:
+            # date_start geçti ama date_end yok → muhtemelen hâlâ devam ediyor
+            resolved_status = "upcoming"
+        else:
+            resolved_status = "upcoming"
 
         # session_key varsa önce ara, yoksa round+type ile bul
         result = await db.execute(
