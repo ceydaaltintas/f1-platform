@@ -190,6 +190,18 @@ async def list_rounds(
     result = await db.execute(query)
     rounds = result.scalars().all()
 
+    # Round-level stale check: race_date geçmişse "completed"'a düşür
+    stale_rounds = [r for r in rounds if r.round_status == "upcoming" and r.race_date and r.race_date < date.today()]
+    if stale_rounds:
+        for r in stale_rounds:
+            r.round_status = "completed"
+        await db.commit()
+        logger.info("%d stale round 'completed' olarak güncellendi", len(stale_rounds))
+        await cache_delete_pattern(f"rounds:{year}:*")
+        # Güncel veriyle tekrar çek
+        result2 = await db.execute(query)
+        rounds = result2.scalars().all()
+
     # Geçmiş tarihli "upcoming" session'ları kontrol et.
     # session_key varsa OpenF1'den gerçek durumu sor; yoksa 4 saat tamponla kapat.
     now = datetime.now(timezone.utc)
