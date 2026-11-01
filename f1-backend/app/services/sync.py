@@ -32,7 +32,7 @@ def _round_status(race_date: date | None) -> str:
     """Yarış tarihi bugünden önceyse completed, değilse upcoming."""
     if race_date is None:
         return "upcoming"
-    return "completed" if race_date <= date.today() else "upcoming"
+    return "completed" if race_date < date.today() else "upcoming"
 
 
 async def sync_season(year: int, db: AsyncSession) -> Season:
