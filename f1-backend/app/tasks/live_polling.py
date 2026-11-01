@@ -73,19 +73,21 @@ async def _poll_async() -> dict:
                     sa_select(SessionModel).where(SessionModel.session_key == session_key)
                 )
                 sess_obj = sess_res.scalar_one_or_none()
-                if sess_obj and sess_obj.type in ("race", "sprint"):
+                if sess_obj:
                     sess_obj.status = "finished"
                     await db.commit()
-                    round_obj = await db.get(
-                        __import__("app.models.f1", fromlist=["Round"]).Round, sess_obj.round_id
-                    )
-                    year = active.get("year", 2026)
-                    await sync_sessions_for_round(round_obj, year, db)
-                    await db_cache.sync_session(sess_obj, db)
-                    await db.commit()
-                    logger.info("Post-race lap sync tamamlandı: sk=%d", session_key)
+                    # Yarış/sprint bitince tam lap verisini da çek
+                    if sess_obj.type in ("race", "sprint"):
+                        round_obj = await db.get(
+                            __import__("app.models.f1", fromlist=["Round"]).Round, sess_obj.round_id
+                        )
+                        year = active.get("year", 2026)
+                        await sync_sessions_for_round(round_obj, year, db)
+                        await db_cache.sync_session(sess_obj, db)
+                        await db.commit()
+                        logger.info("Post-race lap sync tamamlandı: sk=%d", session_key)
         except Exception as exc:
-            logger.warning("Post-race lap sync hatası: %s", exc)
+            logger.warning("Post-session status güncelleme hatası: %s", exc)
         return {"status": "session_finished", "session_key": session_key}
 
     base = settings.openf1_base_url

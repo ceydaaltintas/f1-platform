@@ -207,7 +207,7 @@ async def list_rounds(
     now = datetime.now(timezone.utc)
     candidates_result = await db.execute(
         select(Session).where(
-            Session.status == "upcoming",
+            Session.status.in_(["upcoming", "active"]),
             Session.session_date < now,
             Session.round_id.in_([r.id for r in rounds]),
         )
