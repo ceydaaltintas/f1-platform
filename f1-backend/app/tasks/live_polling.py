@@ -12,7 +12,7 @@ Celery beat tarafından her 4 saniyede tetiklenir.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.tasks.celery_app import celery_app
 
@@ -235,6 +235,45 @@ async def _poll_async() -> dict:
                     results["radio"] = len(recent_radio)
         except Exception as e:
             logger.warning("Radyo polling hatası: %s", e)
+
+        # ── 5. Araba Telemetrisi (hız, gaz, fren, DRS, vites, RPM) ─────────
+        try:
+            since = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+            resp = await client.get(
+                f"{base}/car_data",
+                params={"session_key": session_key, "date>": since},
+            )
+            if resp.status_code == 200:
+                car_raw = resp.json()
+                # Her pilot için en son veri noktası
+                latest_car: dict[int, dict] = {}
+                for pt in car_raw:
+                    dn = pt.get("driver_number")
+                    if dn is not None:
+                        prev = latest_car.get(dn)
+                        if prev is None or (pt.get("date") or "") > (prev.get("date") or ""):
+                            latest_car[dn] = pt
+
+                if latest_car:
+                    payload = {
+                        "drivers": {
+                            str(dn): {
+                                "speed":    pt.get("speed"),
+                                "throttle": pt.get("throttle"),
+                                "brake":    pt.get("brake"),
+                                "drs":      pt.get("drs"),
+                                "n_gear":   pt.get("n_gear"),
+                                "rpm":      pt.get("rpm"),
+                                "date":     pt.get("date"),
+                            }
+                            for dn, pt in latest_car.items()
+                        }
+                    }
+                    await save_live_snapshot(session_key, "car_data", payload)
+                    await publish(session_key, "car_data", payload)
+                    results["car_data"] = len(latest_car)
+        except Exception as e:
+            logger.warning("Car data polling hatası: %s", e)
 
     logger.debug("Poll tamamlandı sk=%d: %s", session_key, results)
     return {"session_key": session_key, "status": "ok", **results}
