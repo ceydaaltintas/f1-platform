@@ -221,12 +221,19 @@ async def sync_sessions_for_round(round_: Round, year: int, db: AsyncSession) ->
                 found = m
                 break
 
-        # 2. circuit_short_name ↔ locality (tarih filtreli)
+        # 2. locality eşleşmesi: circuit_short_name veya location alanı (tarih filtreli)
         if found is None:
             r_locality = (round_.locality or "").lower().strip()
             for m in meetings:
-                m_circuit = (m.get("circuit_short_name") or "").lower().strip()
-                if m_circuit and r_locality and m_circuit in r_locality and _date_ok(m):
+                if not _date_ok(m):
+                    continue
+                m_circuit  = (m.get("circuit_short_name") or "").lower().strip()
+                m_location = (m.get("location") or "").lower().strip()
+                if r_locality and (
+                    (m_circuit and m_circuit in r_locality) or
+                    (m_location and m_location in r_locality) or
+                    (m_location and r_locality in m_location)
+                ):
                     found = m
                     break
 
