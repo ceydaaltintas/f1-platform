@@ -243,16 +243,22 @@ async def _poll_async() -> dict:
                 f"{base}/car_data",
                 params={"session_key": session_key, "date>": since},
             )
+            logger.info("Car data response: status=%d sk=%d", resp.status_code, session_key)
             if resp.status_code == 200:
                 car_raw = resp.json()
+                if not isinstance(car_raw, list):
+                    logger.warning("Car data beklenmedik format (list değil): %s", str(car_raw)[:200])
+                else:
+                    logger.info("Car data points alındı: %d", len(car_raw))
                 # Her pilot için en son veri noktası
                 latest_car: dict[int, dict] = {}
-                for pt in car_raw:
-                    dn = pt.get("driver_number")
-                    if dn is not None:
-                        prev = latest_car.get(dn)
-                        if prev is None or (pt.get("date") or "") > (prev.get("date") or ""):
-                            latest_car[dn] = pt
+                if isinstance(car_raw, list):
+                    for pt in car_raw:
+                        dn = pt.get("driver_number")
+                        if dn is not None:
+                            prev = latest_car.get(dn)
+                            if prev is None or (pt.get("date") or "") > (prev.get("date") or ""):
+                                latest_car[dn] = pt
 
                 if latest_car:
                     payload = {
