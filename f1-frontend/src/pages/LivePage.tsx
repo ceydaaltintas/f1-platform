@@ -647,13 +647,14 @@ export function LivePage() {
           {/* Canlı Telemetri */}
           {(() => {
             const driverCode = selectedDriver ?? entries[0]?.code
-            if (!driverCode || !carData.data?.drivers) return null
+            if (!driverCode) return null
             const entry = entries.find((e: any) => e.code === driverCode)
             const driverNum = entry?.driver_number
-            const cd = driverNum ? carData.data.drivers[String(driverNum)] : null
-            if (!cd) return null
+            const cd = (carData.data?.drivers && driverNum != null)
+              ? carData.data.drivers[String(driverNum)]
+              : null
             const color = entry?.team_colour ?? '#888'
-            const drsOn = cd.drs != null && cd.drs >= 10
+            const drsOn = cd?.drs != null && cd.drs >= 10
             return (
               <div className="card overflow-hidden">
                 <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--b1)' }}>
@@ -662,64 +663,74 @@ export function LivePage() {
                     <p className="text-[13px] font-bold text-white">{driverCode} — Telemetri</p>
                   </div>
                   <span className="text-[10px] mono" style={{ color: 'var(--t3)' }}>
-                    {selectedDriver ? 'Sürücüye tıkla · seçimi kaldır' : 'Sıradan sürücü seç'}
+                    {selectedDriver ? 'Tekrar tıkla · seçimi kaldır' : 'Sıradan sürücü seç'}
                   </span>
                 </div>
-                <div className="px-5 py-4 space-y-3">
-                  {/* Hız */}
-                  <div>
-                    <div className="flex justify-between text-[11px] mono mb-1">
-                      <span style={{ color: 'var(--t2)' }}>HIZ</span>
-                      <span className="text-white font-bold">{cd.speed ?? '—'} km/h</span>
+                {!cd ? (
+                  <div className="px-5 py-5 text-center">
+                    <p className="text-[12px]" style={{ color: 'var(--t3)' }}>
+                      {carData.isLoading || carData.isFetching
+                        ? 'Telemetri bağlanıyor…'
+                        : 'Telemetri verisi henüz yok'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="px-5 py-4 space-y-3">
+                    {/* Hız */}
+                    <div>
+                      <div className="flex justify-between text-[11px] mono mb-1">
+                        <span style={{ color: 'var(--t2)' }}>HIZ</span>
+                        <span className="text-white font-bold">{cd.speed ?? '—'} km/h</span>
+                      </div>
+                      <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <div className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min((cd.speed ?? 0) / 360 * 100, 100)}%`, background: '#00D2BE' }} />
+                      </div>
                     </div>
-                    <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                      <div className="h-full rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min((cd.speed ?? 0) / 360 * 100, 100)}%`, background: '#00D2BE' }} />
+                    {/* Gaz */}
+                    <div>
+                      <div className="flex justify-between text-[11px] mono mb-1">
+                        <span style={{ color: 'var(--t2)' }}>GAZ</span>
+                        <span className="text-white font-bold">{cd.throttle ?? '—'}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <div className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${cd.throttle ?? 0}%`, background: '#00C851' }} />
+                      </div>
+                    </div>
+                    {/* Fren */}
+                    <div>
+                      <div className="flex justify-between text-[11px] mono mb-1">
+                        <span style={{ color: 'var(--t2)' }}>FREN</span>
+                        <span className="text-white font-bold">{cd.brake ?? '—'}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <div className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${cd.brake ?? 0}%`, background: '#E10600' }} />
+                      </div>
+                    </div>
+                    {/* Vites · RPM · DRS */}
+                    <div className="flex gap-3 pt-1">
+                      <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>VİTES</p>
+                        <p className="text-[20px] font-black text-white mono">{cd.n_gear ?? '—'}</p>
+                      </div>
+                      <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>RPM</p>
+                        <p className="text-[14px] font-black text-white mono">{cd.rpm?.toLocaleString() ?? '—'}</p>
+                      </div>
+                      <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{
+                        background: drsOn ? 'rgba(0,210,190,0.12)' : 'rgba(255,255,255,0.05)',
+                        border: drsOn ? '1px solid rgba(0,210,190,0.3)' : '1px solid transparent',
+                      }}>
+                        <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>DRS</p>
+                        <p className="text-[14px] font-black mono" style={{ color: drsOn ? '#00D2BE' : 'rgba(255,255,255,0.3)' }}>
+                          {drsOn ? 'AÇ' : 'KAPALI'}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  {/* Gaz */}
-                  <div>
-                    <div className="flex justify-between text-[11px] mono mb-1">
-                      <span style={{ color: 'var(--t2)' }}>GAZ</span>
-                      <span className="text-white font-bold">{cd.throttle ?? '—'}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                      <div className="h-full rounded-full transition-all duration-300"
-                        style={{ width: `${cd.throttle ?? 0}%`, background: '#00C851' }} />
-                    </div>
-                  </div>
-                  {/* Fren */}
-                  <div>
-                    <div className="flex justify-between text-[11px] mono mb-1">
-                      <span style={{ color: 'var(--t2)' }}>FREN</span>
-                      <span className="text-white font-bold">{cd.brake ?? '—'}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                      <div className="h-full rounded-full transition-all duration-300"
-                        style={{ width: `${cd.brake ?? 0}%`, background: '#E10600' }} />
-                    </div>
-                  </div>
-                  {/* Vites · RPM · DRS */}
-                  <div className="flex gap-3 pt-1">
-                    <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>VİTES</p>
-                      <p className="text-[20px] font-black text-white mono">{cd.n_gear ?? '—'}</p>
-                    </div>
-                    <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>RPM</p>
-                      <p className="text-[14px] font-black text-white mono">{cd.rpm?.toLocaleString() ?? '—'}</p>
-                    </div>
-                    <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{
-                      background: drsOn ? 'rgba(0,210,190,0.12)' : 'rgba(255,255,255,0.05)',
-                      border: drsOn ? '1px solid rgba(0,210,190,0.3)' : '1px solid transparent',
-                    }}>
-                      <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>DRS</p>
-                      <p className="text-[14px] font-black mono" style={{ color: drsOn ? '#00D2BE' : 'rgba(255,255,255,0.3)' }}>
-                        {drsOn ? 'AÇ' : 'KAPALI'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             )
           })()}
