@@ -238,7 +238,7 @@ async def _poll_async() -> dict:
 
         # ── 5. Araba Telemetrisi (hız, gaz, fren, DRS, vites, RPM) ─────────
         try:
-            since = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+            since = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
             resp = await client.get(
                 f"{base}/car_data",
                 params={"session_key": session_key, "date>": since},

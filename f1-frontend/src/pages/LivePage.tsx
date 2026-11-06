@@ -156,6 +156,7 @@ export function LivePage() {
     queryFn:  () => client.get(`/live/${effectiveSid}/snapshot/car_data`).then(r => r.data),
     refetchInterval: 4_000,
     staleTime: 0,
+    retry: false,
     enabled: !isDemo && !!effectiveSid && !isNaN(effectiveSid),
   })
 

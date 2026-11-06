@@ -482,10 +482,10 @@ async def get_snapshot(session_id: int, kind: str):
 
     snapshot = await get_live_snapshot(active["session_key"], kind)
     if snapshot is None:
+        # car_data için boş yapı dön (404 log spam'i önler)
+        if kind == "car_data":
+            return {"drivers": {}}
         raise HTTPException(404, f"'{kind}' verisi henüz yok")
-    return snapshot
-
-
     return snapshot
 
 
