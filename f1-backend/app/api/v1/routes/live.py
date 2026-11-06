@@ -482,11 +482,68 @@ async def get_snapshot(session_id: int, kind: str):
 
     snapshot = await get_live_snapshot(active["session_key"], kind)
     if snapshot is None:
-        # car_data için boş yapı dön (404 log spam'i önler)
-        if kind == "car_data":
-            return {"drivers": {}}
         raise HTTPException(404, f"'{kind}' verisi henüz yok")
     return snapshot
+
+
+@router.get("/{session_id}/car_data")
+async def get_live_car_data(session_id: int):
+    """Anlık araba telemetrisi — Celery'siz, doğrudan OpenF1'den çeker.
+    positions_map ile aynı yaklaşım: 3s cache + direkt API çağrısı."""
+    active = await get_active_session()
+    if active is None or active.get("session_id") != session_id:
+        return {"drivers": {}}
+
+    session_key = active["session_key"]
+    ck = cache_key("live_car_data", session_id)
+    cached = await cache_get(ck)
+    if cached:
+        return cached
+
+    since = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    try:
+        headers = await openf1._auth_headers()
+        import httpx
+        async with httpx.AsyncClient(timeout=8, headers=headers) as client:
+            resp = await client.get(
+                f"{openf1.BASE_URL}/car_data",
+                params={"session_key": session_key, "date>": since},
+            )
+        if resp.status_code != 200:
+            logger.warning("car_data OpenF1 hatası: status=%d", resp.status_code)
+            return {"drivers": {}}
+        car_raw = resp.json()
+        if not isinstance(car_raw, list):
+            return {"drivers": {}}
+    except Exception as e:
+        logger.warning("car_data çekilemedi: %s", e)
+        return {"drivers": {}}
+
+    latest: dict[int, dict] = {}
+    for pt in car_raw:
+        dn = pt.get("driver_number")
+        if dn is None:
+            continue
+        prev = latest.get(dn)
+        if prev is None or (pt.get("date") or "") > (prev.get("date") or ""):
+            latest[dn] = pt
+
+    payload = {
+        "drivers": {
+            str(dn): {
+                "speed":    pt.get("speed"),
+                "throttle": pt.get("throttle"),
+                "brake":    pt.get("brake"),
+                "drs":      pt.get("drs"),
+                "n_gear":   pt.get("n_gear"),
+                "rpm":      pt.get("rpm"),
+                "date":     pt.get("date"),
+            }
+            for dn, pt in latest.items()
+        }
+    }
+    await cache_set(ck, payload, ttl_seconds=3)
+    return payload
 
 
 # ─── Polling tabanlı canlı veri endpoint'leri ────────────────────────────────
