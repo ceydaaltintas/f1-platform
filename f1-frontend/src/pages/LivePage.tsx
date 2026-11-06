@@ -157,7 +157,7 @@ export function LivePage() {
     refetchInterval: 4_000,
     staleTime: 0,
     retry: false,
-    enabled: !isDemo && !!effectiveSid && !isNaN(effectiveSid),
+    enabled: !isDemo && !!effectiveSid && !isNaN(effectiveSid) && !!selectedDriver,
   })
 
   // SSE yorumu — sadece gerçek yarış modunda
@@ -647,7 +647,7 @@ export function LivePage() {
 
           {/* Canlı Telemetri */}
           {(() => {
-            const driverCode = selectedDriver ?? entries[0]?.code
+            const driverCode = selectedDriver
             if (!driverCode) return null
             const entry = entries.find((e: any) => e.code === driverCode)
             const driverNum = entry?.driver_number
