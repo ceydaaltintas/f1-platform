@@ -17,6 +17,7 @@ interface Props {
   compareLabel?: string
   showCorners?: boolean
   height?: number
+  selectedCode?: string
 }
 
 type Pt = { x: number; y: number }
@@ -90,6 +91,7 @@ export function TrackMap({
   primaryLabel, compareLabel,
   showCorners = true,
   height = 460,
+  selectedCode,
 }: Props) {
   const { t } = useTranslation()
   const svgRef = useRef<SVGSVGElement>(null)
@@ -325,18 +327,22 @@ export function TrackMap({
         })}
 
         {/* Canlı GPS konumları */}
-        {livePositions.map(lp => (
-          <g key={`live-${lp.code}`} transform={`translate(${lp.x},${lp.y})`}>
-            <circle cx={0} cy={0} r={20} fill={lp.color + '12'} stroke={lp.color + '30'} strokeWidth={2}>
-              <animate attributeName="r" values="16;24;16" dur="1.5s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.7;0;0.7" dur="1.5s" repeatCount="indefinite" />
-            </circle>
-            <circle cx={0} cy={0} r={10} fill={lp.color} stroke="#05080f" strokeWidth={3} />
-            <text x={0} y={-17} textAnchor="middle" fontSize={13} fontWeight="bold"
-              fontFamily="IBM Plex Mono,monospace" fill={lp.color}
-              stroke="#05080f" strokeWidth={4} paintOrder="stroke">{lp.code}</text>
-          </g>
-        ))}
+        {livePositions.map(lp => {
+          const isSel = selectedCode === lp.code
+          return (
+            <g key={`live-${lp.code}`} transform={`translate(${lp.x},${lp.y})`}>
+              <circle cx={0} cy={0} r={isSel ? 28 : 20} fill={lp.color + (isSel ? '20' : '12')}
+                stroke={lp.color + (isSel ? '60' : '30')} strokeWidth={isSel ? 3 : 2}>
+                <animate attributeName="r" values={isSel ? '22;34;22' : '16;24;16'} dur="1.5s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.7;0;0.7" dur="1.5s" repeatCount="indefinite" />
+              </circle>
+              <circle cx={0} cy={0} r={isSel ? 13 : 10} fill={lp.color} stroke="#05080f" strokeWidth={isSel ? 4 : 3} />
+              <text x={0} y={isSel ? -22 : -17} textAnchor="middle" fontSize={isSel ? 15 : 13} fontWeight="bold"
+                fontFamily="IBM Plex Mono,monospace" fill={lp.color}
+                stroke="#05080f" strokeWidth={4} paintOrder="stroke">{lp.code}</text>
+            </g>
+          )
+        })}
 
         {/* Pilot konumu */}
         {driverPositions.map(dp => {

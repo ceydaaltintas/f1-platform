@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { client } from '../api/client'
 import { TrackMap } from '../components/trackmap/TrackMap'
 import { LiveSimulator } from '../components/live/LiveSimulator'
@@ -150,6 +151,10 @@ export function LivePage() {
 
   // Seçili sürücü (telemetri paneli)
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null)
+  const [selectedDriverNum, setSelectedDriverNum] = useState<number | null>(null)
+  type TelPt = { speed: number; throttle: number; brake: number }
+  const telHistoryRef = useRef<TelPt[]>([])
+  const [telHistory, setTelHistory] = useState<TelPt[]>([])
 
   const carData = useQuery({
     queryKey: ['live-car-data', effectiveSid],
@@ -159,6 +164,22 @@ export function LivePage() {
     retry: false,
     enabled: !isDemo && !!effectiveSid && !isNaN(effectiveSid) && !!selectedDriver,
   })
+
+  // Telemetri geçmişini biriktir (her 4s'de bir yeni nokta)
+  useEffect(() => {
+    if (!carData.data?.drivers || selectedDriverNum == null) return
+    const cd = (carData.data.drivers as Record<string, any>)[String(selectedDriverNum)]
+    if (!cd || cd.speed == null) return
+    const pt: TelPt = { speed: cd.speed ?? 0, throttle: cd.throttle ?? 0, brake: cd.brake ?? 0 }
+    const newBuf = [...telHistoryRef.current, pt].slice(-20)
+    telHistoryRef.current = newBuf
+    setTelHistory(newBuf)
+  }, [carData.data, selectedDriverNum])
+
+  useEffect(() => {
+    telHistoryRef.current = []
+    setTelHistory([])
+  }, [selectedDriver])
 
   // SSE yorumu — sadece gerçek yarış modunda
   const [commentary, setCommentary] = useState('')
@@ -417,7 +438,10 @@ export function LivePage() {
                   <tr key={e.code}
                     style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer',
                       background: isSelected ? 'rgba(255,255,255,0.06)' : 'transparent' }}
-                    onClick={() => setSelectedDriver(isSelected ? null : e.code)}
+                    onClick={() => {
+                      if (isSelected) { setSelectedDriver(null); setSelectedDriverNum(null) }
+                      else { setSelectedDriver(e.code); setSelectedDriverNum(e.driver_number ?? null) }
+                    }}
                     onMouseEnter={ev => { if (!isSelected) ev.currentTarget.style.background='rgba(255,255,255,0.03)' }}
                     onMouseLeave={ev => { if (!isSelected) ev.currentTarget.style.background='transparent' }}>
 
@@ -640,6 +664,7 @@ export function LivePage() {
               <TrackMap
                 points={trackMap.data?.points ?? []}
                 livePositions={positionsMap.data?.positions ?? []}
+                selectedCode={selectedDriver ?? undefined}
                 showCorners height={240}
               />
             )}
@@ -647,89 +672,88 @@ export function LivePage() {
 
           {/* Canlı Telemetri */}
           {(() => {
-            const driverCode = selectedDriver
-            if (!driverCode) return null
-            const entry = entries.find((e: any) => e.code === driverCode)
-            const driverNum = entry?.driver_number
-            const cd = (carData.data?.drivers && driverNum != null)
-              ? carData.data.drivers[String(driverNum)]
+            if (!selectedDriver) return null
+            const entry = entries.find((e: any) => e.code === selectedDriver)
+            const cd = selectedDriverNum != null && carData.data?.drivers
+              ? (carData.data.drivers as Record<string, any>)[String(selectedDriverNum)]
               : null
             const color = entry?.team_colour ?? '#888'
             const drsOn = cd?.drs != null && cd.drs >= 10
             return (
               <div className="card overflow-hidden">
+                {/* Başlık */}
                 <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--b1)' }}>
                   <div className="flex items-center gap-2">
                     <div style={{ width: 3, height: 14, borderRadius: 2, background: color }} />
-                    <p className="text-[13px] font-bold text-white">{driverCode} — Telemetri</p>
+                    <p className="text-[13px] font-bold text-white">{selectedDriver} — Anlık Telemetri</p>
                   </div>
-                  <span className="text-[10px] mono" style={{ color: 'var(--t3)' }}>
-                    {selectedDriver ? 'Tekrar tıkla · seçimi kaldır' : 'Sıradan sürücü seç'}
-                  </span>
+                  <span className="text-[10px] mono" style={{ color: 'var(--t3)' }}>Tekrar tıkla · kapat</span>
                 </div>
+
                 {!cd ? (
                   <div className="px-5 py-5 text-center">
                     <p className="text-[12px]" style={{ color: 'var(--t3)' }}>
-                      {carData.isLoading || carData.isFetching
-                        ? 'Telemetri bağlanıyor…'
-                        : 'Telemetri verisi henüz yok'}
+                      {carData.isLoading || carData.isFetching ? 'Telemetri bağlanıyor…' : 'Telemetri verisi henüz yok'}
                     </p>
                   </div>
                 ) : (
-                  <div className="px-5 py-4 space-y-3">
-                    {/* Hız */}
-                    <div>
-                      <div className="flex justify-between text-[11px] mono mb-1">
-                        <span style={{ color: 'var(--t2)' }}>HIZ</span>
-                        <span className="text-white font-bold">{cd.speed ?? '—'} km/h</span>
-                      </div>
-                      <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                        <div className="h-full rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min((cd.speed ?? 0) / 360 * 100, 100)}%`, background: '#00D2BE' }} />
-                      </div>
+                  <div className="px-4 pt-3 pb-4">
+                    {/* Anlık değerler + DRS/Vites/RPM */}
+                    <div className="flex gap-2 mb-3">
+                      {[
+                        { label: 'HIZ', value: `${cd.speed ?? '—'}`, unit: 'km/h', color: '#00D2BE' },
+                        { label: 'GAZ', value: `${cd.throttle ?? '—'}`, unit: '%', color: '#00C851' },
+                        { label: 'FREN', value: `${cd.brake ?? '—'}`, unit: '%', color: '#E10600' },
+                        { label: 'VİTES', value: `${cd.n_gear ?? '—'}`, unit: '', color: '#fff' },
+                        { label: 'RPM', value: cd.rpm ? (cd.rpm / 1000).toFixed(1) + 'k' : '—', unit: '', color: '#fff' },
+                        { label: 'DRS', value: drsOn ? 'AÇ' : 'KAPALI', unit: '', color: drsOn ? '#00D2BE' : 'rgba(255,255,255,0.3)' },
+                      ].map(item => (
+                        <div key={item.label} className="flex-1 rounded-lg px-2 py-2 text-center"
+                          style={{ background: item.label === 'DRS' && drsOn ? 'rgba(0,210,190,0.1)' : 'rgba(255,255,255,0.04)' }}>
+                          <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>{item.label}</p>
+                          <p className="text-[13px] font-black mono leading-none" style={{ color: item.color }}>
+                            {item.value}<span className="text-[9px] ml-0.5" style={{ color: 'var(--t3)' }}>{item.unit}</span>
+                          </p>
+                        </div>
+                      ))}
                     </div>
-                    {/* Gaz */}
-                    <div>
-                      <div className="flex justify-between text-[11px] mono mb-1">
-                        <span style={{ color: 'var(--t2)' }}>GAZ</span>
-                        <span className="text-white font-bold">{cd.throttle ?? '—'}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                        <div className="h-full rounded-full transition-all duration-300"
-                          style={{ width: `${cd.throttle ?? 0}%`, background: '#00C851' }} />
-                      </div>
-                    </div>
-                    {/* Fren */}
-                    <div>
-                      <div className="flex justify-between text-[11px] mono mb-1">
-                        <span style={{ color: 'var(--t2)' }}>FREN</span>
-                        <span className="text-white font-bold">{cd.brake ?? '—'}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                        <div className="h-full rounded-full transition-all duration-300"
-                          style={{ width: `${cd.brake ?? 0}%`, background: '#E10600' }} />
-                      </div>
-                    </div>
-                    {/* Vites · RPM · DRS */}
-                    <div className="flex gap-3 pt-1">
-                      <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>VİTES</p>
-                        <p className="text-[20px] font-black text-white mono">{cd.n_gear ?? '—'}</p>
-                      </div>
-                      <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>RPM</p>
-                        <p className="text-[14px] font-black text-white mono">{cd.rpm?.toLocaleString() ?? '—'}</p>
-                      </div>
-                      <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{
-                        background: drsOn ? 'rgba(0,210,190,0.12)' : 'rgba(255,255,255,0.05)',
-                        border: drsOn ? '1px solid rgba(0,210,190,0.3)' : '1px solid transparent',
-                      }}>
-                        <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>DRS</p>
-                        <p className="text-[14px] font-black mono" style={{ color: drsOn ? '#00D2BE' : 'rgba(255,255,255,0.3)' }}>
-                          {drsOn ? 'AÇ' : 'KAPALI'}
-                        </p>
-                      </div>
-                    </div>
+
+                    {/* Zaman serisi grafikler */}
+                    {telHistory.length > 1 && (() => {
+                      const charts = [
+                        { key: 'speed' as keyof TelPt, label: 'HIZ (km/h)', color: '#00D2BE', domain: [0, 360] as [number,number] },
+                        { key: 'throttle' as keyof TelPt, label: 'GAZ (%)', color: '#00C851', domain: [0, 100] as [number,number] },
+                        { key: 'brake' as keyof TelPt, label: 'FREN (%)', color: '#E10600', domain: [0, 100] as [number,number] },
+                      ]
+                      return (
+                        <div className="space-y-1">
+                          {charts.map(ch => (
+                            <div key={ch.key}>
+                              <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>{ch.label}</p>
+                              <ResponsiveContainer width="100%" height={48}>
+                                <AreaChart data={telHistory} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                  <defs>
+                                    <linearGradient id={`grad-${ch.key}`} x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor={ch.color} stopOpacity={0.3} />
+                                      <stop offset="95%" stopColor={ch.color} stopOpacity={0} />
+                                    </linearGradient>
+                                  </defs>
+                                  <Area type="monotone" dataKey={ch.key}
+                                    stroke={ch.color} strokeWidth={1.5}
+                                    fill={`url(#grad-${ch.key})`} dot={false}
+                                    isAnimationActive={false} />
+                                  <Tooltip
+                                    contentStyle={{ background: 'rgba(9,14,28,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11, fontFamily: 'IBM Plex Mono,monospace', padding: '4px 8px' }}
+                                    formatter={(v: any) => [`${v}`, ch.label]}
+                                    labelFormatter={() => ''}
+                                  />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
