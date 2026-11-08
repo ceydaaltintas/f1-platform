@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
+import { AreaChart, Area, ResponsiveContainer, Tooltip, CartesianGrid, YAxis } from 'recharts'
 import { client } from '../api/client'
 import { TrackMap } from '../components/trackmap/TrackMap'
 import { LiveSimulator } from '../components/live/LiveSimulator'
@@ -152,6 +152,7 @@ export function LivePage() {
   // Seçili sürücü (telemetri paneli)
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null)
   const [selectedDriverNum, setSelectedDriverNum] = useState<number | null>(null)
+  const [telChannel, setTelChannel] = useState(0)
   type TelPt = { speed: number; throttle: number; brake: number }
   const telHistoryRef = useRef<TelPt[]>([])
   const [telHistory, setTelHistory] = useState<TelPt[]>([])
@@ -679,6 +680,14 @@ export function LivePage() {
               : null
             const color = entry?.team_colour ?? '#888'
             const drsOn = cd?.drs != null && cd.drs >= 10
+
+            const TEL_CHANNELS = [
+              { key: 'speed'    as keyof TelPt, label: 'Hız',  unit: 'km/h', color: '#00D2BE', domain: [0, 360]  as [number,number] },
+              { key: 'throttle' as keyof TelPt, label: 'Gaz',  unit: '%',    color: '#00C851', domain: [0, 100]  as [number,number] },
+              { key: 'brake'    as keyof TelPt, label: 'Fren', unit: '%',    color: '#E10600', domain: [0, 100]  as [number,number] },
+            ]
+            const activeCh = TEL_CHANNELS[telChannel] ?? TEL_CHANNELS[0]
+
             return (
               <div className="card overflow-hidden">
                 {/* Başlık */}
@@ -697,63 +706,73 @@ export function LivePage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="px-4 pt-3 pb-4">
-                    {/* Anlık değerler + DRS/Vites/RPM */}
-                    <div className="flex gap-2 mb-3">
-                      {[
-                        { label: 'HIZ', value: `${cd.speed ?? '—'}`, unit: 'km/h', color: '#00D2BE' },
-                        { label: 'GAZ', value: `${cd.throttle ?? '—'}`, unit: '%', color: '#00C851' },
-                        { label: 'FREN', value: `${cd.brake ?? '—'}`, unit: '%', color: '#E10600' },
-                        { label: 'VİTES', value: `${cd.n_gear ?? '—'}`, unit: '', color: '#fff' },
-                        { label: 'RPM', value: cd.rpm ? (cd.rpm / 1000).toFixed(1) + 'k' : '—', unit: '', color: '#fff' },
-                        { label: 'DRS', value: drsOn ? 'AÇ' : 'KAPALI', unit: '', color: drsOn ? '#00D2BE' : 'rgba(255,255,255,0.3)' },
-                      ].map(item => (
+                  <div className="pt-3 pb-4">
+                    {/* Anlık değer kartları */}
+                    <div className="flex gap-2 px-4 mb-4">
+                      {([
+                        { label: 'HIZ',   value: `${cd.speed ?? '—'}`,  unit: 'km/h', c: '#00D2BE' },
+                        { label: 'GAZ',   value: `${cd.throttle ?? '—'}`, unit: '%',  c: '#00C851' },
+                        { label: 'FREN',  value: `${cd.brake ?? '—'}`,  unit: '%',    c: '#E10600' },
+                        { label: 'VİTES', value: `${cd.n_gear ?? '—'}`, unit: '',     c: '#fff' },
+                        { label: 'RPM',   value: cd.rpm ? (cd.rpm/1000).toFixed(1)+'k' : '—', unit: '', c: '#fff' },
+                        { label: 'DRS',   value: drsOn ? 'AÇ' : 'KAPALI', unit: '',  c: drsOn ? '#00D2BE' : 'rgba(255,255,255,0.3)' },
+                      ] as {label:string;value:string;unit:string;c:string}[]).map(item => (
                         <div key={item.label} className="flex-1 rounded-lg px-2 py-2 text-center"
                           style={{ background: item.label === 'DRS' && drsOn ? 'rgba(0,210,190,0.1)' : 'rgba(255,255,255,0.04)' }}>
                           <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>{item.label}</p>
-                          <p className="text-[13px] font-black mono leading-none" style={{ color: item.color }}>
-                            {item.value}<span className="text-[9px] ml-0.5" style={{ color: 'var(--t3)' }}>{item.unit}</span>
+                          <p className="text-[12px] font-black mono leading-none" style={{ color: item.c }}>
+                            {item.value}
+                            {item.unit && <span className="text-[8px] ml-0.5" style={{ color: 'var(--t3)' }}>{item.unit}</span>}
                           </p>
                         </div>
                       ))}
                     </div>
 
-                    {/* Zaman serisi grafikler */}
-                    {telHistory.length > 1 && (() => {
-                      const charts = [
-                        { key: 'speed' as keyof TelPt, label: 'HIZ (km/h)', color: '#00D2BE', domain: [0, 360] as [number,number] },
-                        { key: 'throttle' as keyof TelPt, label: 'GAZ (%)', color: '#00C851', domain: [0, 100] as [number,number] },
-                        { key: 'brake' as keyof TelPt, label: 'FREN (%)', color: '#E10600', domain: [0, 100] as [number,number] },
-                      ]
-                      return (
-                        <div className="space-y-1">
-                          {charts.map(ch => (
-                            <div key={ch.key}>
-                              <p className="text-[9px] mono mb-0.5" style={{ color: 'var(--t3)' }}>{ch.label}</p>
-                              <ResponsiveContainer width="100%" height={48}>
-                                <AreaChart data={telHistory} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                                  <defs>
-                                    <linearGradient id={`grad-${ch.key}`} x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor={ch.color} stopOpacity={0.3} />
-                                      <stop offset="95%" stopColor={ch.color} stopOpacity={0} />
-                                    </linearGradient>
-                                  </defs>
-                                  <Area type="monotone" dataKey={ch.key}
-                                    stroke={ch.color} strokeWidth={1.5}
-                                    fill={`url(#grad-${ch.key})`} dot={false}
-                                    isAnimationActive={false} />
-                                  <Tooltip
-                                    contentStyle={{ background: 'rgba(9,14,28,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11, fontFamily: 'IBM Plex Mono,monospace', padding: '4px 8px' }}
-                                    formatter={(v: any) => [`${v}`, ch.label]}
-                                    labelFormatter={() => ''}
-                                  />
-                                </AreaChart>
-                              </ResponsiveContainer>
-                            </div>
-                          ))}
-                        </div>
-                      )
-                    })()}
+                    {/* Kanal seçici */}
+                    <div className="flex gap-2 px-4 mb-3">
+                      {TEL_CHANNELS.map((ch, i) => (
+                        <button key={ch.key} onClick={() => setTelChannel(i)}
+                          className="px-3 py-1 rounded-full text-[11px] mono font-semibold transition-all"
+                          style={{
+                            background: telChannel === i ? ch.color + '22' : 'rgba(255,255,255,0.05)',
+                            color: telChannel === i ? ch.color : 'rgba(240,244,255,0.5)',
+                            border: `1px solid ${telChannel === i ? ch.color + '55' : 'transparent'}`,
+                          }}>
+                          {ch.label} {ch.unit}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Grafik */}
+                    {telHistory.length > 1 ? (
+                      <ResponsiveContainer width="100%" height={120}>
+                        <AreaChart data={telHistory} margin={{ top: 4, right: 16, bottom: 0, left: 36 }}>
+                          <defs>
+                            <linearGradient id="live-tel-grad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="10%" stopColor={activeCh.color} stopOpacity={0.25} />
+                              <stop offset="95%" stopColor={activeCh.color} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 8" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                          <YAxis domain={activeCh.domain} width={32}
+                            tick={{ fill: 'rgba(240,244,255,0.45)', fontSize: 10, fontFamily: 'IBM Plex Mono,monospace' }}
+                            tickLine={false} axisLine={false} />
+                          <Tooltip
+                            contentStyle={{ background: 'rgba(9,14,28,0.97)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12, fontFamily: 'IBM Plex Mono,monospace' }}
+                            formatter={(v: any) => [`${v} ${activeCh.unit}`, activeCh.label]}
+                            labelFormatter={() => ''}
+                          />
+                          <Area type="monotone" dataKey={activeCh.key}
+                            stroke={activeCh.color} strokeWidth={2}
+                            fill="url(#live-tel-grad)" dot={false}
+                            isAnimationActive={false} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="px-4 py-3 text-center">
+                        <p className="text-[11px] mono" style={{ color: 'var(--t3)' }}>Grafik biriktiriliyior…</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
